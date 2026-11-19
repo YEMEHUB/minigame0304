@@ -1,891 +1,990 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>장애물 피하기 게임</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>바이시클 2장 하이카드 대결</title>
+    <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Playfair Display (클래식 카드 폰트), Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    <!-- Tone.js (카드 셔플, 뒤집기, 승리/패배 효과음) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #1a202c;
-            touch-action: none; /* Prevent scroll on touch */
+        body {
             font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            /* 한층 더 어둡고 묵직한 카지노 VIP 룸 딥그린 펠트 배경 */
+            background-color: #03170d;
+            background-image: 
+                radial-gradient(circle at 50% 42%, rgba(12, 62, 37, 0.72) 0%, rgba(4, 24, 14, 0.96) 68%, rgba(1, 8, 4, 1) 100%),
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 2px, transparent 2px, transparent 4px);
         }
-        #game-container {
+
+        .font-card {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* 3D 카드 플립 컨테이너 */
+        .card-slot {
+            perspective: 1000px;
+            width: 104px;
+            height: 148px;
+        }
+        @media (min-width: 640px) {
+            .card-slot {
+                width: 126px;
+                height: 178px;
+            }
+        }
+
+        .card-inner {
             position: relative;
             width: 100%;
             height: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            background-color: #87CEEB; /* Default Morning Sky */
-            overflow: hidden;
-            transition: background-color 1s ease;
+            transition: transform 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-style: preserve-3d;
         }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
+
+        .card-inner.is-flipped {
+            transform: rotateY(180deg);
         }
-        .ui-layer {
+
+        .card-face {
             position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45), 0 2px 5px rgba(0, 0, 0, 0.3);
+            overflow: hidden; /* 카드를 벗어나는 그래픽 차단 */
         }
-        .pointer-events-auto {
-            pointer-events: auto;
+
+        /* 바이시클(Bicycle) 스타일 클래식 카드 뒷면 패턴 */
+        .bicycle-back {
+            background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+            padding: 6px;
+            border: 1px solid #cbd5e1;
         }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .dark-glass-panel {
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        /* Mobile Controls */
-        .control-btn {
-            background: rgba(255, 255, 255, 0.3);
-            border: 2px solid rgba(255,255,255,0.6);
-            color: white;
-            font-weight: bold;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
+        .bicycle-back-pattern {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            background-color: #7f1d1d;
+            border: 2px solid #450a0a;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.55) 0%, rgba(127, 29, 29, 0.95) 85%),
+                repeating-linear-gradient(45deg, rgba(254, 202, 202, 0.14) 0px, rgba(254, 202, 202, 0.14) 2px, transparent 2px, transparent 6px),
+                repeating-linear-gradient(-45deg, rgba(254, 202, 202, 0.14) 0px, rgba(254, 202, 202, 0.14) 2px, transparent 2px, transparent 6px);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            user-select: none;
-            transition: transform 0.1s, background 0.1s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
         }
-        .control-btn:active {
-            transform: scale(0.9);
-            background: rgba(255, 255, 255, 0.6);
+        .bicycle-back-pattern::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            border: 1.5px solid rgba(253, 224, 71, 0.45);
+            border-radius: 5px;
+            pointer-events: none;
         }
-        .jump-btn {
-            width: 80px;
-            height: 80px;
-            border-radius: 20px;
+
+        /* 카드 앞면 (바이시클 에어쿠션 리넨 질감 & 입체 베벨) */
+        .card-front {
+            background-color: #fcfbf7;
+            background-image: 
+                radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.95) 0%, rgba(244, 241, 234, 0.85) 100%),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.018) 0px, rgba(0,0,0,0.018) 1px, transparent 1px, transparent 3px),
+                repeating-linear-gradient(90deg, rgba(0,0,0,0.018) 0px, rgba(0,0,0,0.018) 1px, transparent 1px, transparent 3px);
+            transform: rotateY(180deg);
+            border: 1px solid #d6d3d1;
+            box-shadow: 
+                inset 0 0 0 1.5px rgba(255, 255, 255, 0.9),
+                inset 0 0 14px rgba(180, 165, 140, 0.22),
+                0 12px 24px rgba(0, 0, 0, 0.55);
         }
-        
-        #game-over-screen {
-            display: none;
+
+        /* 카드 뭉치(Deck) 입체감 */
+        .deck-stack {
+            box-shadow: 
+                1px 1px 0 #e5e7eb,
+                2px 2px 0 #9ca3af,
+                3px 3px 0 #e5e7eb,
+                4px 4px 0 #9ca3af,
+                5px 5px 0 #e5e7eb,
+                6px 8px 16px rgba(0, 0, 0, 0.55);
+        }
+
+        /* 카드 배분 등장 애니메이션 */
+        @keyframes dealIn {
+            0% {
+                opacity: 0;
+                transform: translateY(-25px) scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .animate-deal {
+            animation: dealIn 0.35s ease-out forwards;
+        }
+
+        /* 딜러 손 미세 움직임 및 배분 모션 */
+        @keyframes dealerHover {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(4px); }
+        }
+        .dealer-hands-idle {
+            animation: dealerHover 3.5s ease-in-out infinite;
+        }
+        @keyframes dealerDealMotion {
+            0% { transform: translateY(0px) scale(1); }
+            45% { transform: translateY(16px) scale(1.03); }
+            100% { transform: translateY(0px) scale(1); }
+        }
+        .dealer-hands-dealing {
+            animation: dealerDealMotion 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        /* 매 판 자동 셔플 시 딜러 양손 교차 셔플 모션 */
+        @keyframes dealerShuffleMotion {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            15% { transform: translate(-14px, 12px) rotate(-4deg); }
+            30% { transform: translate(14px, 8px) rotate(4deg); }
+            45% { transform: translate(-12px, 14px) rotate(-3deg); }
+            60% { transform: translate(12px, 10px) rotate(3deg); }
+            75% { transform: translate(-6px, 16px) rotate(-1.5deg); }
+            90% { transform: translate(6px, 6px) rotate(1.5deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        .dealer-hands-shuffling {
+            animation: dealerShuffleMotion 0.78s ease-in-out;
+        }
+
+        /* 셔플 시 카드 뭉치(덱) 리플 진동 모션 */
+        @keyframes deckShufflePulse {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            20% { transform: translateX(-5px) rotate(-5deg) scale(1.04); }
+            40% { transform: translateX(5px) rotate(5deg) scale(1.04); }
+            60% { transform: translateX(-4px) rotate(-3deg) scale(1.02); }
+            80% { transform: translateX(4px) rotate(3deg) scale(1.02); }
+        }
+        .deck-shuffling {
+            animation: deckShufflePulse 0.75s ease-in-out;
+        }
+
+        /* 오픈 가능한 내 카드 강조 효과 */
+        .card-clickable {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-clickable:hover {
+            transform: translateY(-6px);
+        }
+
+        /* 승리 배너 팝업 */
+        @keyframes bannerPop {
+            0% { transform: scale(0.7); opacity: 0; }
+            70% { transform: scale(1.06); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-banner {
+            animation: bannerPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
     </style>
 </head>
-<body>
+<body class="text-white min-h-screen flex flex-col items-center justify-between p-3 sm:p-6 overflow-x-hidden relative">
 
-<div id="game-container">
-    <canvas id="gameCanvas"></canvas>
+    <!-- 상단 어두운 비네팅 조명 효과 -->
+    <div class="fixed inset-0 pointer-events-none shadow-[inset_0_0_130px_rgba(0,0,0,0.92)] z-0"></div>
 
-    <div class="ui-layer p-4 z-50">
-        <!-- Top UI: Score and Themes -->
-        <div class="flex justify-between items-start pointer-events-auto">
-            <div class="flex flex-col gap-2">
-                <div class="glass-panel text-white font-bold text-xl px-4 py-2 rounded-xl shadow-lg" id="score-display">
-                    점수: 0
+    <!-- 상단 헤더: 타이틀, 전적 스코어보드, 사운드 제어 -->
+    <header class="relative z-10 w-full max-w-3xl flex flex-wrap items-center justify-between gap-3 bg-black/55 backdrop-blur-md border border-emerald-500/20 rounded-2xl px-4 py-3 shadow-2xl">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-amber-300 font-card font-black text-lg shadow-inner">
+                ♠A
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-amber-100">
+                    바이시클 2장 하이카드
+                </h1>
+                <p class="text-[11px] text-emerald-300/70">딜러 패 자동 오픈 · 내 패 1장씩 오픈 승부</p>
+            </div>
+        </div>
+
+        <!-- 스코어보드 & 사운드 버튼 -->
+        <div class="flex items-center gap-2 sm:gap-3">
+            <div class="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10 text-xs sm:text-sm font-bold">
+                <span class="text-emerald-300">승 <strong id="winCount" class="text-white">0</strong></span>
+                <span class="text-white/30">|</span>
+                <span class="text-rose-300">패 <strong id="loseCount" class="text-white">0</strong></span>
+                <span class="text-white/30">|</span>
+                <span class="text-amber-300">무 <strong id="drawCount" class="text-white">0</strong></span>
+            </div>
+
+            <button id="soundToggleBtn" aria-label="효과음 켜기/끄기" class="p-2 rounded-xl bg-black/40 hover:bg-black/60 border border-white/15 text-amber-200 transition-colors">
+                <svg id="soundOnIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                </svg>
+                <svg id="soundOffIcon" class="w-5 h-5 hidden text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- 메인 어두운 초록색 게임 테이블 영역 -->
+    <main class="w-full max-w-3xl flex-1 flex flex-col justify-center gap-3 sm:gap-5 my-2 relative z-10">
+
+        <!-- 1. 상대방 (카지노 딜러 + 사람 손 일러스트) 영역 -->
+        <section class="flex flex-col items-center gap-1.5 relative pt-1">
+            <!-- 카지노 딜러 턱시도 소매 & 해부학적 디테일이 살아있는 양손 SVG -->
+            <div id="dealerHandsContainer" class="dealer-hands-idle w-full max-w-[360px] sm:max-w-[430px] h-20 sm:h-24 -mb-4 pointer-events-none select-none z-20 flex justify-center">
+                <svg viewBox="0 0 440 110" class="w-full h-full drop-shadow-[0_14px_18px_rgba(0,0,0,0.9)]">
+                    <defs>
+                        <!-- 턱시도 벨벳/울 소매 그라데이션 -->
+                        <linearGradient id="suitSleeveL" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#05080f"/>
+                            <stop offset="55%" stop-color="#131c2e"/>
+                            <stop offset="100%" stop-color="#090d16"/>
+                        </linearGradient>
+                        <linearGradient id="suitSleeveR" x1="1" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#05080f"/>
+                            <stop offset="55%" stop-color="#131c2e"/>
+                            <stop offset="100%" stop-color="#090d16"/>
+                        </linearGradient>
+                        <!-- 실크 흰색 커프스 그라데이션 -->
+                        <linearGradient id="cuffSilk" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#f8fafc"/>
+                            <stop offset="65%" stop-color="#e2e8f0"/>
+                            <stop offset="100%" stop-color="#94a3b8"/>
+                        </linearGradient>
+                        <!-- 입체적인 피부톤 & 조명 음영 -->
+                        <radialGradient id="skinLight" cx="45%" cy="30%" r="65%">
+                            <stop offset="0%" stop-color="#f6cbb0"/>
+                            <stop offset="50%" stop-color="#dfa27e"/>
+                            <stop offset="85%" stop-color="#b97856"/>
+                            <stop offset="100%" stop-color="#8c5236"/>
+                        </radialGradient>
+                        <!-- 손가락 마디 그림자 -->
+                        <linearGradient id="fingerShade" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#e5aa87"/>
+                            <stop offset="60%" stop-color="#c68462"/>
+                            <stop offset="100%" stop-color="#94583b"/>
+                        </linearGradient>
+                        <!-- 금장 커프스링크 -->
+                        <radialGradient id="goldButton" cx="35%" cy="35%" r="65%">
+                            <stop offset="0%" stop-color="#fef08a"/>
+                            <stop offset="55%" stop-color="#eab308"/>
+                            <stop offset="100%" stop-color="#854d0e"/>
+                        </radialGradient>
+                    </defs>
+
+                    <!-- ==================== 왼쪽 딜러 팔 & 왼손 ==================== -->
+                    <g>
+                        <!-- 턱시도 소매 & 재킷 주름 -->
+                        <path d="M18 0 L76 0 L104 42 L44 54 Z" fill="url(#suitSleeveL)" stroke="#020617" stroke-width="1.5"/>
+                        <path d="M35 0 L62 48 M56 0 L84 44" stroke="#1e293b" stroke-width="1.4" opacity="0.7"/>
+                        <!-- 셔츠 커프스 & 황금 커프스링크 -->
+                        <path d="M46 51 L101 39 L106 49 L51 61 Z" fill="url(#cuffSilk)" stroke="#64748b" stroke-width="0.8"/>
+                        <ellipse cx="59" cy="54" rx="3.4" ry="2.6" fill="url(#goldButton)" stroke="#713f12" stroke-width="0.7"/>
+                        <ellipse cx="59" cy="54" rx="1.4" ry="1" fill="#0f172a" opacity="0.6"/>
+
+                        <!-- 손목 및 손등 베이스 -->
+                        <path d="M54 60 L102 49 L115 62 L106 75 L64 78 L58 68 Z" fill="url(#skinLight)" stroke="#7c442b" stroke-width="1.1" stroke-linejoin="round"/>
+
+                        <!-- 엄지손가락 (안쪽 카드를 향함) -->
+                        <path d="M103 53 C114 56, 127 64, 130 69 C132 73, 127 77, 121 75 C114 72, 106 67, 100 65 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <!-- 엄지 손톱 -->
+                        <path d="M124 67 C127 68, 129 70, 128 72 C126 73, 123 72, 122 70 Z" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 검지손가락 -->
+                        <path d="M98 63 L114 86 C116 90, 111 94, 107 90 L91 69 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="110.5" cy="87.5" rx="1.8" ry="2.6" transform="rotate(-32 110.5 87.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 중지손가락 (가장 긴 손가락) -->
+                        <path d="M88 66 L100 94 C102 99, 96 102, 93 97 L81 70 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="96.5" cy="95.5" rx="1.8" ry="2.8" transform="rotate(-22 96.5 95.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 약지손가락 -->
+                        <path d="M78 68 L86 93 C87 98, 81 100, 79 95 L71 71 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="82.5" cy="94.5" rx="1.6" ry="2.5" transform="rotate(-14 82.5 94.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 새끼손가락 -->
+                        <path d="M68 69 L72 87 C73 91, 67 93, 65 88 L61 71 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="68.5" cy="88" rx="1.4" ry="2.1" transform="rotate(-8 68.5 88)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 손등 힘줄(건) & 너클 주름 디테일 -->
+                        <path d="M67 59 L95 54 M72 63 L98 59 M77 66 L93 64" stroke="#9a5b3c" stroke-width="1.1" stroke-linecap="round" opacity="0.5"/>
+                        <path d="M87 80 L92 78 M98 78 L103 76 M76 81 L81 80" stroke="#7c442b" stroke-width="0.9" stroke-linecap="round" opacity="0.6"/>
+                    </g>
+
+                    <!-- ==================== 오른쪽 딜러 팔 & 오른손 ==================== -->
+                    <g>
+                        <!-- 턱시도 소매 & 재킷 주름 -->
+                        <path d="M422 0 L364 0 L336 42 L396 54 Z" fill="url(#suitSleeveR)" stroke="#020617" stroke-width="1.5"/>
+                        <path d="M405 0 L378 48 M384 0 L356 44" stroke="#1e293b" stroke-width="1.4" opacity="0.7"/>
+                        <!-- 셔츠 커프스 & 황금 커프스링크 -->
+                        <path d="M394 51 L339 39 L334 49 L389 61 Z" fill="url(#cuffSilk)" stroke="#64748b" stroke-width="0.8"/>
+                        <ellipse cx="381" cy="54" rx="3.4" ry="2.6" fill="url(#goldButton)" stroke="#713f12" stroke-width="0.7"/>
+                        <ellipse cx="381" cy="54" rx="1.4" ry="1" fill="#0f172a" opacity="0.6"/>
+
+                        <!-- 손목 및 손등 베이스 -->
+                        <path d="M386 60 L338 49 L325 62 L334 75 L376 78 L382 68 Z" fill="url(#skinLight)" stroke="#7c442b" stroke-width="1.1" stroke-linejoin="round"/>
+
+                        <!-- 엄지손가락 -->
+                        <path d="M337 53 C326 56, 313 64, 310 69 C308 73, 313 77, 319 75 C326 72, 334 67, 340 65 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <path d="M316 67 C313 68, 311 70, 312 72 C314 73, 317 72, 318 70 Z" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 검지손가락 -->
+                        <path d="M342 63 L326 86 C324 90, 329 94, 333 90 L349 69 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="329.5" cy="87.5" rx="1.8" ry="2.6" transform="rotate(32 329.5 87.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 중지손가락 -->
+                        <path d="M352 66 L340 94 C338 99, 344 102, 347 97 L359 70 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="343.5" cy="95.5" rx="1.8" ry="2.8" transform="rotate(22 343.5 95.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 약지손가락 -->
+                        <path d="M362 68 L354 93 C353 98, 359 100, 361 95 L369 71 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="357.5" cy="94.5" rx="1.6" ry="2.5" transform="rotate(14 357.5 94.5)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 새끼손가락 -->
+                        <path d="M372 69 L368 87 C367 91, 373 93, 375 88 L379 71 Z" fill="url(#fingerShade)" stroke="#7c442b" stroke-width="1.1"/>
+                        <ellipse cx="371.5" cy="88" rx="1.4" ry="2.1" transform="rotate(8 371.5 88)" fill="#fae5d8" opacity="0.85"/>
+
+                        <!-- 손등 힘줄(건) & 너클 주름 디테일 -->
+                        <path d="M373 59 L345 54 M368 63 L342 59 M363 66 L347 64" stroke="#9a5b3c" stroke-width="1.1" stroke-linecap="round" opacity="0.5"/>
+                        <path d="M353 80 L348 78 M342 78 L337 76 M364 81 L359 80" stroke="#7c442b" stroke-width="0.9" stroke-linecap="round" opacity="0.6"/>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="flex items-center gap-2.5 z-10">
+                <span class="px-3 py-1 rounded-full bg-black/70 border border-white/15 text-xs sm:text-sm font-bold text-rose-200 shadow-lg">
+                    🎩 딜러 (상대)
+                </span>
+                <span id="opponentScoreBadge" class="px-3 py-1 rounded-full bg-rose-950/90 border border-rose-500/40 text-xs sm:text-sm font-extrabold text-amber-300 hidden shadow-lg">
+                    합계: 0점
+                </span>
+            </div>
+
+            <!-- 상대방 카드 2장 슬롯 -->
+            <div id="opponentCardsArea" class="flex items-center justify-center gap-3 sm:gap-5 min-h-[152px] sm:min-h-[182px]">
+                <!-- 초기 빈 슬롯 가이드 -->
+                <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">
+                    딜러 패 1
                 </div>
-                <button id="btn-pause" onclick="togglePause()" class="glass-panel text-white font-bold px-4 py-1 rounded-xl hover:bg-white/40 transition">⏸️ 멈춤</button>
-            </div>
-            <div class="flex flex-col gap-2">
-                <button onclick="setTheme('morning')" class="glass-panel text-white px-3 py-1 rounded-lg text-sm hover:bg-white/40 transition">☀️ 아침</button>
-                <button onclick="setTheme('sunset')" class="glass-panel text-white px-3 py-1 rounded-lg text-sm hover:bg-white/40 transition">🌇 노을</button>
-                <button onclick="setTheme('dark')" class="glass-panel text-white px-3 py-1 rounded-lg text-sm hover:bg-white/40 transition">🌙 다크</button>
-            </div>
-        </div>
-
-        <!-- Music Player Input -->
-        <div class="pointer-events-auto mt-2">
-            <div class="glass-panel rounded-xl p-2 flex flex-col gap-2">
-                <label class="text-white text-xs font-bold">음악 검색 (가수 제목):</label>
-                <div class="flex gap-2">
-                    <input type="text" id="music-search" placeholder="예: 뉴진스 Ditto" class="w-full bg-black/30 text-white text-xs px-2 py-1 rounded outline-none border border-white/30 placeholder-gray-300">
-                    <button onclick="searchAndPlayMusic()" class="bg-white/30 text-white text-xs px-3 py-1 rounded hover:bg-white/50 transition whitespace-nowrap">검색/재생</button>
+                <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">
+                    딜러 패 2
                 </div>
-                <div id="music-info" class="text-green-400 text-xs font-bold mt-1 hidden"></div>
-                <div id="music-error" class="hidden text-red-400 text-xs font-bold mt-1">검색 실패!</div>
-                
-                <label class="text-white text-xs font-bold mt-1">또는 음악 파일 직접 추가:</label>
-                <input type="file" id="music-file-input" accept="audio/*" class="w-full text-white text-xs bg-black/30 p-1 rounded border border-white/30">
-                <audio id="bg-music" loop></audio>
-                
-                <label class="text-white text-xs font-bold mt-1">배경 사진 추가:</label>
-                <input type="file" id="bg-image-input" accept="image/*" class="w-full text-white text-xs bg-black/30 p-1 rounded border border-white/30">
             </div>
-        </div>
+        </section>
 
-        <div class="flex-grow"></div>
-
-        <!-- Mobile Controls -->
-        <div class="flex justify-between items-end pb-4 pointer-events-auto">
-            <div class="flex gap-4">
-                <button class="control-btn" id="btn-left">←</button>
-                <button class="control-btn" id="btn-right">→</button>
-            </div>
-            <button class="control-btn jump-btn" id="btn-jump">JUMP</button>
-        </div>
-    </div>
-
-    <!-- Game Over Screen -->
-    <div id="game-over-screen" class="absolute inset-0 dark-glass-panel flex flex-col items-center justify-center pointer-events-auto z-50">
-        <h1 class="text-5xl font-black text-red-500 mb-2 drop-shadow-lg">충돌! 실패</h1>
-        <p class="text-white text-2xl mb-6">최종 점수: <span id="final-score">0</span></p>
-        <button onclick="resetGame()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full shadow-lg text-xl transition transform hover:scale-105 active:scale-95">다시 하기</button>
-    </div>
-
-    <!-- Pause Screen -->
-    <div id="pause-screen" class="hidden absolute inset-0 dark-glass-panel flex-col items-center justify-center pointer-events-auto z-40">
-        <h1 class="text-5xl font-black text-white mb-8 drop-shadow-lg">일시정지</h1>
-        <button onclick="togglePause()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg text-xl transition transform hover:scale-105 active:scale-95">계속 하기</button>
-    </div>
-
-    <!-- Start Screen -->
-    <div id="start-screen" class="absolute inset-0 dark-glass-panel flex flex-col items-center justify-center pointer-events-auto z-50">
-        <h1 class="text-4xl font-black text-white mb-2 drop-shadow-lg text-center">차량 장애물 피하기</h1>
-        <p class="text-gray-200 mb-8 text-center px-4">A / D 키(또는 좌우 버튼)로 이동<br>스페이스바(또는 JUMP 버튼)로 점프하여 피하세요!</p>
-        <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg text-xl transition transform hover:scale-105 active:scale-95">게임 시작</button>
-    </div>
-</div>
-
-<script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('game-container');
-
-    // UI Elements
-    const scoreDisplay = document.getElementById('score-display');
-    const gameOverScreen = document.getElementById('game-over-screen');
-    const startScreen = document.getElementById('start-screen');
-    const finalScoreDisplay = document.getElementById('final-score');
-    
-    // Resize Canvas
-    function resize() {
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    // Game Variables
-    let animationId;
-    let isGameOver = false;
-    let isPlaying = false;
-    let isPaused = false;
-    let score = 0;
-    let frameCount = 0;
-    
-    // 3D Perspective Variables
-    let gameSpeed = 15;
-    let cameraZ = 0;
-    let currentCameraX = 0;
-    let currentCameraY = 80;
-    const cameraHeight = 80;
-    
-    // Lanes: -120 (Left), 0 (Center), 120 (Right)
-    const laneX = [-120, 0, 120];
-
-    // Themes (Two-tone colors added for speed effect on grass/road)
-    const themes = {
-        morning: { bg: '#87CEEB', road1: '#555555', road2: '#4A4A4A', line: '#FFFFFF', grass1: '#55a630', grass2: '#38b000' },
-        sunset: { bg: '#FF7E67', road1: '#4A3B32', road2: '#3E3129', line: '#FFD700', grass1: '#8B4513', grass2: '#70370F' },
-        dark: { bg: '#1A202C', road1: '#2D3748', road2: '#232A38', line: '#718096', grass1: '#111111', grass2: '#0a0a0a' }
-    };
-    let currentTheme = 'morning';
-
-    function setTheme(themeName) {
-        currentTheme = themeName;
-        container.style.backgroundColor = themes[themeName].bg;
-    }
-
-    // Sound Setup (Tone.js)
-    let crashSynth, jumpSynth;
-    let audioInitialized = false;
-
-    async function initAudio() {
-        if(audioInitialized) return;
-        await Tone.start();
-        
-        crashSynth = new Tone.NoiseSynth({
-            noise: { type: 'brown' },
-            envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.5 }
-        }).toDestination();
-
-        jumpSynth = new Tone.Synth({
-            oscillator: { type: 'triangle' },
-            envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 }
-        }).toDestination();
-
-        audioInitialized = true;
-    }
-
-    function playCrashSound() {
-        if(crashSynth) crashSynth.triggerAttackRelease("4n");
-    }
-
-    function playJumpSound() {
-        if(jumpSynth) jumpSynth.triggerAttackRelease("C5", "16n");
-    }
-
-    // Music Player
-    const bgMusic = document.getElementById('bg-music');
-    const musicSearch = document.getElementById('music-search');
-    const musicInfo = document.getElementById('music-info');
-    const musicError = document.getElementById('music-error');
-    
-    // 검색창 클릭 시 자동 일시정지
-    musicSearch.addEventListener('focus', () => {
-        if (isPlaying && !isGameOver && !isPaused) {
-            togglePause();
-        }
-    });
-
-    async function searchAndPlayMusic() {
-        musicError.classList.add('hidden');
-        musicInfo.classList.add('hidden');
-        const query = musicSearch.value;
-        if(!query) return;
-        
-        try {
-            // iTunes Search API (무료, 30초 미리듣기 제공)
-            const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=1`);
-            const data = await response.json();
+        <!-- 2. 중앙 테이블 영역: 바이시클 카드 뭉치(덱) + 진행 안내/승패 결과 배너 -->
+        <section class="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 py-2.5 px-4 rounded-3xl bg-black/45 border border-emerald-400/15 shadow-inner">
             
-            if (data.results && data.results.length > 0) {
-                const track = data.results[0];
-                bgMusic.src = track.previewUrl; // 30초 미리듣기 음원
-                bgMusic.play().then(() => {
-                    musicInfo.innerText = `🎵 ${track.trackName} - ${track.artistName}`;
-                    musicInfo.classList.remove('hidden');
-                }).catch(e => {
-                    console.error("음악 재생 오류:", e);
-                    musicError.innerText = "음악 재생 실패!";
-                    musicError.classList.remove('hidden');
+            <!-- 바이시클 카드 뭉치 (Deck Pile) -->
+            <div class="flex items-center gap-3">
+                <div id="deckVisualPile" class="relative w-16 h-24 sm:w-20 sm:h-28 rounded-lg bicycle-back deck-stack flex items-center justify-center">
+                    <div class="bicycle-back-pattern">
+                        <svg viewBox="0 0 60 90" class="w-full h-full p-1">
+                            <rect x="4" y="4" width="52" height="82" rx="4" fill="none" stroke="#fde68a" stroke-width="0.8" stroke-dasharray="2 1.5" opacity="0.85"/>
+                            <circle cx="30" cy="45" r="16" fill="#450a0a" stroke="#fcd34d" stroke-width="1.2"/>
+                            <circle cx="30" cy="45" r="12" fill="none" stroke="#fca5a5" stroke-width="0.7" stroke-dasharray="1.5 1.5"/>
+                            <path d="M30 25 L33 31 L30 29 L27 31 Z M30 65 L33 59 L30 61 L27 59 Z M12 45 L18 42 L16 45 L18 48 Z M48 45 L42 42 L44 45 L42 48 Z" fill="#fde68a"/>
+                            <text x="30" y="48" font-size="8.5" font-weight="900" fill="#fef08a" text-anchor="middle" font-family="Playfair Display, serif">808</text>
+                        </svg>
+                    </div>
+                </div>
+                <div class="text-left">
+                    <div class="text-xs font-bold text-amber-300 uppercase tracking-wider">BICYCLE DECK</div>
+                    <div class="text-sm sm:text-base font-extrabold text-white">남은 카드: <span id="deckCount" class="text-amber-300">52</span>장</div>
+                    <div class="text-[11px] text-emerald-200/75">스페이드·하트·클로버·다이아</div>
+                </div>
+            </div>
+
+            <!-- 중앙 상태 메시지 및 결과 판정 박스 -->
+            <div class="flex-1 flex flex-col items-center justify-center text-center min-h-[72px]">
+                <div id="statusBanner" class="px-4 py-2.5 rounded-2xl bg-black/70 border border-emerald-500/30 text-sm sm:text-base font-bold text-emerald-100 shadow-md">
+                    아래 [카드 나누기]를 누르면 딜러 패가 자동으로 열립니다!
+                </div>
+                <div id="detailFormula" class="text-xs text-amber-200/90 font-semibold mt-1.5 hidden"></div>
+            </div>
+        </section>
+
+        <!-- 3. 플레이어 (나) 영역 -->
+        <section class="flex flex-col items-center gap-2">
+            <!-- 내 카드 2장 슬롯 -->
+            <div id="playerCardsArea" class="flex items-center justify-center gap-3 sm:gap-5 min-h-[152px] sm:min-h-[182px]">
+                <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">
+                    내 패 1
+                </div>
+                <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">
+                    내 패 2
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2.5">
+                <span class="px-3 py-1 rounded-full bg-black/70 border border-amber-400/30 text-xs sm:text-sm font-bold text-amber-200 shadow-lg">
+                    플레이어 (나)
+                </span>
+                <span id="playerScoreBadge" class="px-3 py-1 rounded-full bg-amber-950/90 border border-amber-400/50 text-xs sm:text-sm font-extrabold text-amber-300 hidden shadow-lg">
+                    합계: 0점
+                </span>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 하단 컨트롤 패널: 단계별 액션 버튼 & 족보(숫자 크기) 안내 -->
+    <footer class="relative z-10 w-full max-w-3xl flex flex-col gap-3">
+        <!-- 메인 액션 버튼 -->
+        <div class="flex items-center justify-center gap-3">
+            <button id="actionBtn" class="w-full sm:w-auto sm:min-w-[310px] py-3.5 px-7 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 active:translate-y-0.5 text-slate-950 font-extrabold text-base sm:text-lg shadow-[0_5px_0_#92400e,0_10px_25px_rgba(0,0,0,0.65)] transition-all cursor-pointer flex items-center justify-center gap-2">
+                <span id="actionBtnIcon">🃏</span>
+                <span id="actionBtnText">카드 2장씩 나누기</span>
+            </button>
+
+            <button id="resetDeckBtn" title="덱 52장 새로 셔플 및 전적 초기화" class="py-3.5 px-4 rounded-2xl bg-black/60 hover:bg-black/80 border border-white/15 text-xs sm:text-sm font-bold text-emerald-200 transition-colors cursor-pointer shrink-0">
+                덱 리셋
+            </button>
+        </div>
+
+        <!-- 카드 크기 순위표 (2 ~ A) -->
+        <div class="bg-black/50 border border-white/10 rounded-xl px-3 py-2 flex flex-wrap items-center justify-center gap-1.5 text-[11px] sm:text-xs text-emerald-100/90">
+            <span class="font-bold text-amber-300 mr-1">숫자 크기 순서:</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">2</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">3</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">4</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">5</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">6</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">7</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">8</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">9</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-white/10">10</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-bold">J(11)</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-bold">Q(12)</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 font-bold">K(13)</span>
+            <span>&lt;</span>
+            <span class="px-1.5 py-0.5 rounded bg-rose-500/30 text-amber-300 font-extrabold border border-amber-400/40">A(14)</span>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * 바이시클 2장 하이카드 대결 게임 로직
+         * - 플레이어 승률 하향 조정 (딜러가 고득점 카드를 더 자주 가져가도록 조정)
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            // 문양 및 숫자 정의
+            const SUITS = [
+                { id: 'spade', symbol: '♠', name: '스페이드', color: 'text-slate-900' },
+                { id: 'heart', symbol: '♥', name: '하트', color: 'text-red-600' },
+                { id: 'club', symbol: '♣', name: '클로버', color: 'text-slate-900' },
+                { id: 'diamond', symbol: '♦', name: '다이아몬드', color: 'text-red-600' }
+            ];
+
+            const RANKS = [
+                { label: '2', value: 2 },
+                { label: '3', value: 3 },
+                { label: '4', value: 4 },
+                { label: '5', value: 5 },
+                { label: '6', value: 6 },
+                { label: '7', value: 7 },
+                { label: '8', value: 8 },
+                { label: '9', value: 9 },
+                { label: '10', value: 10 },
+                { label: 'J', value: 11 },
+                { label: 'Q', value: 12 },
+                { label: 'K', value: 13 },
+                { label: 'A', value: 14 }
+            ];
+
+            // DOM 요소
+            const dealerHandsContainer = document.getElementById('dealerHandsContainer');
+            const deckVisualPile = document.getElementById('deckVisualPile');
+            const opponentCardsArea = document.getElementById('opponentCardsArea');
+            const playerCardsArea = document.getElementById('playerCardsArea');
+            const opponentScoreBadge = document.getElementById('opponentScoreBadge');
+            const playerScoreBadge = document.getElementById('playerScoreBadge');
+            const deckCountEl = document.getElementById('deckCount');
+            const statusBanner = document.getElementById('statusBanner');
+            const detailFormula = document.getElementById('detailFormula');
+            const actionBtn = document.getElementById('actionBtn');
+            const actionBtnIcon = document.getElementById('actionBtnIcon');
+            const actionBtnText = document.getElementById('actionBtnText');
+            const resetDeckBtn = document.getElementById('resetDeckBtn');
+            const winCountEl = document.getElementById('winCount');
+            const loseCountEl = document.getElementById('loseCount');
+            const drawCountEl = document.getElementById('drawCount');
+            const soundToggleBtn = document.getElementById('soundToggleBtn');
+            const soundOnIcon = document.getElementById('soundOnIcon');
+            const soundOffIcon = document.getElementById('soundOffIcon');
+
+            // 게임 상태
+            let deck = [];
+            let opponentHand = [];
+            let playerHand = [];
+            let playerRevealed = [false, false];
+            let gameState = 'READY';
+            let stats = { win: 0, lose: 0, draw: 0 };
+            let isSoundEnabled = true;
+            let synth = null;
+
+            function initAudio() {
+                if (!synth && typeof Tone !== 'undefined') {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -8;
+                }
+            }
+
+            function playSound(type) {
+                if (!isSoundEnabled) return;
+                try {
+                    initAudio();
+                    if (Tone.context.state !== 'running') {
+                        Tone.start();
+                    }
+                    const now = Tone.now();
+                    if (type === 'shuffle') {
+                        for (let i = 0; i < 7; i++) {
+                            synth.triggerAttackRelease(i % 2 === 0 ? 'G3' : 'B3', '64n', now + i * 0.075);
+                        }
+                    } else if (type === 'deal') {
+                        synth.triggerAttackRelease('C5', '32n', now);
+                    } else if (type === 'flip') {
+                        synth.triggerAttackRelease('E5', '32n', now);
+                    } else if (type === 'win') {
+                        synth.triggerAttackRelease('C4', '8n', now);
+                        synth.triggerAttackRelease('E4', '8n', now + 0.1);
+                        synth.triggerAttackRelease('G4', '8n', now + 0.2);
+                        synth.triggerAttackRelease('C5', '4n', now + 0.3);
+                    } else if (type === 'lose') {
+                        synth.triggerAttackRelease('G3', '8n', now);
+                        synth.triggerAttackRelease('E3', '8n', now + 0.12);
+                        synth.triggerAttackRelease('C3', '4n', now + 0.25);
+                    } else if (type === 'draw') {
+                        synth.triggerAttackRelease('D4', '8n', now);
+                        synth.triggerAttackRelease('D4', '8n', now + 0.15);
+                    }
+                } catch (e) {
+                    console.warn('Sound error:', e);
+                }
+            }
+
+            function createAndShuffleDeck() {
+                const newDeck = [];
+                for (const suit of SUITS) {
+                    for (const rank of RANKS) {
+                        newDeck.push({ suit, rank });
+                    }
+                }
+                for (let i = newDeck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
+                }
+                deck = newDeck;
+                updateDeckCount();
+            }
+
+            function updateDeckCount() {
+                deckCountEl.textContent = deck.length;
+            }
+
+            // 바이시클(Bicycle) 전통 상하 대칭 코트 카드(J, Q, K) 일러스트 SVG 생성기
+            function createBicycleCourtSVG(rankLabel, suit) {
+                const isRed = suit.id === 'heart' || suit.id === 'diamond';
+                const primary = isRed ? '#dc2626' : '#1e293b';
+                const secondary = isRed ? '#1e293b' : '#dc2626';
+                const gold = '#eab308';
+                const skin = '#fde68a';
+
+                let halfCharacter = '';
+                if (rankLabel === 'J') {
+                    halfCharacter = `
+                        <line x1="16" y1="8" x2="16" y2="54" stroke="${gold}" stroke-width="2"/>
+                        <path d="M16 6 L13 13 L16 11 L19 13 Z" fill="${primary}"/>
+                        <path d="M16 12 C11 12, 11 18, 16 18 Z" fill="${secondary}"/>
+                        <path d="M21 54 L23 37 L57 37 L59 54 Z" fill="${primary}"/>
+                        <path d="M27 37 L53 37 L55 54 L25 54 Z" fill="${gold}"/>
+                        <path d="M27 37 L55 54 M53 37 L25 54 M40 37 L40 54 M26 45 L54 45" stroke="${secondary}" stroke-width="1.5"/>
+                        <path d="M32 36 L40 40 L48 36 Z" fill="#ffffff" stroke="${secondary}" stroke-width="1"/>
+                        <path d="M29 23 C27 29, 28 34, 31 35 L49 35 C52 34, 53 29, 51 23 Z" fill="${gold}"/>
+                        <ellipse cx="40" cy="28" rx="6.5" ry="7.5" fill="${skin}" stroke="${secondary}" stroke-width="1"/>
+                        <circle cx="37.5" cy="26.5" r="1" fill="${secondary}"/>
+                        <circle cx="42.5" cy="26.5" r="1" fill="${secondary}"/>
+                        <path d="M40 26.5 L39.2 30 L40.8 30" fill="none" stroke="${secondary}" stroke-width="0.9"/>
+                        <path d="M38 32 Q40 33.5 42 32" fill="none" stroke="${primary}" stroke-width="1"/>
+                        <path d="M28 22 Q40 14 52 22 L50 24 Q40 18 30 24 Z" fill="${primary}" stroke="${secondary}" stroke-width="0.9"/>
+                        <path d="M48 20 Q55 13 60 16 Q54 20 49 22 Z" fill="${gold}" stroke="${primary}" stroke-width="0.9"/>
+                    `;
+                } else if (rankLabel === 'Q') {
+                    halfCharacter = `
+                        <path d="M22 54 C23 39, 31 36, 40 36 C49 36, 57 39, 58 54 Z" fill="${primary}"/>
+                        <path d="M28 37 L40 48 L52 37 L48 54 L32 54 Z" fill="${gold}"/>
+                        <path d="M33 37 L40 44 L47 37 Z" fill="#ffffff"/>
+                        <path d="M27 21 C24 28, 24 35, 27 39 L53 39 C56 35, 56 28, 53 21 Z" fill="${secondary}"/>
+                        <path d="M29 22 C28 28, 29 33, 31 36 L49 36 C51 33, 52 28, 51 22 Z" fill="${gold}"/>
+                        <ellipse cx="40" cy="27" rx="6.5" ry="7.5" fill="${skin}" stroke="${secondary}" stroke-width="1"/>
+                        <circle cx="37.5" cy="25.5" r="0.9" fill="${secondary}"/>
+                        <circle cx="42.5" cy="25.5" r="0.9" fill="${secondary}"/>
+                        <path d="M38 31 Q40 32.5 42 31" fill="none" stroke="#dc2626" stroke-width="1.1"/>
+                        <path d="M32 21 L31 14 L35 17 L40 11 L45 17 L49 14 L48 21 Z" fill="${gold}" stroke="${secondary}" stroke-width="1"/>
+                        <circle cx="40" cy="16.5" r="1.1" fill="${primary}"/>
+                        <line x1="58" y1="30" x2="54" y2="52" stroke="#15803d" stroke-width="1.6"/>
+                        <circle cx="58" cy="27" r="4" fill="#dc2626" stroke="${gold}" stroke-width="1"/>
+                        <circle cx="58" cy="27" r="1.6" fill="${gold}"/>
+                    `;
+                } else {
+                    halfCharacter = `
+                        <path d="M15 8 L17 8 L18 42 L15 42 Z" fill="#e2e8f0" stroke="${secondary}" stroke-width="1"/>
+                        <line x1="16" y1="8" x2="16" y2="41" stroke="${secondary}" stroke-width="0.7"/>
+                        <rect x="11" y="41" width="10" height="2.5" rx="0.8" fill="${gold}" stroke="${secondary}" stroke-width="0.9"/>
+                        <rect x="15" y="43.5" width="2" height="7" fill="${primary}"/>
+                        <path d="M22 54 L24 36 L56 36 L58 54 Z" fill="${primary}"/>
+                        <path d="M27 36 L53 36 L55 54 L25 54 Z" fill="${secondary}"/>
+                        <path d="M32 36 L40 47 L48 36 L46 54 L34 54 Z" fill="${gold}"/>
+                        <path d="M26 35 Q40 40 54 35 L52 38 Q40 43 28 38 Z" fill="#ffffff" stroke="${secondary}" stroke-width="0.9"/>
+                        <circle cx="30" cy="26" r="3.8" fill="${gold}" stroke="${secondary}" stroke-width="0.9"/>
+                        <circle cx="50" cy="26" r="3.8" fill="${gold}" stroke="${secondary}" stroke-width="0.9"/>
+                        <ellipse cx="40" cy="27" rx="6.5" ry="7.5" fill="${skin}" stroke="${secondary}" stroke-width="1"/>
+                        <path d="M33 29.5 Q36 35 40 36 Q44 35 47 29.5 Q43 31.5 40 31 Q37 31.5 33 29.5 Z" fill="${gold}" stroke="${secondary}" stroke-width="0.9"/>
+                        <circle cx="37.5" cy="25" r="0.9" fill="${secondary}"/>
+                        <circle cx="42.5" cy="25" r="0.9" fill="${secondary}"/>
+                        <path d="M31 19 L30 11 L35 15 L40 9 L45 15 L50 11 L49 19 Z" fill="${gold}" stroke="${secondary}" stroke-width="1"/>
+                        <rect x="31" y="17" width="18" height="2.5" fill="${primary}" stroke="${secondary}" stroke-width="0.8"/>
+                    `;
+                }
+
+                return `
+                    <svg viewBox="0 0 80 108" class="w-full h-full rounded-[6px] border-[1.5px] ${isRed ? 'border-red-700/70 bg-amber-50/40' : 'border-slate-800/70 bg-slate-50/60'} shadow-inner overflow-hidden">
+                        <g>${halfCharacter}</g>
+                        <line x1="0" y1="55" x2="80" y2="53" stroke="${gold}" stroke-width="2"/>
+                        <line x1="0" y1="55" x2="80" y2="53" stroke="${secondary}" stroke-width="0.7" stroke-dasharray="2.5 1.5"/>
+                        <g transform="rotate(180 40 54)">${halfCharacter}</g>
+                        <text x="68" y="13" font-size="11" fill="${primary}" text-anchor="middle">${suit.symbol}</text>
+                        <text x="12" y="103" font-size="11" fill="${primary}" text-anchor="middle" transform="rotate(180 12 99)">${suit.symbol}</text>
+                    </svg>
+                `;
+            }
+
+            function createCardHTML(card, owner, index) {
+                const { suit, rank } = card;
+                const isCourtCard = ['J', 'Q', 'K'].includes(rank.label);
+
+                let centerArt = '';
+                if (rank.label === 'A' && suit.id === 'spade') {
+                    centerArt = `
+                        <div class="flex flex-col items-center justify-center w-full h-full">
+                            <svg viewBox="0 0 80 95" class="w-14 h-18 sm:w-18 sm:h-22 drop-shadow-sm">
+                                <circle cx="40" cy="44" r="24" fill="none" stroke="#0f172a" stroke-width="1.1" stroke-dasharray="2 2" opacity="0.5"/>
+                                <circle cx="40" cy="44" r="20" fill="none" stroke="#b45309" stroke-width="0.9" opacity="0.65"/>
+                                <path d="M40 14 C29 28, 18 36, 18 47 C18 55, 25 59, 32 57 C35 56, 37 54, 38 52 L34 67 L46 67 L42 52 C43 54, 45 56, 48 57 C55 59, 62 55, 62 47 C62 36, 51 28, 40 14 Z" fill="#0f172a"/>
+                                <path d="M40 21 C34 30, 27 36, 27 43 C27 47, 31 49, 35 48" fill="none" stroke="#eab308" stroke-width="1" opacity="0.8"/>
+                                <text x="40" y="80" font-size="7" font-weight="900" fill="#1e293b" text-anchor="middle" letter-spacing="1.2" font-family="Playfair Display, serif">BICYCLE</text>
+                                <text x="40" y="88" font-size="5" font-weight="700" fill="#64748b" text-anchor="middle" letter-spacing="0.8">US PLAYING CARD CO.</text>
+                            </svg>
+                        </div>
+                    `;
+                } else if (isCourtCard) {
+                    centerArt = `
+                        <div class="w-[58px] h-[86px] sm:w-[70px] sm:h-[102px] flex items-center justify-center p-[2px] rounded-[6px] bg-gradient-to-b from-amber-300/60 via-amber-500/40 to-amber-300/60 shadow-sm overflow-hidden">
+                            ${createBicycleCourtSVG(rank.label, suit)}
+                        </div>
+                    `;
+                } else {
+                    const pipCount = Math.min(rank.value, 10);
+                    let pipGridHTML = '';
+                    if (rank.label === 'A') {
+                        pipGridHTML = `<span class="text-4xl sm:text-5xl leading-none ${suit.color} drop-shadow-[0_2px_2px_rgba(0,0,0,0.18)]">${suit.symbol}</span>`;
+                    } else if (pipCount <= 4) {
+                        pipGridHTML = `<div class="grid ${pipCount === 2 ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-x-2.5 gap-y-1.5'} place-items-center">
+                            ${Array(pipCount).fill(`<span class="text-lg sm:text-xl leading-none ${suit.color} drop-shadow-[0_1px_1px_rgba(0,0,0,0.15)]">${suit.symbol}</span>`).join('')}
+                        </div>`;
+                    } else {
+                        pipGridHTML = `<div class="relative flex items-center justify-center">
+                            <span class="text-3xl sm:text-4xl leading-none ${suit.color} drop-shadow-[0_2px_2px_rgba(0,0,0,0.16)]">${suit.symbol}</span>
+                            <span class="absolute -top-2.5 -left-2.5 text-xs ${suit.color} opacity-75">${suit.symbol}</span>
+                            <span class="absolute -bottom-2.5 -right-2.5 text-xs ${suit.color} opacity-75 rotate-180">${suit.symbol}</span>
+                        </div>`;
+                    }
+                    centerArt = `
+                        <div class="w-[52px] h-[78px] sm:w-[62px] sm:h-[94px] rounded-md border border-stone-300/60 bg-white/40 flex items-center justify-center overflow-hidden">
+                            ${pipGridHTML}
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div id="${owner}-slot-${index}" class="card-slot animate-deal ${owner === 'player' ? 'card-clickable' : ''}" style="animation-delay: ${index * 0.08}s">
+                        <div id="${owner}-card-${index}" class="card-inner">
+                            <div class="card-face bicycle-back">
+                                <div class="bicycle-back-pattern">
+                                    <svg viewBox="0 0 100 145" class="w-full h-full">
+                                        <circle cx="14" cy="14" r="6" fill="none" stroke="#fde68a" stroke-width="0.9" opacity="0.75"/>
+                                        <circle cx="86" cy="14" r="6" fill="none" stroke="#fde68a" stroke-width="0.9" opacity="0.75"/>
+                                        <circle cx="14" cy="131" r="6" fill="none" stroke="#fde68a" stroke-width="0.9" opacity="0.75"/>
+                                        <circle cx="86" cy="131" r="6" fill="none" stroke="#fde68a" stroke-width="0.9" opacity="0.75"/>
+                                        <path d="M22 18 Q50 4 78 18 Q50 32 22 18 Z" fill="none" stroke="#fecaca" stroke-width="0.9" opacity="0.7"/>
+                                        <path d="M22 127 Q50 141 78 127 Q50 113 22 127 Z" fill="none" stroke="#fecaca" stroke-width="0.9" opacity="0.7"/>
+                                        <circle cx="50" cy="72.5" r="24" fill="#450a0a" stroke="#fcd34d" stroke-width="1.3"/>
+                                        <circle cx="50" cy="72.5" r="19" fill="none" stroke="#fecaca" stroke-width="0.8" stroke-dasharray="2.5 1.5"/>
+                                        <circle cx="50" cy="72.5" r="14" fill="#7f1d1d" stroke="#fde047" stroke-width="0.8"/>
+                                        <text x="50" y="76" font-size="11" font-weight="900" fill="#fef08a" text-anchor="middle" font-family="Playfair Display, serif" letter-spacing="0.5">808</text>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="card-face card-front p-2 flex flex-col justify-between">
+                                <div class="flex justify-between items-start">
+                                    <span class="text-xs sm:text-sm font-black font-card ${suit.color}">${rank.label}</span>
+                                    <span class="text-xs ${suit.color}">${suit.symbol}</span>
+                                </div>
+                                <div class="flex items-center justify-center flex-1">
+                                    ${centerArt}
+                                </div>
+                                <div class="flex justify-between items-end rotate-180">
+                                    <span class="text-xs sm:text-sm font-black font-card ${suit.color}">${rank.label}</span>
+                                    <span class="text-xs ${suit.color}">${suit.symbol}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function dealCards() {
+                if (deck.length < 4) {
+                    createAndShuffleDeck();
+                }
+
+                const totalWins = stats.win;
+                let playerAdvantage = true;
+
+                if (totalWins <= 2) {
+                    playerAdvantage = true;
+                } else {
+                    const loseChance = Math.min(0.85, 0.35 + (totalWins * 0.08));
+                    playerAdvantage = Math.random() >= loseChance;
+                }
+
+                deck.sort((a, b) => b.rank.value - a.rank.value);
+
+                if (playerAdvantage) {
+                    playerHand = [deck.shift(), deck.shift()];
+                    opponentHand = [deck.pop(), deck.pop()];
+                } else {
+                    opponentHand = [deck.shift(), deck.shift()];
+                    playerHand = [deck.pop(), deck.pop()];
+                }
+
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+
+                playerRevealed = [false, false];
+                updateDeckCount();
+
+                dealerHandsContainer.classList.remove('dealer-hands-dealing');
+                void dealerHandsContainer.offsetWidth;
+                dealerHandsContainer.classList.add('dealer-hands-dealing');
+
+                opponentScoreBadge.classList.add('hidden');
+                playerScoreBadge.classList.add('hidden');
+                detailFormula.classList.add('hidden');
+
+                opponentCardsArea.innerHTML = opponentHand
+                    .map((card, idx) => createCardHTML(card, 'opp', idx))
+                    .join('');
+
+                playerCardsArea.innerHTML = playerHand
+                    .map((card, idx) => createCardHTML(card, 'player', idx))
+                    .join('');
+
+                [0, 1].forEach(idx => {
+                    const slotEl = document.getElementById(`player-slot-${idx}`);
+                    if (slotEl) {
+                        slotEl.addEventListener('click', () => {
+                            if (gameState === 'PLAYER_TURN' && !playerRevealed[idx]) {
+                                revealSinglePlayerCard(idx);
+                            }
+                        });
+                    }
                 });
-            } else {
-                musicError.innerText = "검색 결과가 없습니다.";
-                musicError.classList.remove('hidden');
-            }
-        } catch (error) {
-            console.error("검색 오류:", error);
-            musicError.innerText = "검색 중 오류가 발생했습니다.";
-            musicError.classList.remove('hidden');
-        }
-    }
 
-    // 파일 업로드로 음악 재생
-    const musicFileInput = document.getElementById('music-file-input');
-    musicFileInput.addEventListener('change', function(e) {
-        musicError.classList.add('hidden');
-        const file = e.target.files[0];
-        if (file) {
-            const objectURL = URL.createObjectURL(file);
-            bgMusic.src = objectURL;
-            bgMusic.play().catch(e => {
-                console.error("음악 재생 오류:", e);
-                musicError.classList.remove('hidden');
+                gameState = 'PLAYER_TURN';
+                playSound('deal');
+
+                statusBanner.className = 'px-4 py-2.5 rounded-2xl bg-black/75 border border-rose-400/40 text-sm sm:text-base font-bold text-rose-100 shadow-md';
+                statusBanner.textContent = '딜러가 강력한 패를 오픈합니다...';
+
+                const oppSum = opponentHand[0].rank.value + opponentHand[1].rank.value;
+                setTimeout(() => {
+                    const oppCard0 = document.getElementById('opp-card-0');
+                    if (oppCard0) oppCard0.classList.add('is-flipped');
+                    playSound('flip');
+                }, 380);
+
+                setTimeout(() => {
+                    const oppCard1 = document.getElementById('opp-card-1');
+                    if (oppCard1) oppCard1.classList.add('is-flipped');
+                    playSound('flip');
+
+                    opponentScoreBadge.textContent = `합계: ${oppSum}점 (${opponentHand[0].rank.label}+${opponentHand[1].rank.label})`;
+                    opponentScoreBadge.classList.remove('hidden');
+
+                    if (gameState === 'PLAYER_TURN') {
+                        statusBanner.className = 'px-4 py-2.5 rounded-2xl bg-black/80 border border-amber-400/50 text-sm sm:text-base font-bold text-amber-100 shadow-md';
+                        statusBanner.textContent = `딜러 점수가 무려 ${oppSum}점입니다! 내 첫 카드를 오픈하세요.`;
+                    }
+                }, 680);
+
+                actionBtnIcon.textContent = '👆';
+                actionBtnText.textContent = '내 첫 번째 카드 까기 (1/2)';
+                actionBtn.className = 'w-full sm:w-auto sm:min-w-[310px] py-3.5 px-7 rounded-2xl bg-gradient-to-b from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 active:translate-y-0.5 text-white font-extrabold text-base sm:text-lg shadow-[0_5px_0_#1e3a8a,0_10px_25px_rgba(0,0,0,0.65)] transition-all cursor-pointer flex items-center justify-center gap-2';
+            }
+
+            function revealSinglePlayerCard(cardIndex) {
+                if (gameState !== 'PLAYER_TURN' || playerRevealed[cardIndex]) return;
+
+                playerRevealed[cardIndex] = true;
+                const cardEl = document.getElementById(`player-card-${cardIndex}`);
+                const slotEl = document.getElementById(`player-slot-${cardIndex}`);
+                if (cardEl) cardEl.classList.add('is-flipped');
+                if (slotEl) slotEl.classList.remove('card-clickable');
+
+                playSound('flip');
+
+                const revealedCount = playerRevealed.filter(Boolean).length;
+                const currentSum = playerHand.reduce((acc, card, idx) => acc + (playerRevealed[idx] ? card.rank.value : 0), 0);
+
+                if (revealedCount === 1) {
+                    const oppSum = opponentHand[0].rank.value + opponentHand[1].rank.value;
+                    const openedCard = playerHand[cardIndex];
+                    playerScoreBadge.textContent = `현재: ${currentSum}점 (${openedCard.rank.label}+?)`;
+                    playerScoreBadge.classList.remove('hidden');
+
+                    statusBanner.className = 'px-4 py-2.5 rounded-2xl bg-black/80 border border-sky-400/50 text-sm sm:text-base font-bold text-sky-100 shadow-md';
+                    statusBanner.textContent = `첫 패 ${openedCard.suit.symbol}${openedCard.rank.label} (${currentSum}점)! 딜러(${oppSum}점)를 따라잡으려면 마지막 카드를 오픈하세요!`;
+
+                    actionBtnIcon.textContent = '🔥';
+                    actionBtnText.textContent = '내 두 번째 카드 까기 (2/2)';
+                    actionBtn.className = 'w-full sm:w-auto sm:min-w-[310px] py-3.5 px-7 rounded-2xl bg-gradient-to-b from-rose-500 to-rose-700 hover:from-rose-400 hover:to-rose-600 active:translate-y-0.5 text-white font-extrabold text-base sm:text-lg shadow-[0_5px_0_#881337,0_10px_25px_rgba(0,0,0,0.65)] transition-all cursor-pointer flex items-center justify-center gap-2';
+                } else {
+                    judgeFinalResult();
+                }
+            }
+
+            function judgeFinalResult() {
+                const oppSum = opponentHand[0].rank.value + opponentHand[1].rank.value;
+                const playerSum = playerHand[0].rank.value + playerHand[1].rank.value;
+
+                setTimeout(() => {
+                    playerScoreBadge.textContent = `합계: ${playerSum}점 (${playerHand[0].rank.label}+${playerHand[1].rank.label})`;
+                    playerScoreBadge.classList.remove('hidden');
+
+                    detailFormula.textContent = `딜러 [${opponentHand[0].suit.symbol}${opponentHand[0].rank.label} + ${opponentHand[1].suit.symbol}${opponentHand[1].rank.label} = ${oppSum}]  VS  나 [${playerHand[0].suit.symbol}${playerHand[0].rank.label} + ${playerHand[1].suit.symbol}${playerHand[1].rank.label} = ${playerSum}]`;
+                    detailFormula.classList.remove('hidden');
+
+                    statusBanner.classList.remove('animate-banner');
+                    void statusBanner.offsetWidth;
+                    statusBanner.classList.add('animate-banner');
+
+                    if (playerSum > oppSum) {
+                        stats.win++;
+                        winCountEl.textContent = stats.win;
+                        statusBanner.className = 'animate-banner px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-base sm:text-lg shadow-xl border-2 border-white';
+                        statusBanner.textContent = `🎉 기적의 승리! (${playerSum}점 vs ${oppSum}점)`;
+                        playSound('win');
+                    } else if (playerSum < oppSum) {
+                        stats.lose++;
+                        loseCountEl.textContent = stats.lose;
+                        statusBanner.className = 'animate-banner px-5 py-2.5 rounded-2xl bg-rose-950/95 text-rose-100 font-black text-base sm:text-lg shadow-xl border border-rose-400';
+                        statusBanner.textContent = `😢 딜러의 압승! (${playerSum}점 vs ${oppSum}점)`;
+                        playSound('lose');
+                    } else {
+                        stats.draw++;
+                        drawCountEl.textContent = stats.draw;
+                        statusBanner.className = 'animate-banner px-5 py-2.5 rounded-2xl bg-slate-900/95 text-amber-200 font-black text-base sm:text-lg shadow-xl border border-amber-300/60';
+                        statusBanner.textContent = `🤝 무승부입니다! (${playerSum}점 동점)`;
+                        playSound('draw');
+                    }
+                }, 320);
+
+                gameState = 'RESULT';
+
+                actionBtnIcon.textContent = '🔄';
+                actionBtnText.textContent = '다음 판 카드 나누기';
+                actionBtn.className = 'w-full sm:w-auto sm:min-w-[310px] py-3.5 px-7 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 active:translate-y-0.5 text-slate-950 font-extrabold text-base sm:text-lg shadow-[0_5px_0_#92400e,0_10px_25px_rgba(0,0,0,0.65)] transition-all cursor-pointer flex items-center justify-center gap-2';
+            }
+
+            actionBtn.addEventListener('click', () => {
+                if (gameState === 'READY' || gameState === 'RESULT') {
+                    dealCards();
+                } else if (gameState === 'PLAYER_TURN') {
+                    const nextIndex = playerRevealed.findIndex(revealed => !revealed);
+                    if (nextIndex !== -1) {
+                        revealSinglePlayerCard(nextIndex);
+                    }
+                }
             });
-        }
-    });
 
-    // Custom Background Image Handling
-    let customBgImg = null;
-    const bgImageInput = document.getElementById('bg-image-input');
-    bgImageInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = function() {
-                    customBgImg = img;
-                }
-                img.src = event.target.result;
-            }
-            reader.readAsDataURL(file);
-        } else {
-            customBgImg = null;
-        }
-    });
+            resetDeckBtn.addEventListener('click', () => {
+                createAndShuffleDeck();
+                stats = { win: 0, lose: 0, draw: 0 };
+                winCountEl.textContent = '0';
+                loseCountEl.textContent = '0';
+                drawCountEl.textContent = '0';
+                gameState = 'READY';
 
-    // 3D Projection Engine
-    function project3D(x, y, z) {
-        let fov = canvas.width * 0.7;
-        let horizonY = canvas.height * 0.4; // 40% height for horizon
-        let scale = z > 0.1 ? fov / z : 0;
-        let screenX = canvas.width / 2 + (x - currentCameraX) * scale;
-        let screenY = horizonY + (currentCameraY - y) * scale;
-        return { x: screenX, y: screenY, scale };
-    }
+                opponentScoreBadge.classList.add('hidden');
+                playerScoreBadge.classList.add('hidden');
+                detailFormula.classList.add('hidden');
 
-    // Player Car (First Person View / Dashboard)
-    const car = {
-        lane: 1, // 0, 1, 2
-        currentX: 0,
-        jumpY: 0,
-        jumpVel: 0,
-        isJumping: false,
-        draw() {
-            let dashHeight = Math.min(canvas.height * 0.45, 300); // 스포츠카 느낌을 위해 약간 더 높게
-            let dashY = canvas.height - dashHeight + (Math.sin(frameCount * 0.2) * 3);
-            
-            if(this.jumpY > 0) dashY += (this.jumpY * 0.2); // 점프 시 대시보드 흔들림
+                opponentCardsArea.innerHTML = `
+                    <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">딜러 패 1</div>
+                    <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">딜러 패 2</div>
+                `;
+                playerCardsArea.innerHTML = `
+                    <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">내 패 1</div>
+                    <div class="card-slot rounded-xl border-2 border-dashed border-emerald-400/20 bg-black/20 flex items-center justify-center text-emerald-200/25 text-xs font-semibold">내 패 2</div>
+                `;
 
-            // 1. 후드 (차량 앞코 - 다크 카본 느낌)
-            ctx.fillStyle = '#0a0a0a';
-            ctx.beginPath();
-            ctx.moveTo(0, dashY);
-            ctx.lineTo(canvas.width, dashY);
-            ctx.lineTo(canvas.width * 0.75, dashY - 40);
-            ctx.lineTo(canvas.width * 0.25, dashY - 40);
-            ctx.fill();
+                statusBanner.className = 'px-4 py-2.5 rounded-2xl bg-black/70 border border-emerald-500/30 text-sm sm:text-base font-bold text-emerald-100 shadow-md';
+                statusBanner.textContent = '새 바이시클 덱(52장)을 셔플했습니다! 카드를 나누세요.';
 
-            // 2. 메인 대시보드 바탕 (알칸타라 다크 그레이)
-            ctx.fillStyle = '#111111';
-            ctx.fillRect(0, dashY, canvas.width, canvas.height - dashY);
+                actionBtnIcon.textContent = '🃏';
+                actionBtnText.textContent = '카드 2장씩 나누기';
+                actionBtn.className = 'w-full sm:w-auto sm:min-w-[310px] py-3.5 px-7 rounded-2xl bg-gradient-to-b from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 active:translate-y-0.5 text-slate-950 font-extrabold text-base sm:text-lg shadow-[0_5px_0_#92400e,0_10px_25px_rgba(0,0,0,0.65)] transition-all cursor-pointer flex items-center justify-center gap-2';
+                playSound('deal');
+            });
 
-            // 대시보드 상단 굴곡
-            ctx.fillStyle = '#1a1a1a';
-            ctx.beginPath();
-            ctx.moveTo(0, dashY);
-            ctx.lineTo(canvas.width, dashY);
-            ctx.lineTo(canvas.width, dashY + 45);
-            ctx.lineTo(0, dashY + 45);
-            ctx.fill();
+            soundToggleBtn.addEventListener('click', () => {
+                isSoundEnabled = !isSoundEnabled;
+                soundOnIcon.classList.toggle('hidden', !isSoundEnabled);
+                soundOffIcon.classList.toggle('hidden', isSoundEnabled);
+            });
 
-            // 옐로우 트림 (시그니처 라인)
-            ctx.strokeStyle = '#FACC15'; // 람보르기니 옐로우
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(0, dashY + 45);
-            ctx.lineTo(canvas.width, dashY + 45);
-            ctx.stroke();
-
-            // 3. 육각형 송풍구 (에어벤트)
-            ctx.fillStyle = '#050505';
-            ctx.beginPath();
-            ctx.moveTo(canvas.width * 0.52, dashY + 5);
-            ctx.lineTo(canvas.width * 0.58, dashY + 5);
-            ctx.lineTo(canvas.width * 0.60, dashY + 25);
-            ctx.lineTo(canvas.width * 0.50, dashY + 25);
-            ctx.fill();
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // 4. 센터페시아 (중앙 콘솔 - 비스듬한 구조)
-            ctx.fillStyle = '#161616';
-            ctx.beginPath();
-            ctx.moveTo(canvas.width * 0.52, dashY + 45);
-            ctx.lineTo(canvas.width * 0.85, dashY + 45);
-            ctx.lineTo(canvas.width * 0.95, canvas.height);
-            ctx.lineTo(canvas.width * 0.55, canvas.height);
-            ctx.fill();
-            // 센터페시아 옐로우 테두리
-            ctx.strokeStyle = '#FACC15';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // 센터페시아 레드 토글 스위치 및 버튼들
-            let btnStartX = canvas.width * 0.62;
-            let btnY = dashY + 80;
-            ctx.fillStyle = '#E53E3E'; // 강렬한 레드
-            for(let i=0; i<5; i++) {
-                ctx.fillRect(btnStartX + (i * 22) - (i*2), btnY + (i*5), 8, 16);
-            }
-            // 엔진 스타트 버튼 (육각형)
-            ctx.fillStyle = '#E53E3E';
-            ctx.beginPath();
-            ctx.arc(canvas.width * 0.7, dashY + 160, 20, 0, Math.PI*2);
-            ctx.fill();
-            ctx.strokeStyle = '#FACC15';
-            ctx.stroke();
-
-            // 5. 디지털 계기판
-            ctx.fillStyle = '#0a192f'; // 푸른 디지털 화면
-            ctx.beginPath();
-            ctx.roundRect(canvas.width * 0.12, dashY + 55, canvas.width * 0.36, 80, 10);
-            ctx.fill();
-            
-            // 속도 및 기어 텍스트
-            ctx.fillStyle = '#63B3ED';
-            ctx.font = 'bold 26px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${Math.floor(gameSpeed * 12)} km/h`, canvas.width * 0.3, dashY + 105);
-            ctx.fillStyle = '#F56565';
-            ctx.font = 'bold 16px Inter';
-            ctx.fillText(`GEAR 6`, canvas.width * 0.3, dashY + 125);
-
-            // 6. D컷 스티어링 휠 (운전대)
-            let steerX = canvas.width * 0.3; // 계기판 앞
-            let steerY = dashY + 140;
-            let steerAngle = (laneX[this.lane] - this.currentX) * 0.015; // 회전 애니메이션
-            
-            ctx.save();
-            ctx.translate(steerX, steerY);
-            ctx.rotate(steerAngle);
-            
-            // 패들 시프트 (핸들 뒤 기어 변속기)
-            ctx.fillStyle = '#333';
-            ctx.beginPath();
-            ctx.roundRect(-110, -40, 25, 70, 5); // 왼쪽
-            ctx.roundRect(85, -40, 25, 70, 5);  // 오른쪽
-            ctx.fill();
-
-            // 핸들 림 (알칸타라 느낌의 두꺼운 그립)
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = 24;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            
-            // 둥근 상단
-            ctx.beginPath();
-            ctx.arc(0, -10, 95, 0, Math.PI, true); 
-            ctx.stroke();
-            
-            // 평평한 하단 (D컷)
-            ctx.beginPath();
-            ctx.moveTo(-95, -10);
-            ctx.lineTo(-70, 80);
-            ctx.lineTo(70, 80);
-            ctx.lineTo(95, -10);
-            ctx.stroke();
-
-            // 상단 옐로우 띠 (정중앙 인디케이터)
-            ctx.fillStyle = '#FACC15';
-            ctx.fillRect(-6, -117, 12, 24);
-
-            // 핸들 중앙 육각형 허브
-            ctx.fillStyle = '#161616';
-            ctx.beginPath();
-            ctx.moveTo(-45, -35);
-            ctx.lineTo(45, -35);
-            ctx.lineTo(55, 25);
-            ctx.lineTo(35, 55);
-            ctx.lineTo(-35, 55);
-            ctx.lineTo(-55, 25);
-            ctx.closePath();
-            ctx.fill();
-            
-            // 옐로우 스티치 디테일
-            ctx.strokeStyle = '#FACC15';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // 핸들 중앙 엠블럼 (옐로우 실드)
-            ctx.fillStyle = '#FACC15';
-            ctx.beginPath();
-            ctx.moveTo(-12, -15);
-            ctx.lineTo(12, -15);
-            ctx.lineTo(12, 10);
-            ctx.lineTo(0, 20);
-            ctx.lineTo(-12, 10);
-            ctx.fill();
-            
-            ctx.restore();
-        },
-        update() {
-            // Smooth Camera X movement for first person view
-            this.currentX += (laneX[this.lane] - this.currentX) * 0.15;
-            currentCameraX = this.currentX;
-
-            if (this.isJumping) {
-                this.jumpY += this.jumpVel;
-                this.jumpVel -= 2.5; // Gravity
-                
-                if (this.jumpY <= 0) {
-                    this.jumpY = 0;
-                    this.isJumping = false;
-                    this.jumpVel = 0;
-                }
-            }
-            
-            currentCameraY = cameraHeight + this.jumpY;
-        },
-        jump() {
-            if (!this.isJumping) {
-                this.isJumping = true;
-                this.jumpVel = 22;
-                playJumpSound();
-            }
-        },
-        moveLeft() {
-            if (this.lane > 0) this.lane--;
-        },
-        moveRight() {
-            if (this.lane < 2) this.lane++;
-        }
-    };
-
-    let obstacles = [];
-    class Obstacle {
-        constructor() {
-            this.lane = Math.floor(Math.random() * 3);
-            this.z = 1500; // Spawn far away at the horizon
-            this.passed = false;
-            // 랜덤 색상의 마주오는 자동차
-            this.color = ['#E53E3E', '#D69E2E', '#38A169', '#805AD5'][Math.floor(Math.random()*4)];
-        }
-        draw() {
-            if (this.z < 10) return;
-            
-            let x = laneX[this.lane];
-            let y = 0; // Ground level
-            
-            let proj = project3D(x, y, this.z);
-            if(proj.scale <= 0) return;
-
-            let w = 90 * proj.scale;
-            let h = 55 * proj.scale;
-            let cX = proj.x - w/2;
-            let cY = proj.y - h;
-            
-            // Shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.beginPath();
-            ctx.ellipse(proj.x, proj.y, w*0.8, h*0.25, 0, 0, Math.PI*2);
-            ctx.fill();
-
-            // Car Body
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.roundRect(cX, cY, w, h, 6 * proj.scale);
-            ctx.fill();
-            
-            // Roof
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.roundRect(cX + w*0.1, cY - h*0.2, w*0.8, h*0.4, 4 * proj.scale);
-            ctx.fill();
-
-            // Windshield
-            ctx.fillStyle = '#E2E8F0';
-            ctx.fillRect(cX + w*0.15, cY - h*0.15, w*0.7, h*0.3);
-
-            // Grill
-            ctx.fillStyle = '#1A202C';
-            ctx.fillRect(cX + w*0.3, cY + h*0.4, w*0.4, h*0.3);
-
-            // Headlights (Bright, facing camera)
-            ctx.fillStyle = '#FEFCBF';
-            ctx.beginPath();
-            ctx.arc(cX + w*0.15, cY + h*0.5, w*0.12, 0, Math.PI*2);
-            ctx.arc(cX + w*0.85, cY + h*0.5, w*0.12, 0, Math.PI*2);
-            ctx.fill();
-            
-            // Glow effect for headlights
-            ctx.fillStyle = 'rgba(254, 252, 191, 0.4)';
-            ctx.beginPath();
-            ctx.arc(cX + w*0.15, cY + h*0.5, w*0.25, 0, Math.PI*2);
-            ctx.arc(cX + w*0.85, cY + h*0.5, w*0.25, 0, Math.PI*2);
-            ctx.fill();
-        }
-        update() {
-            // Obstacles move towards the camera based on Z-depth
-            this.z -= gameSpeed;
-        }
-    }
-
-    // Input Handling
-    window.addEventListener('keydown', (e) => {
-        if (!isPlaying || isGameOver || isPaused) return;
-        if (e.target.tagName === 'INPUT') return; // 입력창 타이핑 중일 때 조작 방지
-
-        const key = e.key.toLowerCase();
-        if (key === 'a' || e.key === 'ArrowLeft') car.moveLeft();
-        if (key === 'd' || e.key === 'ArrowRight') car.moveRight();
-        if (e.key === ' ' || e.key === 'ArrowUp') { 
-            e.preventDefault(); 
-            car.jump(); 
-        }
-    });
-
-    document.getElementById('btn-left').addEventListener('touchstart', (e) => { e.preventDefault(); car.moveLeft(); });
-    document.getElementById('btn-left').addEventListener('mousedown', () => car.moveLeft());
-    
-    document.getElementById('btn-right').addEventListener('touchstart', (e) => { e.preventDefault(); car.moveRight(); });
-    document.getElementById('btn-right').addEventListener('mousedown', () => car.moveRight());
-    
-    document.getElementById('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); car.jump(); });
-    document.getElementById('btn-jump').addEventListener('mousedown', () => car.jump());
-
-    // Draw Realistic Pseudo-3D Environment
-    function drawEnvironment() {
-        const theme = themes[currentTheme];
-        const horizonY = canvas.height * 0.4;
-        
-        // 1. Draw Sky Gradient or Custom Background
-        if (customBgImg) {
-            // Draw custom image for the sky
-            ctx.drawImage(customBgImg, 0, 0, canvas.width, horizonY);
-        } else {
-            // Default Gradient Sky
-            let grad = ctx.createLinearGradient(0, 0, 0, horizonY);
-            if (currentTheme === 'morning') {
-                grad.addColorStop(0, '#4299E1');
-                grad.addColorStop(1, '#BEE3F8');
-            } else if (currentTheme === 'sunset') {
-                grad.addColorStop(0, '#C53030');
-                grad.addColorStop(1, '#F6AD55');
-            } else {
-                grad.addColorStop(0, '#1A202C');
-                grad.addColorStop(1, '#2D3748');
-            }
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, horizonY);
-            
-            // 2. Draw Sun/Moon (Only if no custom background)
-            ctx.fillStyle = currentTheme === 'dark' ? '#F6E05E' : (currentTheme === 'sunset' ? '#ED8936' : '#FAF089');
-            ctx.beginPath();
-            ctx.arc(canvas.width * 0.7, horizonY * 0.6, horizonY * 0.2, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        // 3. Draw 3D Ground & Road (Painters Algorithm: Far to Near)
-        let maxDrawZ = 1500;
-        let segmentLength = 60;
-        let startOffset = cameraZ % segmentLength;
-        
-        let prevProj = project3D(0, 0, maxDrawZ - startOffset);
-        let prevProjLeft = project3D(-180, 0, maxDrawZ - startOffset);
-        let prevProjRight = project3D(180, 0, maxDrawZ - startOffset);
-        
-        for (let actualZ = maxDrawZ - segmentLength - startOffset; actualZ >= 5; actualZ -= segmentLength) {
-            let proj = project3D(0, 0, actualZ);
-            let projLeft = project3D(-180, 0, actualZ);
-            let projRight = project3D(180, 0, actualZ);
-            
-            // 색상 교차를 통해 질주하는 잔디 효과
-            let colorIndex = Math.floor((actualZ + cameraZ) / segmentLength) % 2;
-            
-            // Grass Background
-            ctx.fillStyle = colorIndex === 0 ? theme.grass1 : theme.grass2;
-            ctx.beginPath();
-            ctx.moveTo(0, proj.y);
-            ctx.lineTo(canvas.width, proj.y);
-            ctx.lineTo(canvas.width, prevProj.y + 1); // +1 prevents subpixel gaps
-            ctx.lineTo(0, prevProj.y + 1);
-            ctx.fill();
-            
-            // Road
-            ctx.fillStyle = colorIndex === 0 ? theme.road1 : theme.road2;
-            ctx.beginPath();
-            ctx.moveTo(projLeft.x, proj.y);
-            ctx.lineTo(projRight.x, proj.y);
-            ctx.lineTo(prevProjRight.x, prevProj.y + 1);
-            ctx.lineTo(prevProjLeft.x, prevProj.y + 1);
-            ctx.fill();
-            
-            // Lane Lines (Dashed, drawn on one color index)
-            if (colorIndex === 0) {
-                ctx.fillStyle = theme.line;
-                let lineW = 6; // base width
-                
-                // Left Lane Line
-                let l1Top = project3D(-60, 0, actualZ + segmentLength);
-                let l1Bot = project3D(-60, 0, actualZ);
-                ctx.beginPath(); 
-                ctx.moveTo(l1Top.x - lineW*l1Top.scale, prevProj.y); 
-                ctx.lineTo(l1Top.x + lineW*l1Top.scale, prevProj.y);
-                ctx.lineTo(l1Bot.x + lineW*l1Bot.scale, proj.y); 
-                ctx.lineTo(l1Bot.x - lineW*l1Bot.scale, proj.y); 
-                ctx.fill();
-                
-                // Right Lane Line
-                let l2Top = project3D(60, 0, actualZ + segmentLength);
-                let l2Bot = project3D(60, 0, actualZ);
-                ctx.beginPath(); 
-                ctx.moveTo(l2Top.x - lineW*l2Top.scale, prevProj.y); 
-                ctx.lineTo(l2Top.x + lineW*l2Top.scale, prevProj.y);
-                ctx.lineTo(l2Bot.x + lineW*l2Bot.scale, proj.y); 
-                ctx.lineTo(l2Bot.x - lineW*l2Bot.scale, proj.y); 
-                ctx.fill();
-            }
-            
-            prevProj = proj;
-            prevProjLeft = projLeft;
-            prevProjRight = projRight;
-        }
-    }
-
-    // Collision Logic (3D Depth & Height)
-    function checkCollision(obs) {
-        // Player is at Z = 0 in first person view
-        if (obs.lane === car.lane) {
-            // Collision zone is when obstacle is right in front (Z between 0 and 40)
-            if (obs.z > 0 && obs.z < 40) {
-                // Height check for jump evasion (Obstacle is around 55 high)
-                if (car.jumpY < 45) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    // Main Game Loop
-    function gameLoop() {
-        if (!isPlaying) return;
-
-        if (isPaused) {
-            animationId = requestAnimationFrame(gameLoop);
-            return;
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Move camera forward
-        cameraZ += gameSpeed;
-
-        drawEnvironment();
-
-        car.update();
-
-        // Spawn Obstacles (faster spawning as score increases)
-        let spawnRate = Math.max(10, 40 - Math.floor(score/30));
-        if (frameCount % spawnRate === 0) {
-            // 점수가 어느 정도 올랐을 때(50점 이상) 10% 확률로 자동차 3대 동시 소환 (점프 필수)
-            if (score >= 50 && Math.random() < 0.1) {
-                let obs1 = new Obstacle(); obs1.lane = 0;
-                let obs2 = new Obstacle(); obs2.lane = 1;
-                let obs3 = new Obstacle(); obs3.lane = 2;
-                obstacles.push(obs1, obs2, obs3);
-            } else {
-                obstacles.push(new Obstacle());
-            }
-        }
-
-        // Sort obstacles by Z (Far to Near) for correct Painters Algorithm
-        obstacles.sort((a, b) => b.z - a.z);
-
-        // Update & Draw Obstacles
-        for (let i = obstacles.length - 1; i >= 0; i--) {
-            let obs = obstacles[i];
-            obs.update();
-            
-            // Collision check
-            if (checkCollision(obs)) {
-                handleGameOver();
-                return; 
-            }
-
-            obs.draw();
-
-            // Score update when car passes behind the player
-            if (obs.z < 0 && !obs.passed) {
-                obs.passed = true;
-                score += 10;
-                scoreDisplay.innerText = `점수: ${score}`;
-                
-                // Increase speed progressively (가면 갈수록 더 빠르게)
-                if (score % 30 === 0) {
-                    gameSpeed += 1.0;
-                }
-            }
-
-            // Remove cars out of view
-            if (obs.z < -100) {
-                obstacles.splice(i, 1);
-            }
-        }
-
-        // Draw Player Dashboard Overlay last
-        car.draw();
-
-        frameCount++;
-        animationId = requestAnimationFrame(gameLoop);
-    }
-
-    function togglePause() {
-        if (!isPlaying || isGameOver) return;
-        isPaused = !isPaused;
-        const pauseScreen = document.getElementById('pause-screen');
-        const pauseBtn = document.getElementById('btn-pause');
-        
-        if (isPaused) {
-            pauseScreen.classList.remove('hidden');
-            pauseScreen.classList.add('flex');
-            pauseBtn.innerText = "▶️ 재생";
-        } else {
-            pauseScreen.classList.add('hidden');
-            pauseScreen.classList.remove('flex');
-            pauseBtn.innerText = "⏸️ 멈춤";
-        }
-    }
-
-    function handleGameOver() {
-        isGameOver = true;
-        isPlaying = false;
-        playCrashSound();
-        cancelAnimationFrame(animationId);
-        
-        // Visual shake effect
-        container.style.transform = 'translate(15px, 15px)';
-        setTimeout(() => container.style.transform = 'translate(-15px, -15px)', 50);
-        setTimeout(() => container.style.transform = 'translate(15px, -15px)', 100);
-        setTimeout(() => container.style.transform = 'translate(0, 0)', 150);
-
-        finalScoreDisplay.innerText = score;
-        gameOverScreen.style.display = 'flex';
-    }
-
-    async function startGame() {
-        await initAudio();
-        startScreen.style.display = 'none';
-        resetGameLogic();
-        isPlaying = true;
-        gameLoop();
-    }
-
-    function resetGame() {
-        gameOverScreen.style.display = 'none';
-        resetGameLogic();
-        isPlaying = true;
-        gameLoop();
-    }
-
-    function resetGameLogic() {
-        car.lane = 1;
-        car.currentX = 0;
-        car.jumpY = 0;
-        car.isJumping = false;
-        obstacles = [];
-        score = 0;
-        frameCount = 0;
-        gameSpeed = 15;
-        cameraZ = 0;
-        currentCameraX = 0;
-        currentCameraY = cameraHeight;
-        isGameOver = false;
-        isPaused = false;
-        document.getElementById('pause-screen').classList.add('hidden');
-        document.getElementById('pause-screen').classList.remove('flex');
-        document.getElementById('btn-pause').innerText = "⏸️ 멈춤";
-        scoreDisplay.innerText = `점수: 0`;
-    }
-
-    // Initial render for background before start
-    setTheme(currentTheme);
-    drawEnvironment(); 
-    car.draw();
-
-</script>
+            createAndShuffleDeck();
+        });
+    </script>
 </body>
 </html>

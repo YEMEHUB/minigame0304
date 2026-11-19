@@ -1,1109 +1,1317 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Top-Down FPS - Wave Survival</title>
-    <!-- Tailwind CSS -->
+    <title>K-POP 초성 아이돌 그룹 퀴즈</title>
+    <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Tone.js 로드 (예능 효과음용) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts: Inter & Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap');
-        
-        * {
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
         body {
-            font-family: 'Pretendard', sans-serif;
-            background-color: #0f172a;
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #2e1065, #0f172a 60%, #090d16 100%);
             color: #f8fafc;
-            overflow: hidden;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
 
-        /* 흰색 배경 캔버스 */
-        #gameCanvas {
-            background-color: #ffffff;
-            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
-            border-radius: 12px;
-            cursor: crosshair;
+        /* 네온 유리 질감 카드 */
+        .neon-card {
+            background: rgba(30, 41, 59, 0.72);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(192, 132, 252, 0.25);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(168, 85, 247, 0.15);
+        }
+
+        /* 초성 글자 타일 스타일 */
+        .chosung-tile {
+            background: linear-gradient(145deg, #1e1b4b, #311042);
+            border: 2px solid #a855f7;
+            box-shadow: 0 8px 20px rgba(168, 85, 247, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+            text-shadow: 0 0 15px rgba(232, 121, 249, 0.8);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.92); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: pop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-center items-center p-2 sm:p-4">
+<body class="flex flex-col items-center justify-center p-4 sm:p-6">
 
-    <!-- Game Header Container -->
-    <div class="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center mb-2 px-2 gap-2">
-        <div class="flex items-center gap-3">
-            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                <i class="fa-solid fa-crosshairs text-indigo-500"></i> 2D FPS 서바이벌
+    <!-- 메인 컨테이너 -->
+    <div class="w-full max-w-md mx-auto">
+
+        <!-- 1. 시작 화면 (Start Screen) -->
+        <div id="start-screen" class="neon-card rounded-3xl p-6 sm:p-8 text-center animate-pop">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-fuchsia-500 to-indigo-600 text-3xl shadow-lg shadow-fuchsia-500/30 mb-4">
+                🎤
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2">
+                K-POP 아이돌 그룹<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-cyan-300">초성 퀴즈</span>
             </h1>
-            <span id="waveBadge" class="px-3 py-1 rounded-full bg-indigo-600 text-xs font-bold tracking-wider">
-                WAVE 1
-            </span>
-        </div>
+            <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+                제시되는 초성을 보고 대한민국 대표 아이돌 그룹의 이름을 맞혀보세요! (영어 그룹명도 정답 인정)
+            </p>
 
-        <!-- HUD Stats Bar -->
-        <div class="flex items-center gap-3 sm:gap-4 bg-slate-800/80 backdrop-blur px-3 sm:px-4 py-2 rounded-xl border border-slate-700/50 text-xs sm:text-sm">
-            <!-- Player Health -->
-            <div class="flex items-center gap-2">
-                <i class="fa-solid fa-heart text-rose-500"></i>
-                <span class="font-semibold text-slate-400 hidden xs:inline">체력:</span>
-                <div class="w-20 sm:w-28 bg-slate-700 h-3.5 rounded-full overflow-hidden border border-slate-600 relative">
-                    <div id="hpBar" class="bg-rose-500 h-full transition-all duration-200" style="width: 100%;"></div>
-                    <span id="hpText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white leading-none">150 / 150</span>
+            <!-- 카테고리 필터 선택 -->
+            <div class="bg-slate-900/60 rounded-2xl p-4 mb-4 text-left border border-slate-700/60">
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    출제 범위 선택
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" data-filter="ALL" class="filter-option py-2 px-2 rounded-xl text-xs font-bold bg-fuchsia-600 text-white border border-fuchsia-400 shadow-md transition">
+                        🌟 전체 그룹
+                    </button>
+                    <button type="button" data-filter="BOY" class="filter-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-fuchsia-500 transition">
+                        🕺 보이그룹
+                    </button>
+                    <button type="button" data-filter="GIRL" class="filter-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-fuchsia-500 transition">
+                        💃 걸그룹
+                    </button>
                 </div>
             </div>
 
-            <!-- Dash Skill Cooldown HUD -->
-            <div class="flex items-center gap-1.5 border-l border-slate-700 pl-3">
-                <i class="fa-solid fa-bolt text-amber-400"></i>
-                <span class="font-semibold text-slate-400 hidden xs:inline">대쉬[E]:</span>
-                <div id="dashContainer" class="relative w-12 sm:w-16 bg-slate-700 h-3.5 rounded-full overflow-hidden border border-slate-600">
-                    <div id="dashBar" class="bg-amber-400 h-full transition-all duration-75" style="width: 100%;"></div>
-                    <span id="dashText" class="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-slate-900 leading-none">READY</span>
+            <!-- 제한 시간 설정 -->
+            <div class="bg-slate-900/60 rounded-2xl p-4 mb-6 text-left border border-slate-700/60">
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    제한 시간 설정
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" data-time="7" class="time-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-cyan-400 transition">
+                        ⚡ 스피드 (7초)
+                    </button>
+                    <button type="button" data-time="12" class="time-option py-2 px-2 rounded-xl text-xs font-bold bg-cyan-600 text-white border border-cyan-400 shadow-md transition">
+                        🔥 기본 (12초)
+                    </button>
+                    <button type="button" data-time="0" class="time-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-cyan-400 transition">
+                        ☕ 무제한
+                    </button>
                 </div>
             </div>
 
-            <!-- Enemy Count -->
-            <div class="flex items-center gap-1.5 border-l border-slate-700 pl-3">
-                <i class="fa-solid fa-skull text-amber-400"></i>
-                <span id="enemyCountText" class="font-bold text-amber-400 font-mono text-base">0</span>
-            </div>
-
-            <!-- Sound Toggle -->
-            <button id="soundToggleBtn" class="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-slate-200 ml-1">
-                <i id="soundIcon" class="fa-solid fa-volume-high text-xs"></i>
+            <button id="start-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-purple-600 to-indigo-600 hover:from-fuchsia-600 hover:to-indigo-700 text-white font-extrabold text-lg shadow-lg shadow-fuchsia-500/30 transition transform active:scale-95">
+                게임 시작하기 (목숨 3개)
             </button>
         </div>
-    </div>
 
-    <!-- Main Game Viewport -->
-    <div class="relative w-full max-w-4xl flex justify-center items-center">
-        <!-- Canvas Element -->
-        <canvas id="gameCanvas" width="900" height="600" class="w-full h-auto max-h-[75vh] border-2 border-slate-700"></canvas>
-
-        <!-- Overlay UI (Start / Game Over / Victory) -->
-        <div id="overlay" class="absolute inset-0 bg-slate-900/85 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-6 text-center z-10 transition-all duration-300">
-            <div id="overlayContent" class="max-w-md">
-                <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 text-3xl">
-                    <i id="overlayIcon" class="fa-solid fa-gun"></i>
+        <!-- 2. 퀴즈 진행 화면 (Quiz Screen) -->
+        <div id="quiz-screen" class="hidden neon-card rounded-3xl p-5 sm:p-6">
+            <!-- 상단 상태 바 -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span id="question-counter" class="px-3 py-1 rounded-full bg-slate-800 text-xs font-bold text-fuchsia-400 border border-slate-700">
+                        1번째 문제
+                    </span>
+                    <span id="group-badge" class="px-2.5 py-1 rounded-full bg-indigo-950/90 text-xs font-semibold text-cyan-300 border border-indigo-700/60">
+                        걸그룹 · 4세대
+                    </span>
                 </div>
-                <h2 id="overlayTitle" class="text-3xl font-black mb-2 text-white">2D FPS 챌린지</h2>
-                <p id="overlayDesc" class="text-sm text-slate-300 mb-6 leading-relaxed">
-                    <b class="text-indigo-400">WASD</b> 키로 이동하고 <b class="text-indigo-400">K</b> 키를 눌러 자동 조준 사격하세요!<br>
-                    <b class="text-amber-400">E</b> 키로 대쉬(쿨타임 5초) 사용 시 <b class="text-cyan-400">적 돌진 50 데미지</b>!<br>
-                    처치 시 <b class="text-emerald-400">10% 확률로 50 HP 회복 팩</b>이 드랍됩니다.
-                </p>
-
-                <!-- Key Bindings Guide Box -->
-                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 mb-6 grid grid-cols-3 gap-2 text-xs text-slate-300">
-                    <div class="flex items-center gap-1.5 justify-center">
-                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">WASD</span>
-                        <span>이동</span>
+                <div class="flex items-center gap-3">
+                    <div id="lives-display" class="text-sm font-black tracking-tight" title="남은 기회">
+                        ❤️❤️❤️
                     </div>
-                    <div class="flex items-center gap-1.5 justify-center">
-                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">E</span>
-                        <span>대쉬</span>
-                    </div>
-                    <div class="flex items-center gap-1.5 justify-center">
-                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">K</span>
-                        <span>자동사격</span>
+                    <div class="text-sm font-bold text-slate-200">
+                        <span id="score-display" class="text-emerald-400 font-black">0</span>점
                     </div>
                 </div>
-
-                <button id="startBtn" class="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition font-extrabold text-lg text-white shadow-lg shadow-indigo-600/30 tracking-wide flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-play"></i> 게임 시작
-                </button>
             </div>
+
+            <!-- 제한 시간 프로그레스 바 -->
+            <div id="timer-container" class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden mb-5 border border-slate-700/50">
+                <div id="timer-bar" class="h-full bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-rose-500 transition-all duration-100 ease-linear" style="width: 100%;"></div>
+            </div>
+
+            <!-- 초성 표시 메인 영역 -->
+            <div class="relative w-full py-8 px-4 mb-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col items-center justify-center min-h-[200px]">
+                <span class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4">
+                    제시된 초성
+                </span>
+
+                <!-- 초성 타일 컨테이너 -->
+                <div id="chosung-container" class="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 mb-3">
+                    <!-- JS로 동적 생성 -->
+                </div>
+
+                <span id="letter-count-info" class="text-xs text-fuchsia-300/80 font-semibold mt-1">
+                    총 4글자
+                </span>
+
+                <!-- 정답/오답 피드백 오버레이 -->
+                <div id="feedback-overlay" class="hidden absolute inset-0 rounded-2xl bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20">
+                    <div id="feedback-icon" class="text-4xl mb-1.5">⭕</div>
+                    <div id="feedback-title" class="text-xl font-black text-emerald-400 mb-1">정답입니다!</div>
+                    <div id="feedback-answer" class="text-2xl font-black text-white mb-2">방탄소년단 (BTS)</div>
+                    <p id="feedback-desc" class="text-xs text-slate-300 max-w-xs leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- 힌트 표시 박스 -->
+            <div id="hint-box" class="hidden mb-3 py-2.5 px-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-center">
+                <span class="text-xs font-bold text-amber-300 leading-relaxed" id="hint-text">🎵 힌트: Dynamite, 봄날</span>
+            </div>
+
+            <!-- 정답 입력 폼 -->
+            <form id="answer-form" class="flex flex-col gap-2.5" autocomplete="off">
+                <input 
+                    type="text" 
+                    id="answer-input" 
+                    placeholder="아이돌 그룹 이름을 입력하세요" 
+                    class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/95 border-2 border-slate-600 focus:border-fuchsia-500 focus:outline-none text-white font-bold text-center text-base sm:text-lg placeholder:text-slate-500 placeholder:font-normal transition"
+                    required
+                />
+
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" id="hint-btn" class="col-span-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm border border-slate-600 transition">
+                        💡 힌트 보기
+                    </button>
+                    <button type="submit" id="submit-btn" class="col-span-2 py-3 rounded-xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 hover:from-fuchsia-600 hover:to-indigo-700 text-white font-extrabold text-sm sm:text-base shadow-md transition active:scale-95">
+                        정답 제출 (Enter)
+                    </button>
+                </div>
+            </form>
+
+            <!-- 다음 문제 버튼 -->
+            <button id="next-btn" class="hidden w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black text-base shadow-lg transition transform active:scale-95">
+                다음 문제로 ➔
+            </button>
         </div>
 
-        <!-- Boss Health Bar (Top Center of Canvas Area) -->
-        <div id="bossHpContainer" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-rose-500/50 px-5 py-2 rounded-xl flex flex-col items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-300 z-0">
-            <div class="flex items-center gap-2 text-xs font-bold text-rose-400 uppercase tracking-wider">
-                <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i>
-                <span id="bossName">BOSS WAVE</span>
+        <!-- 3. 최종 결과 화면 (Result Screen) -->
+        <div id="result-screen" class="hidden neon-card rounded-3xl p-6 sm:p-8 text-center">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-tr from-fuchsia-500 to-cyan-400 text-4xl shadow-xl mb-4">
+                👑
             </div>
-            <div class="w-64 sm:w-80 h-3 bg-slate-800 rounded-full border border-rose-900 overflow-hidden relative">
-                <div id="bossHpBar" class="h-full bg-gradient-to-r from-rose-600 to-amber-500 transition-all duration-150" style="width: 100%;"></div>
+            <h2 class="text-2xl font-black text-white mb-1">퀴즈 완료!</h2>
+            <p id="result-comment" class="text-sm text-fuchsia-300 font-semibold mb-6">당신은 진정한 K-POP 고인물!</p>
+
+            <!-- 성적 요약 박스 -->
+            <div class="bg-slate-900/75 rounded-2xl p-5 mb-6 border border-slate-700/70">
+                <div class="text-xs text-slate-400 mb-1">최종 정답 수</div>
+                <div class="text-4xl font-black text-white mb-2">
+                    <span id="final-correct" class="text-emerald-400">0</span> <span class="text-xl text-slate-400">문제 클리어</span>
+                </div>
+                <div class="text-xs font-bold text-amber-400">
+                    최종 획득 점수: <span id="final-score">0</span>점
+                </div>
             </div>
-            <span id="bossHpText" class="text-[11px] font-mono font-bold text-slate-300">100 / 100</span>
+
+            <!-- 문제별 정오표 리스트 -->
+            <div class="text-left mb-6">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">문제별 정오표</h3>
+                <div id="review-list" class="max-h-52 overflow-y-auto space-y-2 pr-1">
+                    <!-- JS로 동적 생성 -->
+                </div>
+            </div>
+
+            <button id="restart-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-purple-600 to-indigo-600 hover:from-fuchsia-600 hover:to-indigo-700 text-white font-extrabold text-base shadow-lg transition transform active:scale-95">
+                ↻ 새로운 문제로 다시 도전하기
+            </button>
         </div>
 
-        <!-- Wave Start Notification Overlay Banner -->
-        <div id="waveBanner" class="absolute pointer-events-none opacity-0 transition-all duration-500 transform scale-75 flex flex-col items-center justify-center z-20 drop-shadow-2xl">
-            <h2 id="waveBannerText" class="text-4xl sm:text-6xl font-black text-amber-400 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
-                WAVE 1 START!
-            </h2>
-            <p id="waveBannerSub" class="text-slate-800 font-bold text-sm sm:text-base mt-1 bg-white/80 px-4 py-1 rounded-full border border-amber-400 shadow">
-                모든 적을 처치하세요!
-            </p>
-        </div>
     </div>
 
-    <!-- Footer Guide -->
-    <div class="mt-3 text-xs text-slate-500 text-center flex items-center justify-center gap-4 flex-wrap">
-        <span><i class="fa-solid fa-shield-halved text-slate-400"></i> 체력: 150</span>
-        <span><i class="fa-solid fa-bolt text-amber-400"></i> 대쉬 공격: 50 딜</span>
-        <span><i class="fa-solid fa-notes-medical text-emerald-400"></i> 회복 드랍율: 10% (+50 HP)</span>
-        <span><i class="fa-solid fa-bullseye text-slate-400"></i> 10/25/50 Wave 보스</span>
-    </div>
-
-    <!-- JavaScript Game Engine Code -->
     <script>
-        // --- Web Audio API SFX Synth Generator ---
-        class SoundEngine {
-            constructor() {
-                this.ctx = null;
-                this.enabled = true;
+        /**
+         * K-POP 아이돌 그룹 초성 퀴즈 데이터베이스
+         * 대중적인 톱티어 그룹부터 숨은 명곡 보유 그룹·중소돌·신인 그룹까지 고루 포함
+         */
+        const IDOL_GROUPS = [
+            {
+                name: "방탄소년단",
+                aliases: ["BTS", "방탄"],
+                chosung: ["ㅂ", "ㅌ", "ㅅ", "ㄴ", "ㄷ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "Dynamite, 봄날, DNA (빅히트)",
+                desc: "빌보드 핫 100 1위를 다수 석권하며 전 세계에 K-POP 열풍을 일으킨 7인조 보이그룹입니다."
+            },
+            {
+                name: "블랙핑크",
+                aliases: ["BLACKPINK", "블핑"],
+                chosung: ["ㅂ", "ㄹ", "ㅍ", "ㅋ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "뚜두뚜두, Kill This Love (YG)",
+                desc: "코첼라 헤드라이너로 활약하며 글로벌 신드롬을 일으킨 4인조 걸그룹입니다."
+            },
+            {
+                name: "세븐틴",
+                aliases: ["SEVENTEEN", "SVT", "셉틴"],
+                chosung: ["ㅅ", "ㅂ", "ㅌ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "손오공, 아주 NICE, 음악의 신 (플레디스)",
+                desc: "자체 제작 아이돌의 대표주자로 칼군무와 유쾌한 에너지가 돋보이는 13인조 보이그룹입니다."
+            },
+            {
+                name: "뉴진스",
+                aliases: ["NewJeans", "뉴진"],
+                chosung: ["ㄴ", "ㅈ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Hype Boy, Ditto, Super Shy (어도어)",
+                desc: "이지리스닝 팝 사운드와 Y2K 감성으로 신드롬을 일으킨 5인조 걸그룹입니다."
+            },
+            {
+                name: "아이브",
+                aliases: ["IVE"],
+                chosung: ["ㅇ", "ㅇ", "ㅂ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "LOVE DIVE, After LIKE, I AM (스타쉽)",
+                desc: "당당한 자기애 콘셉트로 음원 차트를 올킬하며 큰 사랑을 받는 6인조 걸그룹입니다."
+            },
+            {
+                name: "에스파",
+                aliases: ["aespa"],
+                chosung: ["ㅇ", "ㅅ", "ㅍ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Next Level, Supernova, Spicy (SM)",
+                desc: "독보적인 쇠맛 사운드와 메타버스 세계관으로 4세대를 대표하는 4인조 걸그룹입니다."
+            },
+            {
+                name: "스트레이키즈",
+                aliases: ["Stray Kids", "스키즈", "SKZ"],
+                chosung: ["ㅅ", "ㅌ", "ㄹ", "ㅇ", "ㅋ", "ㅈ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "神메뉴, 특(S-Class), 락(樂) (JYP)",
+                desc: "강렬한 마라맛 퍼포먼스와 자체 프로듀싱으로 빌보드 200 연속 1위를 기록한 8인조 보이그룹입니다."
+            },
+            {
+                name: "트와이스",
+                aliases: ["TWICE", "트둥이"],
+                chosung: ["ㅌ", "ㅇ", "ㅇ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "CHEER UP, TT, Fancy (JYP)",
+                desc: "수많은 국민 히트곡과 전 세계 스타디움 투어를 매진시킨 9인조 걸그룹입니다."
+            },
+            {
+                name: "소녀시대",
+                aliases: ["SNSD", "Girls' Generation", "소시"],
+                chosung: ["ㅅ", "ㄴ", "ㅅ", "ㄷ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "Gee, 다시 만난 세계, 소원을 말해봐 (SM)",
+                desc: "K-POP 걸그룹의 교과서이자 레전드로 불리는 국민 걸그룹입니다."
+            },
+            {
+                name: "르세라핌",
+                aliases: ["LE SSERAFIM", "LESSERAFIM", "핌둥이"],
+                chosung: ["ㄹ", "ㅅ", "ㄹ", "ㅍ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "ANTIFRAGILE, UNFORGIVEN, EASY (쏘스뮤직)",
+                desc: "두려움 없이 앞으로 나아간다는 당당한 메시지와 파워풀한 퍼포먼스가 강점인 5인조 걸그룹입니다."
+            },
+            {
+                name: "드림캐쳐",
+                aliases: ["Dreamcatcher", "드캐"],
+                chosung: ["ㄷ", "ㄹ", "ㅋ", "ㅊ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대 (매니아 강자)",
+                songs: "BOCA, Scream, Chase Me (메탈·록 사운드)",
+                desc: "K-POP에서 드문 강렬한 록/메탈 장르와 악몽 세계관으로 해외 투어에서 엄청난 팬덤을 보유한 7인조 걸그룹입니다."
+            },
+            {
+                name: "온앤오프",
+                aliases: ["ONF", "온옾"],
+                chosung: ["ㅇ", "ㅇ", "ㅇ", "ㅍ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대 (명곡 맛집)",
+                songs: "사랑하게 될 거야, Beautiful Beautiful, 모스코 모스코",
+                desc: "황현 프로듀서와의 찰떡 호흡으로 '숨은 명곡 맛집'이라 불리며 내국인 전원 동반 입대로도 화제가 된 보이그룹입니다."
+            },
+            {
+                name: "위클리",
+                aliases: ["Weeekly"],
+                chosung: ["ㅇ", "ㅋ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "After School, Tag Me (@Me), Ven para",
+                desc: "책상 퍼포먼스를 선보인 'After School'이 스포티파이 1억 스트리밍을 돌파하며 글로벌 역주행을 기록한 걸그룹입니다."
+            },
+            {
+                name: "베리베리",
+                aliases: ["VERIVERY", "베베"],
+                chosung: ["ㅂ", "ㄹ", "ㅂ", "ㄹ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "Lay Back, Thunder, Tap Tap (젤리피쉬)",
+                desc: "빅스의 후배 그룹으로 멤버들이 직접 뮤직비디오까지 편집하는 '크리에이티브돌'로 알려진 보이그룹입니다."
+            },
+            {
+                name: "체리블렛",
+                aliases: ["Cherry Bullet", "체블"],
+                chosung: ["ㅊ", "ㄹ", "ㅂ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Q&A, Love So Sweet, 알oha Oe (FNC)",
+                desc: "사랑스러운 비주얼과 비디오 게임 콘셉트, 그리고 시티팝 명곡 'Love So Sweet'으로 사랑받은 걸그룹입니다."
+            },
+            {
+                name: "원어스",
+                aliases: ["ONEUS"],
+                chosung: ["ㅇ", "ㅇ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "가자(LIT), 월하미인(LUNA), 반박불가 (RBW)",
+                desc: "한국적인 부채춤 퍼포먼스와 동양풍 콘셉트 무대로 '무대 천재'라는 수식어를 얻은 보이그룹입니다."
+            },
+            {
+                name: "퍼플키스",
+                aliases: ["PURPLE KISS", "퍼키"],
+                chosung: ["ㅍ", "ㅍ", "ㅋ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Zombie, Ponzona, Sweet Juice (RBW)",
+                desc: "마마무의 여동생 그룹으로 멤버 전원이 뛰어난 보컬과 작사·작곡 실력을 갖춘 실력파 걸그룹입니다."
+            },
+            {
+                name: "크래비티",
+                aliases: ["CRAVITY", "크비"],
+                chosung: ["ㅋ", "ㄹ", "ㅂ", "ㅌ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "Groovy, Party Rock, My Turn (스타쉽)",
+                desc: "청량한 하이틴 에너지와 에너제틱한 칼군무를 겸비한 9인조 보이그룹입니다."
+            },
+            {
+                name: "빌리",
+                aliases: ["Billlie"],
+                chosung: ["ㅂ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "긴가민가요, RING X RING (미스틱스토리)",
+                desc: "멤버 츠키의 다채로운 표정 연기 직캠('긴가민가요')으로 대중에 강렬한 눈도장을 찍은 걸그룹입니다."
+            },
+            {
+                name: "우아",
+                aliases: ["woo!ah!", "WOOAH"],
+                chosung: ["ㅇ", "ㅇ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Bad Girl, 단거(Danger), BLUSH",
+                desc: "통통 튀는 Z세대 하이틴 감성과 중독성 있는 댄스곡으로 매니아층을 모은 5인조 걸그룹입니다."
+            },
+            {
+                name: "펜타곤",
+                aliases: ["PENTAGON"],
+                chosung: ["ㅍ", "ㅌ", "ㄱ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "빛나리, 데이지, 청개구리 (큐브)",
+                desc: "역주행 메가 히트곡 '빛나리'와 서정적인 록 발라드 '데이지'를 직접 만든 자체 프로듀싱 보이그룹입니다."
+            },
+            {
+                name: "이달의소녀",
+                aliases: ["LOONA", "이달소"],
+                chosung: ["ㅇ", "ㄷ", "ㅇ", "ㅅ", "ㄴ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Butterfly, Hi High, PTT",
+                desc: "방대한 세계관과 예술적인 군무로 국내외 K-POP 평론가들과 글로벌 팬들에게 극찬받은 걸그룹입니다."
+            },
+            {
+                name: "골든차일드",
+                aliases: ["Golden Child", "골차"],
+                chosung: ["ㄱ", "ㄷ", "ㅊ", "ㅇ", "ㄷ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "담다디, Wannabe, Burn It (울림)",
+                desc: "청량돌에서 치명적인 섹시 콘셉트까지 폭넓은 스펙트럼과 라이브 실력을 보여준 보이그룹입니다."
+            },
+            {
+                name: "프로미스나인",
+                aliases: ["fromis_9", "프나"],
+                chosung: ["ㅍ", "ㄹ", "ㅁ", "ㅅ", "ㄴ", "ㅇ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "DM, WE GO, Stay This Way, Supersonic",
+                desc: "청량한 서머송과 비주얼 합으로 군부대와 페스티벌 섭외 1순위로 꼽히는 걸그룹입니다."
+            },
+            {
+                name: "다크비",
+                aliases: ["DKB"],
+                chosung: ["ㄷ", "ㅋ", "ㅂ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대 (숨은 실력파)",
+                songs: "미안해 엄마, 줄꺼야, Flirting X (브레이브)",
+                desc: "용감한형제가 제작한 그룹으로, <피크타임>에서 압도적인 아크로바틱과 퍼포먼스 실력을 입증한 보이그룹입니다."
+            },
+            {
+                name: "하이키",
+                aliases: ["H1-KEY"],
+                chosung: ["ㅎ", "ㅇ", "ㅋ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "건물 사이에 피어난 장미, SEOUL",
+                desc: "중소기획사의 기적으로 불리며 '건물 사이에 피어난 장미' 역주행으로 음원 차트를 강타한 4인조 걸그룹입니다."
+            },
+            {
+                name: "하츠투하츠",
+                aliases: ["Hearts2Hearts", "H2H", "하투하"],
+                chosung: ["ㅎ", "ㅊ", "ㅌ", "ㅎ", "ㅊ"],
+                type: "GIRL",
+                label: "걸그룹 · 최신 신인",
+                songs: "The Chase, RUDE!, Lemon Tang (SM)",
+                desc: "SM엔터테인먼트가 선보인 8인조 다국적 걸그룹으로, 진심이 담긴 음악으로 팬들과 마음을 잇는다는 의미를 담고 있습니다."
+            },
+            {
+                name: "알파드라이브원",
+                aliases: ["ALPHA DRIVE ONE", "ALD1"],
+                chosung: ["ㅇ", "ㅍ", "ㄷ", "ㄹ", "ㅇ", "ㅂ", "ㅇ"],
+                type: "BOY",
+                label: "보이그룹 · 최신 신인",
+                songs: "FREAK ALARM (EUPHORIA)",
+                desc: "서바이벌 프로젝트를 통해 결성된 8인조 보이그룹으로, 강렬한 퍼포먼스와 에너지로 주목받는 신예입니다."
+            },
+            {
+                name: "튜이드",
+                aliases: ["TUIDE", "Tune the Tide"],
+                chosung: ["ㅌ", "ㅇ", "ㄷ"],
+                type: "GIRL",
+                label: "걸그룹 · 최신 신인",
+                songs: "Tune the Tide 데뷔 앨범",
+                desc: "새로운 흐름을 만들겠다는 뜻을 담은 다국적 10대 걸그룹으로, 개성 넘치는 비주얼과 사운드를 선보입니다."
+            },
+            {
+                name: "아워벌스데이",
+                aliases: ["OURBIRTHDAY"],
+                chosung: ["ㅇ", "ㅇ", "ㅂ", "ㅅ", "ㄷ"],
+                type: "GIRL",
+                label: "걸그룹 · 최신 신인",
+                songs: "OURBIRTHDAY 데뷔 싱글",
+                desc: "통통 튀는 매력과 신선한 콘셉트로 새롭게 등장한 7인조 신인 걸그룹입니다."
+            },
+            {
+                name: "롱샷",
+                aliases: ["LNGSHOT"],
+                chosung: ["ㄹ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 최신 신인",
+                songs: "Moonwalkin' (SHOT CALLERS)",
+                desc: "모어비전에서 선보인 4인조 보이그룹으로, 세련된 힙합·R&B 감성과 무대 장악력을 갖춘 신예입니다."
+            },
+            {
+                name: "튠넥스",
+                aliases: ["TUNEXX"],
+                chosung: ["ㅌ", "ㄴ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 최신 신인",
+                songs: "TUNEXX 미니 1집",
+                desc: "IST엔터테인먼트에서 선보인 신인 보이그룹으로, 탄탄한 퍼포먼스와 트렌디한 음악 색깔을 보여줍니다."
+            },
+            {
+                name: "우주소녀",
+                aliases: ["WJSN", "Cosmic Girls", "우소"],
+                chosung: ["ㅇ", "ㅈ", "ㅅ", "ㄴ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "이루리, 비밀이야, SAVE ME SAVE YOU (스타쉽)",
+                desc: "몽환적인 판타지 콘셉트와 매년 새해 첫날 차트를 역주행하는 '이루리'로 사랑받는 걸그룹입니다."
+            },
+            {
+                name: "레드벨벳",
+                aliases: ["Red Velvet", "레벨"],
+                chosung: ["ㄹ", "ㄷ", "ㅂ", "ㅂ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "빨간 맛, Psycho, Bad Boy (SM)",
+                desc: "상큼 발랄한 '레드'와 세련되고 몽환적인 '벨벳' 두 가지 콘셉트를 완벽하게 소화하는 걸그룹입니다."
+            },
+            {
+                name: "샤이니",
+                aliases: ["SHINee"],
+                chosung: ["ㅅ", "ㅇ", "ㄴ"],
+                type: "BOY",
+                label: "보이그룹 · 2세대",
+                songs: "누난 너무 예뻐, Lucifer, View (SM)",
+                desc: "컨템퍼러리 밴드 콘셉트와 압도적인 라이브·퍼포먼스 실력으로 K-POP의 기준을 세운 보이그룹입니다."
+            },
+            {
+                name: "엑소",
+                aliases: ["EXO"],
+                chosung: ["ㅇ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "으르렁, Growl, Love Shot (SM)",
+                desc: "초능력 세계관과 밀리언셀러 기록으로 3세대 보이그룹 전성기를 연 대표 그룹입니다."
+            },
+            {
+                name: "투모로우바이투게더",
+                aliases: ["TXT", "투바투"],
+                chosung: ["ㅌ", "ㅁ", "ㄹ", "ㅇ", "ㅂ", "ㅇ", "ㅌ", "ㄱ", "ㄷ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "0X1=LOVESONG, Sugar Rush Ride, Deja Vu (빅히트)",
+                desc: "성장 서사와 세련된 팝 사운드, 스토리텔링 퍼포먼스로 글로벌 인기를 얻은 5인조 보이그룹입니다."
+            },
+            {
+                name: "엔하이픈",
+                aliases: ["ENHYPEN", "엔딥"],
+                chosung: ["ㅇ", "ㅎ", "ㅇ", "ㅍ"],
+                type: "BOY",
+                label: "보이그룹 · 4세대",
+                songs: "Given-Taken, Drunk-Dazed, Bite Me (빌리프랩)",
+                desc: "다크 판타지·뱀파이어 콘셉트와 칼군무로 데뷔 초부터 월드 투어급 인기를 모은 보이그룹입니다."
+            },
+            {
+                name: "제로베이스원",
+                aliases: ["ZEROBASEONE", "ZB1", "제베원"],
+                chosung: ["ㅈ", "ㄹ", "ㅂ", "ㅇ", "ㅅ", "ㅇ"],
+                type: "BOY",
+                label: "보이그룹 · 5세대",
+                songs: "In Bloom, Crush, FEEL THE POP (웨이크원)",
+                desc: "청량하고 빛나는 청춘 에너지로 5세대 보이그룹의 포문을 연 9인조 그룹입니다."
+            },
+            {
+                name: "라이즈",
+                aliases: ["RIIZE"],
+                chosung: ["ㄹ", "ㅇ", "ㅈ"],
+                type: "BOY",
+                label: "보이그룹 · 5세대",
+                songs: "Get A Guitar, Love 119, Boom Boom Bass (SM)",
+                desc: "이모셔널 팝 장르와 감각적인 비주얼, 중독성 있는 멜로디로 큰 사랑을 받는 보이그룹입니다."
+            },
+            {
+                name: "보이넥스트도어",
+                aliases: ["BOYNEXTDOOR", "보넥도"],
+                chosung: ["ㅂ", "ㅇ", "ㄴ", "ㅅ", "ㅌ", "ㄷ", "ㅇ"],
+                type: "BOY",
+                label: "보이그룹 · 5세대",
+                songs: "One and Only, 뭣 같아, Earth, Wind & Fire (KOZ)",
+                desc: "옆집 소년들처럼 친근하고 솔직한 일상 이야기와 자유분방한 무대 매력이 돋보이는 6인조 보이그룹입니다."
+            },
+            {
+                name: "투어스",
+                aliases: ["TWS"],
+                chosung: ["ㅌ", "ㅇ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 5세대",
+                songs: "첫 만남은 계획대로 되지 않아, 내가 S면 넌 나의 N이 되어줘 (플레디스)",
+                desc: "맑고 청량한 '보이후드 팝' 장르와 섬세한 군무로 큰 사랑을 받은 6인조 보이그룹입니다."
+            },
+            {
+                name: "키스오브라이프",
+                aliases: ["KISS OF LIFE", "키오라", "KIOF"],
+                chosung: ["ㅋ", "ㅅ", "ㅇ", "ㅂ", "ㄹ", "ㅇ", "ㅍ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Shhh, Midas Touch, Sticky (S2)",
+                desc: "탄탄한 라이브 보컬과 힙한 R&B·팝 사운드로 '괴물 신인'이라 불리며 역주행과 정주행을 동시에 이룬 걸그룹입니다."
+            },
+            {
+                name: "트리플에스",
+                aliases: ["tripleS", "트스"],
+                chosung: ["ㅌ", "ㄹ", "ㅍ", "ㅇ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Generation, Rising, Girls Never Die (모드하우스)",
+                desc: "팬 참여형 시스템과 다채로운 디멘션(유닛) 조합, 완성도 높은 퍼포먼스로 주목받는 대형 걸그룹입니다."
+            },
+            {
+                name: "엔믹스",
+                aliases: ["NMIXX"],
+                chosung: ["ㅇ", "ㅁ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "O.O, Love Me Like This, DASH, 별별별 (JYP)",
+                desc: "한 곡 안에 여러 장르를 녹여낸 '믹스팝'과 멤버 전원의 폭발적인 가창력·안무 실력이 특징인 걸그룹입니다."
+            },
+            {
+                name: "스테이씨",
+                aliases: ["STAYC"],
+                chosung: ["ㅅ", "ㅌ", "ㅇ", "ㅆ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "SO BAD, ASAP, Teddy Bear, Bubble (하이업)",
+                desc: "전원 센터급 비주얼과 '틴프레시' 콘셉트, 중독성 있는 훅으로 사랑받는 6인조 걸그룹입니다."
+            },
+            {
+                name: "오마이걸",
+                aliases: ["OH MY GIRL", "오마걸"],
+                chosung: ["ㅇ", "ㅁ", "ㅇ", "ㄱ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "비밀정원, 살짝 설렜어(Nonstop), Dolphin (WM)",
+                desc: "동화 같은 감성과 탄탄한 보컬, '살짝 설렜어'·'Dolphin' 연속 히트로 큰 사랑을 받은 걸그룹입니다."
+            },
+            {
+                name: "러블리즈",
+                aliases: ["Lovelyz"],
+                chosung: ["ㄹ", "ㅂ", "ㄹ", "ㅈ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "아츄(Ah-Choo), Destiny, 지금, 우리 (울림)",
+                desc: "서정적인 멜로디와 청순·아련한 콘셉트, '아츄'로 대표되는 명곡들을 남긴 8인조 걸그룹입니다."
+            },
+            {
+                name: "여자친구",
+                aliases: ["GFRIEND", "여친"],
+                chosung: ["ㅇ", "ㅈ", "ㅊ", "ㄱ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "오늘부터 우리는, 시간을 달려서, MAGO (쏘스뮤직)",
+                desc: "격렬한 칼군무와 청순한 이미지의 '파워 청순'을 개척하며 수많은 명곡을 남긴 걸그룹입니다."
+            },
+            {
+                name: "마마무",
+                aliases: ["MAMAMOO", "마부"],
+                chosung: ["ㅁ", "ㅁ", "ㅁ"],
+                type: "GIRL",
+                label: "걸그룹 · 3세대",
+                songs: "음오아예, 넌 is 뭔들, 별이 빛나는 밤, HIP (RBW)",
+                desc: "믿고 듣는 보컬과 자유분방한 무대 매너, 개성 넘치는 음악 색깔로 사랑받은 4인조 걸그룹입니다."
+            },
+            {
+                name: "에이핑크",
+                aliases: ["Apink", "에핑"],
+                chosung: ["ㅇ", "ㅇ", "ㅍ", "ㅋ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "NoNoNo, Mr. Chu, 1도 없어, Dumhdurum",
+                desc: "청순 콘셉트에서 성숙한 '청순 카리스마'로의 변신까지 성공하며 오랜 기간 사랑받은 장수 걸그룹입니다."
+            },
+            {
+                name: "씨스타",
+                aliases: ["SISTAR"],
+                chosung: ["ㅆ", "ㅅ", "ㅌ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "Touch My Body, Loving U, Alone, I Swear (스타쉽)",
+                desc: "건강미와 시원한 가창력으로 '여름 하면 씨스타'라는 공식을 만든 서머 퀸 걸그룹입니다."
+            },
+            {
+                name: "투애니원",
+                aliases: ["2NE1", "투에니원"],
+                chosung: ["ㅌ", "ㅇ", "ㄴ", "ㅇ", "ㅇ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "내가 제일 잘 나가, Fire, I Don't Care, Lonely (YG)",
+                desc: "독보적인 카리스마와 개성, 힙합·레게·일렉트로닉을 넘나드는 음악으로 2세대 걸그룹 판도를 바꾼 그룹입니다."
+            },
+            {
+                name: "카라",
+                aliases: ["KARA"],
+                chosung: ["ㅋ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "미스터, STEP, 루팡, WHEN I MOVE (DSP)",
+                desc: "엉덩이 춤과 'STEP' 등으로 한국과 일본 양국에서 큰 인기를 누린 대표 2세대 걸그룹입니다."
+            },
+            {
+                name: "티아라",
+                aliases: ["T-ara"],
+                chosung: ["ㅌ", "ㅇ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "Roly-Poly, Lovey-Dovey, 보핍보핍",
+                desc: "복고 디스코 'Roly-Poly'와 클럽 댄스 'Lovey-Dovey' 등 중독성 강한 히트곡을 남긴 걸그룹입니다."
+            },
+            {
+                name: "포미닛",
+                aliases: ["4MINUTE"],
+                chosung: ["ㅍ", "ㅁ", "ㄴ"],
+                type: "GIRL",
+                label: "걸그룹 · 2세대",
+                songs: "Hot Issue, 이름이 뭐예요?, 미쳐 (큐브)",
+                desc: "강렬한 걸크러시와 에너제틱한 퍼포먼스로 독자적인 색깔을 보여준 5인조 걸그룹입니다."
+            },
+            {
+                name: "빅뱅",
+                aliases: ["BIGBANG"],
+                chosung: ["ㅂ", "ㅂ"],
+                type: "BOY",
+                label: "보이그룹 · 2세대",
+                songs: "거짓말, 마지막 인사, 하루하루, 봄여름가을겨울 (YG)",
+                desc: "자작곡과 트렌디한 스타일, 수많은 메가 히트곡으로 K-POP의 지평을 넓힌 레전드 보이그룹입니다."
+            },
+            {
+                name: "동방신기",
+                aliases: ["TVXQ", "동방"],
+                chosung: ["ㄷ", "ㅂ", "ㅅ", "ㄱ"],
+                type: "BOY",
+                label: "보이그룹 · 2세대",
+                songs: "Rising Sun, 주문-MIROTIC, 왜",
+                desc: "완벽한 라이브와 하모니, 강렬한 퍼포먼스로 한일 양국에서 큰 족적을 남긴 보이그룹입니다."
+            },
+            {
+                name: "인피니트",
+                aliases: ["INFINITE"],
+                chosung: ["ㅇ", "ㅍ", "ㄴㅌ"],
+                type: "BOY",
+                label: "보이그룹 · 2세대",
+                songs: "내꺼하자, 추격자, Man In Love (울림)",
+                desc: "칼군무의 대명사로 불리며 '추격자' 등 완성도 높은 댄스곡들로 사랑받은 보이그룹입니다."
+            },
+            {
+                name: "비투비",
+                aliases: ["BTOB"],
+                chosung: ["ㅂ", "ㅌ", "ㅂ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "그리워하다, 너 없인 안 된다, 아름답고도 아프구나 (큐브)",
+                desc: "뛰어난 가창력과 감성 발라드, 그리고 유쾌한 예능감까지 겸비한 실력파 보이그룹입니다."
+            },
+            {
+                name: "갓세븐",
+                aliases: ["GOT7", "갓칠"],
+                chosung: ["ㄱ", "ㅅ", "ㅂ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "딱 좋아(Just right), Hard Carry, Lullaby, NANANA",
+                desc: "마샬아츠 트릭킹 퍼포먼스와 자유분방한 팀 케미로 국내외에서 폭넓은 팬덤을 보유한 보이그룹입니다."
+            },
+            {
+                name: "몬스타엑스",
+                aliases: ["MONSTA X", "몬엑"],
+                chosung: ["ㅁ", "ㅅ", "ㅌ", "ㅇ", "ㅅ"],
+                type: "BOY",
+                label: "보이그룹 · 3세대",
+                songs: "DRAMARAMA, Shoot Out, LOVE KILLA (스타쉽)",
+                desc: "파워풀한 카리스마와 묵직한 사운드, 강렬한 무대 장악력으로 사랑받는 보이그룹입니다."
+            },
+            {
+                name: "하이라이트",
+                aliases: ["Highlight", "비스트", "BEAST"],
+                chosung: ["ㅎ", "ㅇ", "ㄹㅇㅌ"],
+                type: "BOY",
+                label: "보이그룹 · 2세대",
+                songs: "Fiction, 비가 오는 날엔, 얼굴 찌푸리지 말아요",
+                desc: "서정적인 발라드부터 세련된 댄스곡까지 폭넓은 히트곡을 보유한 장수 보이그룹입니다."
+            },
+            {
+                name: "아일릿",
+                aliases: ["ILLIT"],
+                chosung: ["ㅇ", "ㅇ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Magnetic, Lucky Girl Syndrome, Cherish (빌리프랩)",
+                desc: "데뷔곡 'Magnetic'으로 빌보드 핫 100에 진입하며 5세대 대표 신드롬을 일으킨 5인조 걸그룹입니다."
+            },
+            {
+                name: "리센느",
+                aliases: ["RESCENE"],
+                chosung: ["ㄹ", "ㅅ", "ㄴ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "LOVE ATTACK, UhUh, YoYo, Glow Up",
+                desc: "향기를 테마로 한 몽환적이고 세련된 멜로디와 'LOVE ATTACK' 역주행으로 명곡 맛집이라 불리는 5인조 걸그룹입니다."
+            },
+            {
+                name: "이즈나",
+                aliases: ["izna"],
+                chosung: ["ㅇ", "ㅈ", "ㄴ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "IZNA, TIMEBOMB, SIGN (웨이크원)",
+                desc: "<아이랜드2>를 통해 결성되고 테디가 프로듀싱에 참여한 7인조 걸그룹으로, 세련된 퍼포먼스와 비주얼을 자랑합니다."
+            },
+            {
+                name: "베이비몬스터",
+                aliases: ["BABYMONSTER", "베몬"],
+                chosung: ["ㅂ", "ㅇ", "ㅂ", "ㅁ", "ㅅ", "ㅌ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "SHEESH, DRIP, BATTER UP, FOREVER (YG)",
+                desc: "압도적인 라이브 실력과 힙합 카리스마로 '괴물 신인'의 면모를 보여주는 YG의 7인조 걸그룹입니다."
+            },
+            {
+                name: "미야오",
+                aliases: ["MEOVV"],
+                chosung: ["ㅁ", "ㅇ", "ㅇ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "MEOW, TOXIC, BODY (더블랙레이블)",
+                desc: "테디가 이끄는 더블랙레이블의 첫 걸그룹으로, 시크한 고양이 콘셉트와 트렌디한 사운드로 주목받는 5인조 그룹입니다."
+            },
+            {
+                name: "세이마이네임",
+                aliases: ["SAY MY NAME", "세마넴"],
+                chosung: ["ㅅ", "ㅇ", "ㅁ", "ㅇ", "ㄴ", "ㅇ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "WaveWay, ShaLala (인코드)",
+                desc: "김재중이 제작하고 혼다 히토미가 합류해 화제를 모은 7인조 걸그룹으로, 맑고 청량한 감성을 선보입니다."
+            },
+            {
+                name: "유니스",
+                aliases: ["UNIS"],
+                chosung: ["ㅇ", "ㄴ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "SUPERWOMAN, 너만 몰라 (F&F)",
+                desc: "<유니버스 티켓>을 통해 탄생한 8인조 다국적 걸그룹으로, 당차고 에너제틱한 무대 매너가 돋보입니다."
+            },
+            {
+                name: "영파씨",
+                aliases: ["YOUNG POSSE", "영파"],
+                chosung: ["ㅇ", "ㅍ", "ㅆ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "MACARONI CHEESE, XXL, ATE THAT (DSP)",
+                desc: "정통 힙합 사운드와 유쾌한 B급 감성, 탄탄한 랩 실력으로 독보적인 길을 걷고 있는 5인조 걸그룹입니다."
+            },
+            {
+                name: "배드빌런",
+                aliases: ["BADVILLAIN", "배빌"],
+                chosung: ["ㅂ", "ㄷ", "ㅂ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "BADVILLAIN, +82, 숨(ZOOM) (빅플래닛메이드)",
+                desc: "파워풀한 댄스 퍼포먼스와 강렬한 걸크러시 콘셉트로 무대를 압도하는 7인조 걸그룹입니다."
+            },
+            {
+                name: "캔디샵",
+                aliases: ["Candy Shop"],
+                chosung: ["ㅋ", "ㄷ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Good Girl, Don't Cry (브레이브)",
+                desc: "용감한형제가 13년 만에 선보인 걸그룹으로, 통통 튀는 Z세대 감성과 중독성 있는 멜로디를 들려줍니다."
+            },
+            {
+                name: "피프티피프티",
+                aliases: ["FIFTY FIFTY", "핍티"],
+                chosung: ["ㅍ", "ㅍ", "ㅌ", "ㅍ", "ㅍ", "ㅌ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Cupid, SOS, Gravity (어트랙트)",
+                desc: "빌보드 신드롬을 일으킨 'Cupid'와 5인조 재편 후 발표한 'SOS', 'Gravity'로 감미로운 보컬을 들려주는 걸그룹입니다."
+            },
+            {
+                name: "키키",
+                aliases: ["KiiiKiii"],
+                chosung: ["ㅋ", "ㅋ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "I DO ME, BTG (스타쉽)",
+                desc: "아이브의 여동생 그룹으로 데뷔한 스타쉽의 5인조 걸그룹으로, 자유분방하고 신선한 감성으로 큰 화제를 모았습니다."
+            },
+            {
+                name: "메이딘",
+                aliases: ["MADEIN"],
+                chosung: ["ㅁ", "ㅇ", "ㄷ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "UNO, 사랑, 두려움 (143엔터)",
+                desc: "케플러 출신 마시로·예서와 라임라잇 멤버들이 뭉쳐 새롭게 데뷔한 한일 다국적 걸그룹입니다."
+            },
+            {
+                name: "지니어스",
+                aliases: ["Geenius"],
+                chosung: ["ㅈ", "ㄴ", "ㅇ", "ㅅ"],
+                type: "GIRL",
+                label: "걸그룹 · 5세대",
+                songs: "Voyage",
+                desc: "오랜 연습생 기간을 거쳐 탄탄한 팀워크와 세련된 신스팝 사운드로 데뷔한 5인조 걸그룹입니다."
+            },
+            {
+                name: "케플러",
+                aliases: ["Kep1er"],
+                chosung: ["ㅋ", "ㅍ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 4.5세대",
+                songs: "WA DA DA, Shooting Star, TIPI-TAP (웨이크원)",
+                desc: "<걸스플래닛999>를 통해 결성되어 에너제틱한 퍼포먼스와 몽환적인 멜로디로 국내외 팬들의 사랑을 받는 걸그룹입니다."
+            },
+            {
+                name: "라잇썸",
+                aliases: ["LIGHTSUM"],
+                chosung: ["ㄹ", "ㅇ", "ㅆ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "Vanilla, VIVACE, Honey or Spice (큐브)",
+                desc: "긍정적인 에너지와 상큼 발랄함, 성숙한 퍼포먼스까지 고루 소화하는 큐브엔터테인먼트의 걸그룹입니다."
+            },
+            {
+                name: "클라씨",
+                aliases: ["CLASS:y"],
+                chosung: ["ㅋ", "ㄹ", "ㅆ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "SHUT DOWN, CLASSY, Psycho and Beautiful",
+                desc: "<방과후 설렘>을 통해 탄생해 어린 나이에도 흔들림 없는 라이브와 강렬한 퍼포먼스를 보여주는 7인조 걸그룹입니다."
+            },
+            {
+                name: "첫사랑",
+                aliases: ["CSR"],
+                chosung: ["ㅊ", "ㅅ", "ㄹ"],
+                type: "GIRL",
+                label: "걸그룹 · 4세대",
+                songs: "첫사랑(Pop? Pop!), 러브티콘 (♡TiCON)",
+                desc: "멤버 전원이 2005년생 동갑내기로 구성되어 청순하고 풋풋한 K-POP 정통 소녀 감성을 이어가는 걸그룹입니다."
             }
+        ];
 
-            init() {
-                if (!this.ctx) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    this.ctx = new AudioContext();
+        // --- DOM 요소 참조 ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+
+        const filterOptionBtns = document.querySelectorAll('.filter-option');
+        const timeOptionBtns = document.querySelectorAll('.time-option');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const questionCounter = document.getElementById('question-counter');
+        const groupBadge = document.getElementById('group-badge');
+        const livesDisplay = document.getElementById('lives-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const timerContainer = document.getElementById('timer-container');
+        const timerBar = document.getElementById('timer-bar');
+
+        const chosungContainer = document.getElementById('chosung-container');
+        const letterCountInfo = document.getElementById('letter-count-info');
+        const feedbackOverlay = document.getElementById('feedback-overlay');
+        const feedbackIcon = document.getElementById('feedback-icon');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackAnswer = document.getElementById('feedback-answer');
+        const feedbackDesc = document.getElementById('feedback-desc');
+
+        const hintBox = document.getElementById('hint-box');
+        const hintText = document.getElementById('hint-text');
+        const answerForm = document.getElementById('answer-form');
+        const answerInput = document.getElementById('answer-input');
+        const hintBtn = document.getElementById('hint-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        const finalCorrect = document.getElementById('final-correct');
+        const finalScore = document.getElementById('final-score');
+        const resultComment = document.getElementById('result-comment');
+        const reviewList = document.getElementById('review-list');
+
+        // --- 게임 상태 변수 ---
+        const MAX_LIVES = 3;
+        let selectedFilter = 'ALL'; // 'ALL', 'BOY', 'GIRL'
+        let timeLimit = 12; // 기본 12초
+        let quizList = [];
+        let currentIndex = 0;
+        let score = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let isAnswered = false;
+        let hintUsed = false;
+        let timerInterval = null;
+        let timeLeft = 0;
+        let userHistory = [];
+
+        // --- 효과음 설정 (Tone.js) ---
+        let synth = null;
+        function playTone(type) {
+            try {
+                if (!synth && typeof Tone !== 'undefined') {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -8;
                 }
-            }
+                if (!synth) return;
+                if (Tone.context.state !== 'running') Tone.start();
 
-            playShot() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.08);
-
-                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
-
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 0.08);
-                } catch(e){}
-            }
-
-            playHit() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.05);
-
-                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 0.05);
-                } catch(e){}
-            }
-
-            playPlayerHit() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
-                    osc.frequency.linearRampToValueAtTime(60, this.ctx.currentTime + 0.15);
-
-                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 0.15);
-                } catch(e){}
-            }
-
-            playHeal() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const now = this.ctx.currentTime;
-                    [300, 450, 600].forEach((f, idx) => {
-                        const osc = this.ctx.createOscillator();
-                        const gain = this.ctx.createGain();
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(f, now + idx * 0.06);
-                        gain.gain.setValueAtTime(0.15, now + idx * 0.06);
-                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.12);
-                        osc.connect(gain);
-                        gain.connect(this.ctx.destination);
-                        osc.start(now + idx * 0.06);
-                        osc.stop(now + idx * 0.06 + 0.12);
-                    });
-                } catch(e){}
-            }
-
-            playWaveClear() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const now = this.ctx.currentTime;
-                    [440, 554.37, 659.25, 880].forEach((f, idx) => {
-                        const osc = this.ctx.createOscillator();
-                        const gain = this.ctx.createGain();
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(f, now + idx * 0.08);
-                        gain.gain.setValueAtTime(0.1, now + idx * 0.08);
-                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.15);
-                        osc.connect(gain);
-                        gain.connect(this.ctx.destination);
-                        osc.start(now + idx * 0.08);
-                        osc.stop(now + idx * 0.08 + 0.15);
-                    });
-                } catch(e){}
-            }
-
-            playDash() {
-                if (!this.enabled) return;
-                this.init();
-                try {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.12);
-
-                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
-
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 0.12);
-                } catch(e){}
-            }
-        }
-
-        const sound = new SoundEngine();
-
-        // --- Game Specifications & Variables ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        const PLAYER_MAX_HP = 150;
-        const BULLET_DAMAGE = 10;
-        const DASH_DAMAGE = 50; 
-        const HEAL_AMOUNT = 50;  
-        const HEAL_DROP_RATE = 0.10; 
-        const ENEMY_DAMAGE = 10;
-        const NORMAL_ENEMY_HP = 10;
-        const DASH_COOLDOWN_MS = 5000; 
-        const SHOOT_COOLDOWN = 120; // ms
-
-        let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
-        let currentWave = 1;
-        let lastShootTime = 0;
-        let lastDashTime = -DASH_COOLDOWN_MS;
-
-        // Keyboard State
-        const keys = {
-            w: false,
-            a: false,
-            s: false,
-            d: false,
-            e: false,
-            k: false
-        };
-
-        // Entities Containers
-        let player;
-        let bullets = [];
-        let enemies = [];
-        let particles = [];
-        let healthPacks = []; 
-
-        // UI References
-        const waveBadge = document.getElementById('waveBadge');
-        const hpBar = document.getElementById('hpBar');
-        const hpText = document.getElementById('hpText');
-        const dashBar = document.getElementById('dashBar');
-        const dashText = document.getElementById('dashText');
-        const enemyCountText = document.getElementById('enemyCountText');
-        const bossHpContainer = document.getElementById('bossHpContainer');
-        const bossHpBar = document.getElementById('bossHpBar');
-        const bossHpText = document.getElementById('bossHpText');
-        const bossName = document.getElementById('bossName');
-        const waveBanner = document.getElementById('waveBanner');
-        const waveBannerText = document.getElementById('waveBannerText');
-        const waveBannerSub = document.getElementById('waveBannerSub');
-        const overlay = document.getElementById('overlay');
-        const overlayTitle = document.getElementById('overlayTitle');
-        const overlayDesc = document.getElementById('overlayDesc');
-        const overlayIcon = document.getElementById('overlayIcon');
-        const startBtn = document.getElementById('startBtn');
-        const soundToggleBtn = document.getElementById('soundToggleBtn');
-        const soundIcon = document.getElementById('soundIcon');
-
-        // --- Health Pack Class ---
-        class HealthPack {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 12;
-                this.pulse = 0;
-            }
-
-            update() {
-                this.pulse += 0.08;
-            }
-
-            draw() {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                const scale = 1 + Math.sin(this.pulse) * 0.1;
-                ctx.scale(scale, scale);
-
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius + 3, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#10b981';
-                ctx.fill();
-                ctx.strokeStyle = '#047857';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(-6, -2, 12, 4);
-                ctx.fillRect(-2, -6, 4, 12);
-
-                ctx.restore();
-            }
-        }
-
-        // --- Player Class ---
-        class Player {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.radius = 16;
-                this.speed = 3.8;
-                this.hp = PLAYER_MAX_HP;
-                this.angle = 0;
-                this.moveAngle = 0;
-            }
-
-            update() {
-                let dx = 0;
-                let dy = 0;
-
-                if (keys.w) dy -= 1;
-                if (keys.s) dy += 1;
-                if (keys.a) dx -= 1;
-                if (keys.d) dx += 1;
-
-                if (dx !== 0 || dy !== 0) {
-                    const len = Math.hypot(dx, dy);
-                    dx /= len;
-                    dy /= len;
-
-                    this.x += dx * this.speed;
-                    this.y += dy * this.speed;
-
-                    this.moveAngle = Math.atan2(dy, dx);
-                    this.angle = this.moveAngle;
+                const now = Tone.now();
+                if (type === 'correct') {
+                    synth.triggerAttackRelease("C5", "16n", now);
+                    synth.triggerAttackRelease("E5", "16n", now + 0.09);
+                    synth.triggerAttackRelease("G5", "16n", now + 0.18);
+                    synth.triggerAttackRelease("C6", "8n", now + 0.27);
+                } else if (type === 'wrong') {
+                    synth.triggerAttackRelease("C3", "8n", now);
+                    synth.triggerAttackRelease("B2", "4n", now + 0.12);
+                } else if (type === 'hint') {
+                    synth.triggerAttackRelease("G5", "32n", now);
                 }
-
-                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
-                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
-            }
-
-            dash() {
-                const now = performance.now();
-                if (now - lastDashTime >= DASH_COOLDOWN_MS) {
-                    lastDashTime = now;
-
-                    let dashAngle = this.angle;
-                    let dx = 0, dy = 0;
-                    if (keys.w) dy -= 1;
-                    if (keys.s) dy += 1;
-                    if (keys.a) dx -= 1;
-                    if (keys.d) dx += 1;
-
-                    if (dx !== 0 || dy !== 0) {
-                        dashAngle = Math.atan2(dy, dx);
-                    }
-
-                    const startX = this.x;
-                    const startY = this.y;
-                    const dashDistance = 120;
-
-                    this.x += Math.cos(dashAngle) * dashDistance;
-                    this.y += Math.sin(dashAngle) * dashDistance;
-
-                    this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
-                    this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
-
-                    const endX = this.x;
-                    const endY = this.y;
-
-                    enemies.forEach(enemy => {
-                        const hitDistance = distToSegment({ x: enemy.x, y: enemy.y }, { x: startX, y: startY }, { x: endX, y: endY });
-                        if (hitDistance < enemy.radius + 20) {
-                            enemy.hp -= DASH_DAMAGE;
-                            createHitParticles(enemy.x, enemy.y, '#38bdf8', 12);
-                            sound.playHit();
-
-                            if (enemy.isBoss) {
-                                updateBossHpUI(enemy.hp, enemy.maxHp);
-                            }
-
-                            if (enemy.hp <= 0) {
-                                createHitParticles(enemy.x, enemy.y, enemy.color, 20);
-                                handleEnemyDrop(enemy.x, enemy.y);
-                            }
-                        }
-                    });
-
-                    createDashWindParticles(this.x, this.y, dashAngle);
-                    sound.playDash();
-                }
-            }
-
-            draw() {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.angle);
-
-                ctx.fillStyle = '#334155';
-                ctx.fillRect(4, -3, 18, 6);
-
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = '#3b82f6'; 
-                ctx.fill();
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = '#1e40af';
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.arc(6, -4, 3, 0, Math.PI * 2);
-                ctx.arc(6, 4, 3, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
-
-                ctx.restore();
+            } catch (e) {
+                // 오디오 차단 환경 무시
             }
         }
 
-        // --- Bullet Class ---
-        class Bullet {
-            constructor(x, y, angle, isEnemy = false) {
-                this.x = x;
-                this.y = y;
-                this.speed = isEnemy ? 4.5 : 9;
-                this.vx = Math.cos(angle) * this.speed;
-                this.vy = Math.sin(angle) * this.speed;
-                this.radius = isEnemy ? 5 : 4;
-                this.isEnemy = isEnemy;
-                this.markedForRemoval = false;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-
-                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
-                    this.markedForRemoval = true;
-                }
-            }
-
-            draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.isEnemy ? '#ef4444' : '#f59e0b';
-                ctx.fill();
-                
-                ctx.lineWidth = 1.5;
-                ctx.strokeStyle = this.isEnemy ? '#991b1b' : '#b45309';
-                ctx.stroke();
-            }
-        }
-
-        // Helper: Point to Line Segment Distance Calculation
-        function distToSegment(p, v, w) {
-            const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
-            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
-            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-            t = Math.max(0, Math.min(1, t));
-            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
-        }
-
-        // --- Enemy Class ---
-        class Enemy {
-            constructor(x, y, isBoss = false, bossHp = 100) {
-                this.x = x;
-                this.y = y;
-                this.isBoss = isBoss;
-                this.maxHp = isBoss ? bossHp : NORMAL_ENEMY_HP;
-                this.hp = this.maxHp;
-                this.radius = isBoss ? 32 : 15;
-                this.speed = isBoss ? 1.6 : 2.2 + Math.min(currentWave * 0.05, 1.5);
-                this.color = isBoss ? '#dc2626' : '#ea580c';
-                this.lastShootTime = 0;
-                this.shootInterval = isBoss ? 500 : 2200;
-                this.angle = 0;
-            }
-
-            update() {
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
-                const dist = Math.hypot(dx, dy);
-
-                this.angle = Math.atan2(dy, dx);
-
-                if (dist > this.radius + player.radius) {
-                    this.x += (dx / dist) * this.speed;
-                    this.y += (dy / dist) * this.speed;
-                }
-
-                const now = performance.now();
-                if (now - this.lastShootTime > this.shootInterval) {
-                    this.lastShootTime = now;
-                    this.shoot();
-                }
-            }
-
-            shoot() {
-                const angle = Math.atan2(player.y - this.y, player.x - this.x);
-                bullets.push(new Bullet(this.x, this.y, angle, true));
-
-                if (this.isBoss) {
-                    bullets.push(new Bullet(this.x, this.y, angle - 0.25, true));
-                    bullets.push(new Bullet(this.x, this.y, angle + 0.25, true));
-                }
-            }
-
-            draw() {
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.angle);
-
-                if (this.isBoss) {
-                    ctx.beginPath();
-                    ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
-                    ctx.strokeStyle = '#991b1b';
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                }
-
-                ctx.beginPath();
-                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-                ctx.lineWidth = 2.5;
-                ctx.strokeStyle = '#7c2d12';
-                ctx.stroke();
-
-                ctx.fillStyle = '#ffffff';
-                ctx.beginPath();
-                ctx.arc(4, -5, 3.5, 0, Math.PI * 2);
-                ctx.arc(4, 5, 3.5, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#000000';
-                ctx.beginPath();
-                ctx.arc(5, -5, 1.5, 0, Math.PI * 2);
-                ctx.arc(5, 5, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.restore();
-
-                if (this.hp < this.maxHp) {
-                    const barWidth = this.radius * 2;
-                    const barHeight = 5;
-                    const hpRatio = this.hp / this.maxHp;
-
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                    ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth, barHeight);
-
-                    ctx.fillStyle = this.isBoss ? '#ef4444' : '#22c55e';
-                    ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth * hpRatio, barHeight);
-                }
-            }
-        }
-
-        // Helper: Enemy Spawn Coordinates
-        function getRandomSpawnPos() {
-            let x, y;
-            if (Math.random() < 0.5) {
-                x = Math.random() < 0.5 ? 20 : canvas.width - 20;
-                y = Math.random() * canvas.height;
-            } else {
-                x = Math.random() * canvas.width;
-                y = Math.random() < 0.5 ? 20 : canvas.height - 20;
-            }
-            return { x, y };
-        }
-
-        // Banner Display Animation Logic
-        function showWaveBanner(wave, isBossWave) {
-            if (isBossWave) {
-                waveBannerText.innerText = `WAVE ${wave} BOSS!`;
-                waveBannerText.className = "text-4xl sm:text-6xl font-black text-rose-500 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] animate-pulse";
-                waveBannerSub.innerText = "보스가 등장했습니다! 사격에 주의하세요!";
-            } else {
-                waveBannerText.innerText = `WAVE ${wave} START!`;
-                waveBannerText.className = "text-4xl sm:text-6xl font-black text-amber-400 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]";
-                waveBannerSub.innerText = "모든 적을 처치하세요!";
-            }
-
-            waveBanner.classList.remove('opacity-0', 'scale-75');
-            waveBanner.classList.add('opacity-100', 'scale-100');
-
-            setTimeout(() => {
-                waveBanner.classList.remove('opacity-100', 'scale-100');
-                waveBanner.classList.add('opacity-0', 'scale-75');
-            }, 1800);
-        }
-
-        // --- Spawn Wave Enemies Logic ---
-        function spawnWave(wave) {
-            enemies = [];
-            waveBadge.innerText = `WAVE ${wave}`;
-
-            const isBossWave = (wave === 10 || wave === 25 || wave === 50);
-
-            showWaveBanner(wave, isBossWave);
-
-            // Wave 당 적 2명씩 늘어나되 최대 30명으로 제한
-            let normalEnemyCount = (wave % 10 === 0) ? 30 : Math.min(30, wave * 2);
-
-            for (let i = 0; i < normalEnemyCount; i++) {
-                const pos = getRandomSpawnPos();
-                enemies.push(new Enemy(pos.x, pos.y, false));
-            }
-
-            if (isBossWave) {
-                let bossHp = 100;
-                if (wave === 25) bossHp = 300;
-                if (wave === 50) bossHp = 500;
-
-                enemies.push(new Enemy(canvas.width / 2, 80, true, bossHp));
-
-                bossHpContainer.classList.remove('opacity-0');
-                bossName.innerText = `WAVE ${wave} BOSS`;
-                updateBossHpUI(bossHp, bossHp);
-            } else {
-                bossHpContainer.classList.add('opacity-0');
-            }
-
-            updateHUD();
-        }
-
-        // --- Handle Enemy Drop Item ---
-        function handleEnemyDrop(x, y) {
-            if (Math.random() < HEAL_DROP_RATE) {
-                healthPacks.push(new HealthPack(x, y));
-            }
-        }
-
-        // --- Game Setup & Initialization ---
-        function initGame() {
-            player = new Player(canvas.width / 2, canvas.height / 2);
-            bullets = [];
-            enemies = [];
-            particles = [];
-            healthPacks = [];
-            currentWave = 1;
-            lastDashTime = -DASH_COOLDOWN_MS;
-
-            spawnWave(currentWave);
-            updateHUD();
-        }
-
-        function createHitParticles(x, y, color = '#ef4444', count = 8) {
-            for (let i = 0; i < count; i++) {
-                particles.push(new Particle(x, y, color));
-            }
-        }
-
-        function createHealParticles(x, y) {
-            for (let i = 0; i < 12; i++) {
-                particles.push(new Particle(x, y, '#10b981', 4));
-            }
-        }
-
-        // --- Dash Skyblue Wind Particle Effect ---
-        function createDashWindParticles(x, y, angle) {
-            const windColors = ['#38bdf8', '#7dd3fc', '#bae6fd', '#0284c7'];
-            for (let i = 0; i < 22; i++) {
-                const color = windColors[Math.floor(Math.random() * windColors.length)];
-                particles.push(new DashWindParticle(x, y, angle, color));
-            }
-        }
-
-        // --- Particle Effect Class ---
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.radius = Math.random() * 3 + 2;
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 4 + 1;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
-                this.alpha = 1;
-                this.decay = Math.random() * 0.04 + 0.02;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.alpha -= this.decay;
-            }
-
-            draw() {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.alpha);
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
-        // --- Dash Wind Trail Particle ---
-        class DashWindParticle {
-            constructor(x, y, dashAngle, color) {
-                const spreadAngle = (dashAngle + Math.PI) + (Math.random() - 0.5) * 1.2;
-                const speed = Math.random() * 6 + 2;
-
-                this.x = x + (Math.random() - 0.5) * 20;
-                this.y = y + (Math.random() - 0.5) * 20;
-                this.vx = Math.cos(spreadAngle) * speed;
-                this.vy = Math.sin(spreadAngle) * speed;
-                this.length = Math.random() * 12 + 8;
-                this.width = Math.random() * 3 + 1.5;
-                this.angle = spreadAngle;
-                this.color = color;
-                this.alpha = 1;
-                this.decay = Math.random() * 0.05 + 0.03;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.alpha -= this.decay;
-            }
-
-            draw() {
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, this.alpha);
-                ctx.strokeStyle = this.color;
-                ctx.lineWidth = this.width;
-                ctx.lineCap = 'round';
-
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y);
-                ctx.lineTo(this.x - Math.cos(this.angle) * this.length, this.y - Math.sin(this.angle) * this.length);
-                ctx.stroke();
-                ctx.restore();
-            }
-        }
-
-        // --- Shooting & Control Logic ---
-        function handleShooting() {
-            if (!keys.k) return;
-
-            const now = performance.now();
-            if (now - lastShootTime >= SHOOT_COOLDOWN) {
-                lastShootTime = now;
-
-                let targetAngle = player.angle;
-
-                if (enemies.length > 0) {
-                    let nearestEnemy = null;
-                    let minDistance = Infinity;
-
-                    enemies.forEach(enemy => {
-                        const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            nearestEnemy = enemy;
-                        }
-                    });
-
-                    if (nearestEnemy) {
-                        targetAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
-                        player.angle = targetAngle; 
-                    }
-                }
-
-                bullets.push(new Bullet(player.x, player.y, targetAngle, false));
-                sound.playShot();
-            }
-        }
-
-        // --- Main Game Loop ---
-        function gameLoop() {
-            if (gameState === 'PLAYING') {
-                update();
-                render();
-            }
-            requestAnimationFrame(gameLoop);
-        }
-
-        function update() {
-            // 1. Player Movement & Shooting
-            player.update();
-            handleShooting();
-
-            // 2. Update Health Packs & Pickup Check
-            healthPacks.forEach(hp => hp.update());
-            for (let i = healthPacks.length - 1; i >= 0; i--) {
-                const hp = healthPacks[i];
-                const dist = Math.hypot(player.x - hp.x, player.y - hp.y);
-                if (dist < player.radius + hp.radius) {
-                    player.hp = Math.min(PLAYER_MAX_HP, player.hp + HEAL_AMOUNT);
-                    createHealParticles(hp.x, hp.y);
-                    sound.playHeal();
-                    healthPacks.splice(i, 1);
-                    updateHUD();
-                }
-            }
-
-            // 3. Update Bullets
-            bullets.forEach(b => b.update());
-            bullets = bullets.filter(b => !b.markedForRemoval);
-
-            // 4. Update Particles
-            particles.forEach(p => p.update());
-            particles = particles.filter(p => p.alpha > 0);
-
-            // 5. Update Enemies & Collision Logic
-            enemies.forEach(enemy => {
-                enemy.update();
-
-                // Player vs Enemy Collision
-                const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-                if (distToPlayer < player.radius + enemy.radius) {
-                    player.hp -= 0.5;
-                    sound.playPlayerHit();
-                    updateHUD();
-
-                    if (player.hp <= 0) {
-                        triggerGameOver();
-                    }
-                }
-            });
-
-            // 6. Bullet Collisions
-            bullets.forEach(bullet => {
-                if (bullet.isEnemy) {
-                    const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
-                    if (dist < player.radius + bullet.radius) {
-                        bullet.markedForRemoval = true;
-                        player.hp -= ENEMY_DAMAGE;
-                        createHitParticles(player.x, player.y, '#3b82f6', 10);
-                        sound.playPlayerHit();
-                        updateHUD();
-
-                        if (player.hp <= 0) {
-                            triggerGameOver();
-                        }
-                    }
-                } else {
-                    enemies.forEach(enemy => {
-                        const dist = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
-                        if (dist < enemy.radius + bullet.radius) {
-                            bullet.markedForRemoval = true;
-                            enemy.hp -= BULLET_DAMAGE;
-                            createHitParticles(bullet.x, bullet.y, enemy.color, 6);
-                            sound.playHit();
-
-                            if (enemy.isBoss) {
-                                updateBossHpUI(enemy.hp, enemy.maxHp);
-                            }
-
-                            if (enemy.hp <= 0) {
-                                createHitParticles(enemy.x, enemy.y, enemy.color, 20);
-                                handleEnemyDrop(enemy.x, enemy.y);
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Filter Dead Enemies
-            const prevCount = enemies.length;
-            enemies = enemies.filter(e => e.hp > 0);
-
-            if (enemies.length !== prevCount) {
-                updateHUD();
-            }
-
-            updateDashHUD();
-
-            // 7. Wave Clear Check
-            if (enemies.length === 0) {
-                if (currentWave === 50) {
-                    triggerVictory();
-                } else {
-                    currentWave++;
-                    sound.playWaveClear();
-                    spawnWave(currentWave);
-                }
-            }
-        }
-
-        // --- Render Engine (Canvas) ---
-        function render() {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            ctx.strokeStyle = '#f1f5f9';
-            ctx.lineWidth = 1;
-            const gridSize = 40;
-            for (let x = 0; x < canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y < canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
-
-            healthPacks.forEach(hp => hp.draw());
-            particles.forEach(p => p.draw());
-            bullets.forEach(b => b.draw());
-            enemies.forEach(e => e.draw());
-            player.draw();
-        }
-
-        // --- HUD & UI Updates ---
-        function updateHUD() {
-            const hpRatio = Math.max(0, player.hp / PLAYER_MAX_HP);
-            hpBar.style.width = `${hpRatio * 100}%`;
-            hpText.innerText = `${Math.max(0, Math.ceil(player.hp))} / ${PLAYER_MAX_HP}`;
-
-            enemyCountText.innerText = enemies.length;
-        }
-
-        function updateDashHUD() {
-            const elapsed = performance.now() - lastDashTime;
-            const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
-
-            dashBar.style.width = `${progress * 100}%`;
-
-            if (progress >= 1) {
-                dashText.innerText = 'READY';
-                dashText.className = 'absolute inset-0 flex items-center justify-center text-[9px] font-bold text-slate-900 leading-none';
-                dashBar.className = 'bg-amber-400 h-full transition-all duration-75';
-            } else {
-                const remainingSec = ((DASH_COOLDOWN_MS - elapsed) / 1000).toFixed(1);
-                dashText.innerText = `${remainingSec}s`;
-                dashText.className = 'absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white leading-none';
-                dashBar.className = 'bg-slate-500 h-full transition-all duration-75';
-            }
-        }
-
-        function updateBossHpUI(hp, maxHp) {
-            const ratio = Math.max(0, hp / maxHp);
-            bossHpBar.style.width = `${ratio * 100}%`;
-            bossHpText.innerText = `${Math.max(0, hp)} / ${maxHp}`;
-        }
-
-        // --- State Management Screen Handlers ---
-        function triggerGameOver() {
-            gameState = 'GAMEOVER';
-            bossHpContainer.classList.add('opacity-0');
-
-            overlayTitle.innerText = "GAME OVER";
-            overlayTitle.className = "text-3xl font-black mb-2 text-rose-500";
-            overlayDesc.innerText = `Wave ${currentWave}에서 전사하셨습니다. 다시 도전하여 50 Wave 보스를 격파하세요!`;
-            overlayIcon.className = "fa-solid fa-skull-crossbones";
-            startBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> 다시 도전하기`;
-
-            overlay.classList.remove('opacity-0', 'pointer-events-none');
-        }
-
-        function triggerVictory() {
-            gameState = 'VICTORY';
-            bossHpContainer.classList.add('opacity-0');
-
-            overlayTitle.innerText = "VICTORY! 승리!";
-            overlayTitle.className = "text-3xl font-black mb-2 text-emerald-400";
-            overlayDesc.innerText = `축하합니다! 50 Wave 최종 보스를 격파하고 전장을 지켜냈습니다!`;
-            overlayIcon.className = "fa-solid fa-trophy text-amber-400";
-            startBtn.innerHTML = `<i class="fa-solid fa-play"></i> 새 게임 시작`;
-
-            overlay.classList.remove('opacity-0', 'pointer-events-none');
-
-            if (typeof confetti === 'function') {
-                confetti({
-                    particleCount: 150,
-                    spread: 80,
-                    origin: { y: 0.6 }
+        // --- 필터 & 제한시간 옵션 선택 ---
+        filterOptionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterOptionBtns.forEach(b => {
+                    b.className = 'filter-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-fuchsia-500 transition';
                 });
+                btn.className = 'filter-option py-2 px-2 rounded-xl text-xs font-bold bg-fuchsia-600 text-white border border-fuchsia-400 shadow-md transition';
+                selectedFilter = btn.dataset.filter;
+            });
+        });
+
+        timeOptionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                timeOptionBtns.forEach(b => {
+                    b.className = 'time-option py-2 px-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:border-cyan-400 transition';
+                });
+                btn.className = 'time-option py-2 px-2 rounded-xl text-xs font-bold bg-cyan-600 text-white border border-cyan-400 shadow-md transition';
+                timeLimit = parseInt(btn.dataset.time, 10);
+            });
+        });
+
+        // --- 배열 셔플 ---
+        function shuffleArray(arr) {
+            const copy = [...arr];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
             }
+            return copy;
         }
 
-        // --- Event Listeners & Controls Setup ---
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            if (keys.hasOwnProperty(key)) {
-                keys[key] = true;
+        // --- 게임 시작 ---
+        startBtn.addEventListener('click', startQuiz);
+        restartBtn.addEventListener('click', startQuiz);
+
+        function updateLivesUI() {
+            const remaining = Math.max(0, MAX_LIVES - wrongCount);
+            livesDisplay.textContent = '❤️'.repeat(remaining) + '🖤'.repeat(wrongCount);
+        }
+
+        function startQuiz() {
+            let filtered = IDOL_GROUPS;
+            if (selectedFilter !== 'ALL') {
+                filtered = IDOL_GROUPS.filter(g => g.type === selectedFilter);
             }
 
-            if (key === 'e' && gameState === 'PLAYING' && player) {
-                player.dash();
+            // 문제 제한 없이 출제 풀을 랜덤 셔플(소진 시 다시 섞어서 무한 제공)
+            quizList = shuffleArray(filtered);
+            currentIndex = 0;
+            score = 0;
+            correctCount = 0;
+            wrongCount = 0;
+            userHistory = [];
+
+            scoreDisplay.textContent = '0';
+            updateLivesUI();
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+
+            loadQuestion();
+        }
+
+        // --- 문제 로드 ---
+        function loadQuestion() {
+            clearInterval(timerInterval);
+            isAnswered = false;
+            hintUsed = false;
+
+            // 준비된 출제 풀을 모두 풀었을 경우 다시 셔플하여 이어서 출제
+            if (currentIndex >= quizList.length) {
+                let filtered = IDOL_GROUPS;
+                if (selectedFilter !== 'ALL') {
+                    filtered = IDOL_GROUPS.filter(g => g.type === selectedFilter);
+                }
+                quizList = shuffleArray(filtered);
+                currentIndex = 0;
             }
-        });
 
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            if (keys.hasOwnProperty(key)) {
-                keys[key] = false;
+            const current = quizList[currentIndex];
+            const questionNumber = userHistory.length + 1;
+
+            // UI 초기화
+            questionCounter.textContent = `${questionNumber}번째 문제`;
+            groupBadge.textContent = current.label;
+            feedbackOverlay.classList.add('hidden');
+            hintBox.classList.add('hidden');
+            answerForm.classList.remove('hidden');
+            nextBtn.classList.add('hidden');
+            answerInput.value = '';
+            answerInput.disabled = false;
+
+            // 글자 수에 따라 초성 타일 크기 동적 조절
+            const len = current.chosung.length;
+            const tileSizeClass = len >= 7
+                ? 'w-9 h-11 text-xl sm:w-10 sm:h-12 sm:text-2xl'
+                : 'w-12 h-14 text-2xl sm:w-14 sm:h-16 sm:text-3xl';
+
+            chosungContainer.innerHTML = current.chosung.map((char, idx) => `
+                <div class="chosung-tile ${tileSizeClass} rounded-xl flex items-center justify-center font-black text-white animate-pop" style="animation-delay: ${idx * 40}ms">
+                    ${char}
+                </div>
+            `).join('');
+
+            letterCountInfo.textContent = `총 ${len}글자`;
+
+            startQuestionTimer();
+            setTimeout(() => answerInput.focus(), 50);
+        }
+
+        // --- 타이머 작동 ---
+        function startQuestionTimer() {
+            clearInterval(timerInterval);
+            if (timeLimit === 0) {
+                timerContainer.classList.add('hidden');
+                return;
             }
+
+            timerContainer.classList.remove('hidden');
+            timeLeft = timeLimit * 10;
+            const totalTicks = timeLeft;
+            timerBar.style.width = '100%';
+
+            timerInterval = setInterval(() => {
+                if (isAnswered) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+
+                timeLeft -= 1;
+                const pct = Math.max(0, (timeLeft / totalTicks) * 100);
+                timerBar.style.width = `${pct}%`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    evaluateAnswer('', true);
+                }
+            }, 100);
+        }
+
+        // --- 대표곡 힌트 보기 ---
+        hintBtn.addEventListener('click', () => {
+            if (isAnswered || hintUsed) return;
+            hintUsed = true;
+            playTone('hint');
+            const current = quizList[currentIndex];
+            hintText.textContent = `💡 힌트: ${current.songs}`;
+            hintBox.classList.remove('hidden');
+            answerInput.focus();
         });
 
-        startBtn.addEventListener('click', () => {
-            sound.init();
-            overlay.classList.add('opacity-0', 'pointer-events-none');
-            gameState = 'PLAYING';
-            initGame();
+        // --- 정답 제출 ---
+        answerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (isAnswered) return;
+            const userVal = answerInput.value.trim();
+            if (!userVal) {
+                answerInput.classList.add('animate-shake');
+                setTimeout(() => answerInput.classList.remove('animate-shake'), 400);
+                return;
+            }
+            evaluateAnswer(userVal, false);
         });
 
-        soundToggleBtn.addEventListener('click', () => {
-            sound.enabled = !sound.enabled;
-            if (sound.enabled) {
-                soundIcon.className = 'fa-solid fa-volume-high text-xs';
+        // --- 정답 판정 로직 (공백/특수문자 제거 후 비교) ---
+        function normalizeText(str) {
+            return str.replace(/[\s\-\(\)·]/g, '').toLowerCase();
+        }
+
+        function evaluateAnswer(userInput, isTimeout) {
+            isAnswered = true;
+            clearInterval(timerInterval);
+            answerInput.disabled = true;
+
+            const current = quizList[currentIndex];
+            const cleanInput = normalizeText(userInput);
+            const validAnswers = [current.name, ...(current.aliases || [])].map(normalizeText);
+
+            const isCorrect = !isTimeout && validAnswers.includes(cleanInput);
+
+            if (isCorrect) {
+                playTone('correct');
+                correctCount++;
+                const earned = hintUsed ? 50 : 100;
+                score += earned;
+                scoreDisplay.textContent = score;
+
+                feedbackIcon.textContent = '⭕';
+                feedbackTitle.textContent = `정답입니다! (+${earned}점)`;
+                feedbackTitle.className = 'text-xl font-black text-emerald-400 mb-1';
             } else {
-                soundIcon.className = 'fa-solid fa-volume-xmark text-xs text-slate-500';
+                playTone('wrong');
+                wrongCount++;
+                updateLivesUI();
+                feedbackIcon.textContent = isTimeout ? '⏰' : '❌';
+                feedbackTitle.textContent = isTimeout
+                    ? `시간 초과! 땡! (${wrongCount}/${MAX_LIVES} 오답)`
+                    : `아쉽습니다! 땡! (${wrongCount}/${MAX_LIVES} 오답)`;
+                feedbackTitle.className = 'text-xl font-black text-rose-400 mb-1';
+                quizScreen.classList.add('animate-shake');
+                setTimeout(() => quizScreen.classList.remove('animate-shake'), 400);
             }
+
+            const engAlias = current.aliases && current.aliases[0] ? ` (${current.aliases[0]})` : '';
+            feedbackAnswer.textContent = `${current.name}${engAlias}`;
+            feedbackDesc.textContent = current.desc;
+
+            userHistory.push({
+                name: current.name,
+                chosung: current.chosung.join(''),
+                userAnswer: isTimeout ? '시간 초과' : userInput,
+                isCorrect
+            });
+
+            const isGameOver = wrongCount >= MAX_LIVES;
+            feedbackOverlay.classList.remove('hidden');
+            answerForm.classList.add('hidden');
+            nextBtn.classList.remove('hidden');
+            nextBtn.textContent = isGameOver ? '3번 틀렸어요! 결과 보기 💀' : '다음 문제로 ➔';
+            nextBtn.focus();
+        }
+
+        // --- 다음 문제 이동 ---
+        nextBtn.addEventListener('click', () => {
+            if (wrongCount >= MAX_LIVES) {
+                showFinalResults();
+                return;
+            }
+            currentIndex++;
+            loadQuestion();
         });
 
-        // Initialize Canvas & Start Frame Loop on Load
-        window.onload = () => {
-            gameLoop();
-        };
+        // --- 최종 결과 화면 출력 ---
+        function showFinalResults() {
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            resultScreen.classList.add('animate-pop');
+
+            finalCorrect.textContent = correctCount;
+            finalScore.textContent = score;
+
+            if (correctCount >= 20) {
+                resultComment.textContent = "미쳤습니다! 오답 3번을 버텨낸 진짜 K-POP 레전드! 👑";
+            } else if (correctCount >= 10) {
+                resultComment.textContent = "멋져요! 두 자릿수 연속 정답을 달성하셨네요! 🔥";
+            } else if (correctCount >= 5) {
+                resultComment.textContent = "꽤 선전하셨어요! 다음엔 더 오래 살아남아 봅시다! 👏";
+            } else {
+                resultComment.textContent = "아쉽지만 3번의 기회가 모두 소진됐어요! 다시 도전해 보세요! 💪";
+            }
+
+            reviewList.innerHTML = userHistory.map((item, idx) => `
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-400">${idx + 1}.</span>
+                        <span class="px-1.5 py-0.5 rounded bg-indigo-950 text-fuchsia-300 font-bold text-[11px]">${item.chosung}</span>
+                        <span class="font-extrabold text-white">${item.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${item.isCorrect
+                            ? '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">정답</span>'
+                            : `<span class="text-slate-400 line-through">${item.userAnswer}</span> <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold">오답</span>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
     </script>
 </body>
 </html>

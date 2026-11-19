@@ -1,1627 +1,1618 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>로블록스 끝말잇기 스테이지 배틀 (Roblox Word Chain Battle)</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Canvas Confetti -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <!-- Google Fonts for Roblox-like blocky look -->
-  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@600;800;900&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Jua', 'Noto Sans KR', sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
-      min-height: 100vh;
-      color: #ffffff;
-      user-select: none;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SKYLINE RUNNER 3D - 장애물 피하기</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 
-    /* Custom scrollbar and animations */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
-    ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'sans-serif'],
+                        display: ['"Orbitron"', '"Inter"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
 
-    @keyframes pulseGlow {
-      0%, 100% { filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.6)); }
-      50% { filter: drop-shadow(0 0 25px rgba(168, 85, 247, 0.9)); }
-    }
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #0b1021;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
 
-    @keyframes healGlow {
-      0% { filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.4)); transform: scale(1); }
-      50% { filter: drop-shadow(0 0 30px rgba(34, 197, 94, 1)); transform: scale(1.05); }
-      100% { filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.4)); transform: scale(1); }
-    }
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
 
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-8px); }
-      40%, 80% { transform: translateX(8px); }
-    }
+        /* 속도감 비네트 효과 */
+        #speed-vignette {
+            background: radial-gradient(circle at center, transparent 58%, rgba(56, 189, 248, 0.16) 100%);
+            transition: opacity 0.3s ease;
+        }
 
-    @keyframes bounceShort {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
-    }
+        /* 글래스모피즘 패널 */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
 
-    .glow-hero { animation: pulseGlow 3s infinite ease-in-out; }
-    .glow-heal { animation: healGlow 1s ease-in-out; }
-    .animate-shake { animation: shake 0.4s ease-in-out; }
-    .animate-bounce-short { animation: bounceShort 2s infinite ease-in-out; }
+        .glass-pill {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
 
-    .roblox-btn {
-      box-shadow: 0 6px 0 #1e1b4b, 0 10px 15px rgba(0,0,0,0.4);
-      transition: all 0.1s ease;
-      background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
-      border: 3px solid #000;
-    }
-    .roblox-btn:hover {
-      filter: brightness(1.1);
-    }
-    .roblox-btn:active {
-      transform: translateY(4px);
-      box-shadow: 0 2px 0 #1e1b4b, 0 4px 6px rgba(0,0,0,0.4);
-    }
-
-    .roblox-btn-yellow {
-      background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
-      color: #000;
-      box-shadow: 0 6px 0 #713f12, 0 10px 15px rgba(0,0,0,0.4);
-    }
-
-    .roblox-card {
-      background: rgba(15, 23, 42, 0.85);
-      border: 4px solid #000;
-      box-shadow: 6px 6px 0px #000;
-    }
-
-    /* Roblox Character Pixel Block Styles */
-    .roblox-avatar {
-      position: relative;
-      width: 70px;
-      height: 90px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .r-head {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      border: 2px solid #000;
-      position: relative;
-      z-index: 5;
-    }
-    .r-torso {
-      width: 42px;
-      height: 36px;
-      border-radius: 4px;
-      border: 2px solid #000;
-      margin-top: -2px;
-      position: relative;
-      z-index: 3;
-    }
-    .r-limbs {
-      display: flex;
-      justify-content: space-between;
-      width: 42px;
-      margin-top: -2px;
-    }
-    .r-leg {
-      width: 19px;
-      height: 32px;
-      border-radius: 3px;
-      border: 2px solid #000;
-    }
-    .r-arm {
-      position: absolute;
-      top: 30px;
-      width: 13px;
-      height: 34px;
-      border-radius: 3px;
-      border: 2px solid #000;
-      z-index: 4;
-    }
-    .r-arm.left { left: 1px; }
-    .r-arm.right { right: 1px; }
-
-    /* Speech Bubble */
-    .speech-bubble {
-      position: relative;
-      background: #ffffff;
-      border-radius: 12px;
-      border: 3px solid #000;
-      color: #000;
-      box-shadow: 4px 4px 0px #000;
-    }
-    .speech-bubble::after {
-      content: '';
-      position: absolute;
-      bottom: -12px;
-      left: 20px;
-      border-width: 12px 10px 0;
-      border-style: solid;
-      border-color: #ffffff transparent;
-      display: block;
-      width: 0;
-    }
-    .speech-bubble::before {
-      content: '';
-      position: absolute;
-      bottom: -16px;
-      left: 18px;
-      border-width: 14px 12px 0;
-      border-style: solid;
-      border-color: #000000 transparent;
-      display: block;
-      width: 0;
-    }
-  </style>
+        /* 콤보 팝업 애니메이션 */
+        @keyframes popScale {
+            0% { transform: scale(0.75); opacity: 0.5; }
+            50% { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .combo-pop {
+            animation: popScale 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+    </style>
 </head>
-<body class="flex flex-col items-center justify-start p-2 sm:p-4 min-h-screen">
+<body class="font-sans text-white antialiased">
 
-  <!-- Floating Toast Notification -->
-  <div id="toast-container" class="fixed top-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+    <!-- 3D 렌더링 캔버스 -->
+    <canvas id="game-canvas"></canvas>
 
-  <!-- Header Banner -->
-  <header class="w-full max-w-xl text-center mb-3">
-    <h1 class="text-3xl sm:text-4xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">
-      🎮 로블록스 끝말잇기 배틀
-    </h1>
-    <p class="text-xs sm:text-sm text-indigo-200 font-bold mt-1">
-      영웅 캐릭터를 선택하고 연속 스테이지의 강력한 상대들을 제압하세요!
-    </p>
-  </header>
+    <!-- 고속 주행 시 가장자리 속도감 오버레이 -->
+    <div id="speed-vignette" class="fixed inset-0 pointer-events-none opacity-0 z-10"></div>
 
-  <main class="w-full max-w-xl">
+    <!-- 상단 HUD (점수, 거리, 속도, 음소거, 일시정지) -->
+    <header id="hud-layer" class="fixed top-0 left-0 right-0 z-20 p-3 sm:p-5 flex items-start justify-between pointer-events-none">
+        <!-- 좌측: 점수 및 콤보 -->
+        <div class="flex flex-col gap-2">
+            <div class="glass-pill rounded-2xl px-4 py-2.5 sm:px-5 sm:py-3 shadow-lg">
+                <div class="flex items-center gap-3">
+                    <div>
+                        <div class="text-[10px] sm:text-xs font-semibold tracking-wider text-sky-300 uppercase">SCORE</div>
+                        <div id="hud-score" class="font-display text-2xl sm:text-3xl font-black tracking-tight text-white">0</div>
+                    </div>
+                    <div class="h-8 w-px bg-white/15"></div>
+                    <div>
+                        <div class="text-[10px] sm:text-xs font-semibold tracking-wider text-amber-300 uppercase">ORBS</div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></span>
+                            <span id="hud-orbs" class="font-display text-lg sm:text-xl font-bold text-amber-300">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- ================= 1. CHARACTER SELECT SCREEN ================= -->
-    <section id="select-screen" class="roblox-card p-4 sm:p-6 rounded-2xl space-y-4">
-      <div class="flex justify-between items-center border-b-2 border-indigo-900 pb-2">
-        <h2 class="text-lg sm:text-xl font-black text-yellow-400">
-          👦 대표 캐릭터 선택 (9종)
-        </h2>
-        <span class="text-xs bg-indigo-900 text-indigo-200 font-bold px-3 py-1 rounded-full border border-indigo-500">
-          특수 패시브 적용
-        </span>
-      </div>
+            <!-- 콤보 배지 -->
+            <div id="combo-container" class="hidden self-start glass-pill rounded-full px-3.5 py-1 border-amber-400/40 bg-amber-500/20">
+                <span id="hud-combo" class="font-display text-xs sm:text-sm font-extrabold text-amber-300 tracking-wide">COMBO x2</span>
+            </div>
+        </div>
 
-      <!-- 3x3 Character Grid -->
-      <div id="character-grid" class="grid grid-cols-3 gap-2 sm:gap-3">
-        <!-- Rendered via JavaScript -->
-      </div>
+        <!-- 중앙 상단: 거리 & 최고 점수 (데스크톱/태블릿) -->
+        <div class="hidden md:flex items-center gap-3 glass-pill rounded-2xl px-5 py-2.5 shadow-lg">
+            <div class="text-center px-2">
+                <div class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">DISTANCE</div>
+                <div id="hud-distance-md" class="font-display text-lg font-bold text-white">0m</div>
+            </div>
+            <div class="h-6 w-px bg-white/15"></div>
+            <div class="text-center px-2">
+                <div class="text-[10px] font-semibold tracking-wider text-emerald-400 uppercase">SPEED</div>
+                <div id="hud-speed-md" class="font-display text-lg font-bold text-emerald-300">1.0x</div>
+            </div>
+            <div class="h-6 w-px bg-white/15"></div>
+            <div class="text-center px-2">
+                <div class="text-[10px] font-semibold tracking-wider text-purple-300 uppercase">BEST</div>
+                <div id="hud-best-md" class="font-display text-lg font-bold text-purple-200">0</div>
+            </div>
+        </div>
 
-      <!-- Selected Character Info Card -->
-      <div id="char-detail-card" class="bg-black/60 border-2 border-yellow-400 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-        <div class="flex items-center gap-3">
-          <div id="detail-avatar-preview" class="w-16 h-20 relative flex-shrink-0"></div>
-          <div>
+        <!-- 우측: 컨트롤 버튼 (사운드, 일시정지) & 모바일 거리 표시 -->
+        <div class="flex flex-col items-end gap-2 pointer-events-auto">
             <div class="flex items-center gap-2">
-              <h3 id="detail-name" class="text-lg font-black text-yellow-300">클래식 누브</h3>
-              <span id="detail-title" class="text-[10px] bg-yellow-500 text-black font-bold px-2 py-0.5 rounded-full">대표 캐릭터</span>
-            </div>
-            <p id="detail-desc" class="text-xs text-gray-300 mt-0.5">기본에 충실한 표준형 누브입니다.</p>
-            <p id="detail-skill" class="text-xs text-cyan-300 font-bold mt-1">✨ 스킬: 균형 잡힌 공격력</p>
-          </div>
-        </div>
-        
-        <!-- Timer Control -->
-        <div class="flex flex-col items-end gap-1 w-full sm:w-auto">
-          <div class="text-xs text-gray-300 font-bold">제한 시간 선택:</div>
-          <div class="flex gap-1">
-            <button onclick="setTimer(20)" id="time-20" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-green-500 text-black">20초</button>
-            <button onclick="setTimer(12)" id="time-12" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white">12초</button>
-            <button onclick="setTimer(7)" id="time-7" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white">7초</button>
-          </div>
-        </div>
-      </div>
+                <button id="btn-sound" onclick="toggleMute()" class="glass-pill hover:bg-white/15 active:scale-95 transition rounded-xl p-2.5 sm:p-3 text-white shadow-lg" title="효과음 켜기/끄기">
+                    <!-- 사운드 ON 아이콘 -->
+                    <svg id="icon-sound-on" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"></path>
+                    </svg>
+                    <!-- 사운드 OFF 아이콘 -->
+                    <svg id="icon-sound-off" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M23 9l-6 6M17 9l6 6"></path>
+                    </svg>
+                </button>
 
-      <!-- Game Start Button -->
-      <button onclick="startGame()" class="roblox-btn w-full py-3.5 text-xl sm:text-2xl font-black text-yellow-300 rounded-xl tracking-wider uppercase">
-        🚀 끝말잇기 배틀 출전!
-      </button>
-    </section>
-
-    <!-- ================= 2. GAMEPLAY SCREEN ================= -->
-    <section id="game-screen" class="hidden space-y-3">
-      
-      <!-- Top Battle Arena Board -->
-      <div class="roblox-card p-3 sm:p-4 rounded-2xl relative overflow-hidden">
-        
-        <!-- Stage Badge Banner -->
-        <div class="flex justify-between items-center mb-2 bg-indigo-950 border-2 border-indigo-500 px-3 py-1 rounded-xl">
-          <div id="stage-badge" class="bg-yellow-400 text-black font-black text-sm px-3 py-0.5 rounded-full border border-black shadow">
-            STAGE 1
-          </div>
-          <div id="opponent-title-tag" class="text-xs sm:text-sm font-bold text-cyan-300">
-            상대: 베이컨 보이 🥓
-          </div>
-          <div class="text-xs font-bold text-yellow-300">
-            누적 점수: <span id="total-score-badge">0</span>
-          </div>
-        </div>
-
-        <!-- Opponent Display Area -->
-        <div class="flex items-start justify-between gap-2 border-b-2 border-gray-700 pb-3">
-          
-          <!-- Opponent Avatar Container -->
-          <div class="text-center w-24 flex-shrink-0">
-            <div id="opponent-avatar-container" class="roblox-avatar scale-75 origin-top">
-              <!-- Rendered dynamically -->
-            </div>
-            <span id="opponent-name-tag" class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded-full border border-black inline-block -mt-4 relative z-10">
-              베이컨 보이 🥓
-            </span>
-          </div>
-
-          <!-- Speech Bubble & HP -->
-          <div class="flex-1 flex flex-col justify-between h-full space-y-2">
-            <!-- Speech Bubble -->
-            <div class="speech-bubble p-2 sm:p-3 text-xs sm:text-sm font-bold min-h-[55px] flex items-center justify-center text-center">
-              <span id="opponent-speech">누구든 나 베이컨을 넘을 순 없다! 🥓</span>
+                <button id="btn-pause" onclick="togglePause()" class="glass-pill hover:bg-white/15 active:scale-95 transition rounded-xl p-2.5 sm:p-3 text-white shadow-lg hidden" title="일시정지 (P / ESC)">
+                    <svg id="icon-pause" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6"></path>
+                    </svg>
+                    <svg id="icon-play-small" class="w-5 h-5 hidden text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"></path>
+                    </svg>
+                </button>
             </div>
 
-            <!-- Opponent HP Bar -->
-            <div>
-              <div class="flex justify-between text-xs font-bold mb-0.5 text-red-400">
-                <span id="opponent-hp-label">상대 HP</span>
-                <span id="opponent-hp-text">100 / 100</span>
-              </div>
-              <div class="w-full bg-gray-800 rounded-full h-3 border-2 border-black overflow-hidden">
-                <div id="opponent-hp-bar" class="bg-gradient-to-r from-red-600 to-red-400 h-full w-full transition-all duration-300"></div>
-              </div>
+            <!-- 모바일용 거리 / 속도 미니 표시 -->
+            <div class="flex md:hidden items-center gap-2 glass-pill rounded-xl px-3 py-1.5 text-xs">
+                <span id="hud-distance-sm" class="font-display font-bold text-slate-200">0m</span>
+                <span class="text-white/25">|</span>
+                <span id="hud-speed-sm" class="font-display font-bold text-emerald-300">1.0x</span>
             </div>
-          </div>
         </div>
+    </header>
 
-        <!-- Center Round & Word Display -->
-        <div class="my-3 text-center bg-gray-900/90 border-2 border-indigo-500/50 p-3 rounded-xl relative">
-          <!-- Timer Circle -->
-          <div class="absolute top-2 right-2 bg-yellow-400 border-2 border-black text-black font-black w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-[2px_2px_0px_#000]" id="timer-box">
-            20
-          </div>
-
-          <div class="text-xs text-indigo-300 font-bold mb-1">제시어 (다음 시작 글자)</div>
-          <div class="flex items-center justify-center gap-3">
-            <div class="text-2xl sm:text-4xl font-black text-white bg-black/60 px-4 py-1 rounded-lg border-2 border-yellow-400 tracking-wider" id="current-word-display">
-              로블록스
-            </div>
-          </div>
-          <div class="text-sm font-bold text-yellow-300 mt-1">
-            👉 '<span id="target-char" class="text-xl underline text-green-400">스</span>' (으)로 시작하세요!
-          </div>
+    <!-- 모바일 터치 보조 컨트롤 버튼 (하단 양옆 - 옵션) -->
+    <div id="mobile-touch-pads" class="fixed bottom-5 left-4 right-4 z-20 flex items-center justify-between pointer-events-none md:hidden opacity-75">
+        <div class="flex gap-2 pointer-events-auto">
+            <button ontouchstart="handleActionInput('LEFT', event)" onclick="handleActionInput('LEFT', event)" class="glass-pill active:bg-sky-500/40 rounded-2xl w-14 h-14 flex items-center justify-center shadow-lg">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button ontouchstart="handleActionInput('RIGHT', event)" onclick="handleActionInput('RIGHT', event)" class="glass-pill active:bg-sky-500/40 rounded-2xl w-14 h-14 flex items-center justify-center shadow-lg">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
         </div>
-
-        <!-- Player Side (Bottom Arena) -->
-        <div class="flex items-end justify-between gap-2 pt-1">
-          <!-- Player HP -->
-          <div class="flex-1 space-y-1">
-            <div class="flex justify-between text-xs font-bold text-green-400">
-              <span id="player-name-tag">영웅 HP</span>
-              <span id="player-hp-text">100 / 100</span>
-            </div>
-            <div class="w-full bg-gray-800 rounded-full h-3 border-2 border-black overflow-hidden">
-              <div id="player-hp-bar" class="bg-gradient-to-r from-green-500 to-emerald-300 h-full w-full transition-all duration-300"></div>
-            </div>
-            <!-- Stats Bar -->
-            <div class="text-xs text-gray-300 font-bold flex justify-between items-center">
-              <span>단어: <span id="combo-text" class="text-cyan-300 text-sm">0</span>개</span>
-              <span id="skill-badge" class="text-[10px] bg-indigo-900 border border-indigo-400 text-indigo-200 px-2 py-0.5 rounded-full">패시브 발동중</span>
-            </div>
-          </div>
-
-          <!-- Player Avatar Display -->
-          <div class="text-center w-24 flex-shrink-0">
-            <div id="player-avatar-container" class="roblox-avatar scale-75 origin-bottom">
-              <!-- Rendered via JS -->
-            </div>
-            <span id="player-label" class="bg-blue-600 text-white font-black text-xs px-2 py-0.5 rounded-full border border-black inline-block relative z-10">
-              내 캐릭터
-            </span>
-          </div>
+        <div class="flex gap-2 pointer-events-auto">
+            <button ontouchstart="handleActionInput('SLIDE', event)" onclick="handleActionInput('SLIDE', event)" class="glass-pill active:bg-amber-500/40 rounded-2xl w-14 h-14 flex items-center justify-center shadow-lg">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <button ontouchstart="handleActionInput('JUMP', event)" onclick="handleActionInput('JUMP', event)" class="glass-pill active:bg-emerald-500/40 rounded-2xl w-14 h-14 flex items-center justify-center shadow-lg">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+            </button>
         </div>
-
-      </div>
-
-      <!-- Word History Box -->
-      <div class="roblox-card p-2.5 rounded-xl">
-        <div class="text-xs text-gray-400 font-bold mb-1 flex justify-between items-center">
-          <span>📜 단어 히스토리</span>
-          <span class="text-[10px] text-yellow-300">⚠️ 상대의 한방단어(륨, 녘, 틱...) 주의!</span>
-        </div>
-        <div id="history-box" class="h-20 overflow-y-auto bg-black/60 border border-gray-700 rounded-lg p-2 text-xs flex flex-wrap gap-1.5 align-content-start">
-          <span class="bg-indigo-900 border border-indigo-500 text-indigo-200 px-2 py-0.5 rounded-md">로블록스</span>
-        </div>
-      </div>
-
-      <!-- Input Area -->
-      <form id="word-form" onsubmit="submitWord(event)" class="flex gap-2">
-        <input 
-          type="text" 
-          id="word-input" 
-          autocomplete="off" 
-          placeholder="단어를 입력하세요!" 
-          class="flex-1 bg-gray-900 border-4 border-black text-white text-lg font-bold px-4 py-3 rounded-xl focus:outline-none focus:border-yellow-400 placeholder-gray-500 shadow-inner"
-        />
-        <button 
-          type="submit" 
-          id="submit-btn"
-          class="roblox-btn px-6 text-xl font-black text-yellow-300 rounded-xl flex items-center justify-center gap-1"
-        >
-          공격 ⚔️
-        </button>
-      </form>
-
-      <!-- Control Buttons -->
-      <div class="flex justify-between items-center text-xs">
-        <button onclick="surrender()" class="text-gray-400 hover:text-red-400 underline font-bold">
-          🏳️ 항복하고 처음으로
-        </button>
-        <button onclick="toggleAudio()" id="audio-btn" class="bg-gray-800 border border-black px-2 py-1 rounded text-yellow-300 font-bold">
-          🔊 소리 ON
-        </button>
-      </div>
-
-    </section>
-
-    <!-- ================= 3. STAGE VICTORY / REWARD MODAL ================= -->
-    <div id="victoryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity">
-      <div class="bg-slate-900 border-4 border-yellow-400 rounded-3xl p-6 sm:p-8 max-w-lg w-11/12 text-center shadow-2xl relative overflow-hidden animate-bounce-short">
-        <div class="inline-block px-4 py-1 bg-yellow-500/20 text-yellow-300 font-bold rounded-full text-xs sm:text-sm uppercase tracking-wider mb-2 border border-yellow-500/40">
-          STAGE CLEARED!
-        </div>
-        
-        <h2 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 mb-2">
-          보스 퇴치 성공! 🎉
-        </h2>
-        
-        <p id="victorySubText" class="text-slate-300 text-sm sm:text-base mb-6">
-          상대를 제압했습니다! 다음 스테이지로 진입하기 전 보상을 선택하세요.
-        </p>
-
-        <!-- Hero Card Preview -->
-        <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-6 flex items-center justify-between shadow-inner">
-          <div class="flex items-center space-x-3">
-            <div id="victoryHeroAvatar" class="w-14 h-14 bg-indigo-950 border-2 border-indigo-500 rounded-xl flex items-center justify-center text-3xl shadow">
-              👦
-            </div>
-            <div class="text-left">
-              <div id="victoryHeroName" class="font-bold text-white text-base sm:text-lg">클래식 노비</div>
-              <div class="text-xs text-green-400 font-semibold flex items-center space-x-1">
-                <span>❤️ 체력 회복 가능</span>
-              </div>
-            </div>
-          </div>
-          <div class="text-right">
-            <span class="text-xs text-slate-400">다음 보스</span>
-            <div id="victoryNextOpponent" class="font-bold text-red-400 text-sm sm:text-base">흑백 블록맨</div>
-          </div>
-        </div>
-
-        <!-- Choice Buttons -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <button onclick="handleVictoryChoice('keep')" class="roblox-btn bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl flex flex-col items-center justify-center border-b-4 border-green-800 transition">
-            <span class="text-base sm:text-lg flex items-center space-x-1">
-              <span>💖</span> <span>체력 Full 회복</span>
-            </span>
-            <span class="text-[11px] text-green-100 font-normal mt-0.5">현재 캐릭터 유지 & 100% 회복</span>
-          </button>
-
-          <button onclick="handleVictoryChoice('change')" class="roblox-btn bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-xl flex flex-col items-center justify-center border-b-4 border-indigo-900 transition">
-            <span class="text-base sm:text-lg flex items-center space-x-1">
-              <span>🔄</span> <span>캐릭터 교체</span>
-            </span>
-            <span class="text-[11px] text-purple-100 font-normal mt-0.5">9명의 영웅 중 선택 (풀체력)</span>
-          </button>
-        </div>
-      </div>
     </div>
 
-    <!-- ================= 4. GAME OVER MODAL ================= -->
-    <div id="result-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="roblox-card p-6 rounded-2xl max-w-sm w-full text-center space-y-4">
-        <div id="result-icon" class="text-6xl">💀</div>
-        <h2 id="result-title" class="text-3xl font-black text-red-500">GAME OVER!</h2>
-        <p id="result-msg" class="text-sm text-gray-200">체력이 0이 되었습니다!</p>
-        
-        <div class="bg-black/60 border border-gray-700 p-3 rounded-xl space-y-1 text-sm font-bold">
-          <div class="flex justify-between text-gray-300">
-            <span>도달한 스테이지:</span>
-            <span id="final-stage" class="text-yellow-400">STAGE 1</span>
-          </div>
-          <div class="flex justify-between text-gray-300">
-            <span>최종 누적 점수:</span>
-            <span id="final-score" class="text-yellow-400">0점</span>
-          </div>
-          <div class="flex justify-between text-gray-300">
-            <span>성공한 단어:</span>
-            <span id="final-count" class="text-cyan-400">0개</span>
-          </div>
-        </div>
+    <!-- 시작 화면 오버레이 -->
+    <div id="start-overlay" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-[3px]">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border border-white/20">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-bold tracking-widest uppercase mb-3">
+                3RD-PERSON ENDLESS RUNNER
+            </div>
+            <h1 class="font-display text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-white via-sky-200 to-cyan-300 bg-clip-text text-transparent mb-2">
+                SKYLINE RUNNER
+            </h1>
+            <p class="text-slate-300 text-sm mb-6">
+                끝없이 펼쳐진 스카이라인 트랙을 질주하며 장애물을 피하고 에너지 오브를 모으세요!
+            </p>
 
-        <div class="space-y-2 pt-2">
-          <button onclick="restartGame()" class="roblox-btn w-full py-3 text-lg font-black text-yellow-300 rounded-xl">
-            🔄 다시 도전하기
-          </button>
-          <button onclick="backToSelect()" class="roblox-btn roblox-btn-yellow w-full py-2.5 text-base font-black rounded-xl">
-            👥 영웅 캐릭터 변경
-          </button>
+            <!-- 조작 가이드 카드 -->
+            <div class="grid grid-cols-3 gap-2.5 mb-6 text-left">
+                <div class="bg-slate-900/75 border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center">
+                    <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-sm mb-1.5">
+                        ◀ ▶
+                    </div>
+                    <div class="text-xs font-bold text-white">차선 이동</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">A / D · 스와이프</div>
+                </div>
+                <div class="bg-slate-900/75 border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-sm mb-1.5">
+                        ▲
+                    </div>
+                    <div class="text-xs font-bold text-white">점프</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">W / Space / 위로</div>
+                </div>
+                <div class="bg-slate-900/75 border border-white/10 rounded-2xl p-3 flex flex-col items-center text-center">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-sm mb-1.5">
+                        ▼
+                    </div>
+                    <div class="text-xs font-bold text-white">슬라이드</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">S / 아래로</div>
+                </div>
+            </div>
+
+            <!-- 최고 점수 표시 -->
+            <div class="flex items-center justify-center gap-2 text-xs text-slate-300 mb-5">
+                <span>최고 기록:</span>
+                <span id="start-best-score" class="font-display font-bold text-amber-300 text-sm">0</span>
+            </div>
+
+            <button onclick="startGame()" class="w-full py-4 rounded-2xl font-display font-extrabold text-lg tracking-wider bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(56,189,248,0.45)] active:scale-[0.98] transition cursor-pointer">
+                PLAY NOW
+            </button>
+            <div class="text-[11px] text-slate-400 mt-3">
+                또는 <span class="text-slate-200 font-semibold">SPACE / ENTER</span> 키를 눌러 바로 시작
+            </div>
         </div>
-      </div>
     </div>
 
-  </main>
-
-  <footer class="mt-2 text-center text-xs text-indigo-300/60 font-bold">
-    Roblox Endless Stage Word Chain Battle
-  </footer>
-
-  <script>
-    /* ===================================================================
-       1. HEROES & OPPONENTS DATA DEFINITIONS
-       =================================================================== */
-    const HEROES = [
-      {
-        id: 'classic',
-        name: '클래식 누브',
-        title: '표준형 영웅',
-        desc: '노란 머리/팔, 파란 몸통, 초록 다리의 정통 누브',
-        skill: '기본 밸런스형 (스탯 균형)',
-        hpBonus: 0,
-        dmgBonus: 1.0,
-        defBonus: 1.0,
-        html: `
-          <div class="r-head bg-yellow-400"></div>
-          <div class="r-torso bg-blue-600"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-green-600"></div>
-            <div class="r-leg bg-green-600"></div>
-          </div>
-          <div class="r-arm left bg-yellow-400"></div>
-          <div class="r-arm right bg-yellow-400"></div>
-        `
-      },
-      {
-        id: 'rainbow',
-        name: '무지개 누브',
-        title: '화려한 영웅',
-        desc: '화려한 레인보우 라이팅 오라를 뿜는 희귀 누브',
-        skill: '점수 1.5배 획득',
-        hpBonus: 10,
-        dmgBonus: 1.1,
-        defBonus: 1.0,
-        html: `
-          <div class="r-head bg-pink-500 animate-pulse"></div>
-          <div class="r-torso bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-cyan-400"></div>
-            <div class="r-leg bg-yellow-400"></div>
-          </div>
-          <div class="r-arm left bg-lime-400"></div>
-          <div class="r-arm right bg-fuchsia-500"></div>
-        `
-      },
-      {
-        id: 'shark',
-        name: '상어 후드 누브',
-        title: '해양의 영웅',
-        desc: '날카로운 상어 이빨 후드를 뒤집어쓴 강한 누브',
-        skill: '공격력 +20% 증가',
-        hpBonus: 15,
-        dmgBonus: 1.2,
-        defBonus: 0.9,
-        html: `
-          <div class="r-head bg-blue-900 border-2 border-cyan-400 flex items-end justify-center">
-            <div class="text-[8px] text-white font-bold pb-0.5">🦈</div>
-          </div>
-          <div class="r-torso bg-cyan-800"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-slate-800"></div>
-            <div class="r-leg bg-slate-800"></div>
-          </div>
-          <div class="r-arm left bg-blue-700"></div>
-          <div class="r-arm right bg-blue-700"></div>
-        `
-      },
-      {
-        id: 'gojo',
-        name: '고죠 사토루 누브',
-        title: '무하한의 영웅',
-        desc: '안대를 착용하고 무하한 결계를 펼치는 최강 누브',
-        skill: '피해량 25% 감소',
-        hpBonus: 20,
-        dmgBonus: 1.15,
-        defBonus: 0.75,
-        html: `
-          <div class="r-head bg-white relative flex items-center justify-center">
-            <div class="w-full h-2 bg-black absolute"></div>
-          </div>
-          <div class="r-torso bg-indigo-950"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-slate-900"></div>
-            <div class="r-leg bg-slate-900"></div>
-          </div>
-          <div class="r-arm left bg-indigo-900"></div>
-          <div class="r-arm right bg-indigo-900"></div>
-        `
-      },
-      {
-        id: 'jammin',
-        name: '잼민이 누브',
-        title: '게이머 영웅',
-        desc: 'RGB 헤드셋을 끼고 신나게 단어를 연타하는 누브',
-        skill: '콤보 데미지 보너스',
-        hpBonus: 5,
-        dmgBonus: 1.25,
-        defBonus: 1.05,
-        html: `
-          <div class="r-head bg-amber-300 relative">
-            <div class="w-full h-1.5 bg-red-600 absolute top-0"></div>
-          </div>
-          <div class="r-torso bg-emerald-600"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-blue-800"></div>
-            <div class="r-leg bg-blue-800"></div>
-          </div>
-          <div class="r-arm left bg-amber-300"></div>
-          <div class="r-arm right bg-amber-300"></div>
-        `
-      },
-      {
-        id: 'puppy',
-        name: '강아지 누브',
-        title: '힐링의 영웅',
-        desc: '귀여운 강아지 귀와 코를 가진 힐링형 영웅',
-        skill: '단어 입력 시 HP +3 회복',
-        hpBonus: 30,
-        dmgBonus: 0.95,
-        defBonus: 0.9,
-        html: `
-          <div class="r-head bg-amber-700 flex items-center justify-center text-[9px]">🐶</div>
-          <div class="r-torso bg-amber-100"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-amber-800"></div>
-            <div class="r-leg bg-amber-800"></div>
-          </div>
-          <div class="r-arm left bg-amber-700"></div>
-          <div class="r-arm right bg-amber-700"></div>
-        `
-      },
-      {
-        id: 'cat',
-        name: '고양이 누브',
-        title: '민첩의 영웅',
-        desc: '스피드가 빠른 고양이 귀 장착 영웅',
-        skill: '제한시간 +3초 증가',
-        hpBonus: 10,
-        dmgBonus: 1.05,
-        defBonus: 0.95,
-        html: `
-          <div class="r-head bg-gray-200 flex items-center justify-center text-[9px]">🐱</div>
-          <div class="r-torso bg-pink-400"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-gray-300"></div>
-            <div class="r-leg bg-gray-300"></div>
-          </div>
-          <div class="r-arm left bg-gray-200"></div>
-          <div class="r-arm right bg-gray-200"></div>
-        `
-      },
-      {
-        id: 'cyborg',
-        name: '사이보그 누브',
-        title: '기계의 영웅',
-        desc: '붉은 안구 센서와 차가운 강철 바이저를 착용한 사이보그',
-        skill: '체력 +40 증가',
-        hpBonus: 40,
-        dmgBonus: 1.0,
-        defBonus: 0.85,
-        html: `
-          <div class="r-head bg-slate-400 border-2 border-red-500"></div>
-          <div class="r-torso bg-slate-700"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-slate-900"></div>
-            <div class="r-leg bg-slate-900"></div>
-          </div>
-          <div class="r-arm left bg-slate-500"></div>
-          <div class="r-arm right bg-slate-500"></div>
-        `
-      },
-      {
-        id: 'demon',
-        name: '악마 누브',
-        title: '파괴의 영웅',
-        desc: '붉은 뿔과 악마 날개를 지닌 가공할 단어 파괴자',
-        skill: '공격력 +35% 극대화',
-        hpBonus: -10,
-        dmgBonus: 1.35,
-        defBonus: 1.1,
-        html: `
-          <div class="r-head bg-red-700 border-2 border-black flex items-center justify-center text-[9px]">😈</div>
-          <div class="r-torso bg-black"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-red-950"></div>
-            <div class="r-leg bg-red-950"></div>
-          </div>
-          <div class="r-arm left bg-red-700"></div>
-          <div class="r-arm right bg-red-700"></div>
-        `
-      }
-    ];
-
-    const OPPONENTS = [
-      {
-        id: 'bacon',
-        name: '베이컨 보이 🥓',
-        tag: '상대: 베이컨 보이',
-        hp: 100,
-        lethalChance: 0.1,
-        lines: {
-          start: '누구든 나 베이컨을 넘을 순 없다! 🥓',
-          hit: '으윽! 제법이구나... 받아라!',
-          attack: '이 단어로 널 제압하겠다!',
-          lethal: '치명적인 한방단어 맛을 보아라!',
-          defeat: '말도 안 돼... 내 베이컨 머리가...!'
-        },
-        html: `
-          <div class="r-head bg-amber-200">
-            <div class="w-full h-2 bg-rose-700 rounded-t"></div>
-          </div>
-          <div class="r-torso bg-red-700"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-yellow-900"></div>
-            <div class="r-leg bg-yellow-900"></div>
-          </div>
-          <div class="r-arm left bg-amber-200"></div>
-          <div class="r-arm right bg-amber-200"></div>
-        `
-      },
-      {
-        id: 'monochrome',
-        name: '흑백 블록맨 ⬛',
-        tag: '상대: 흑백 캐릭터',
-        hp: 120,
-        lethalChance: 0.15,
-        lines: {
-          start: '모든 색을 지워버리겠다.',
-          hit: '흑백의 세계는 흔들리지 않는다...',
-          attack: '차가운 단어 공격!',
-          lethal: '너의 단어 공격을 은폐시키겠다!',
-          defeat: '빛이... 너무 강하군...'
-        },
-        html: `
-          <div class="r-head bg-white"></div>
-          <div class="r-torso bg-black border border-white"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-gray-900"></div>
-            <div class="r-leg bg-gray-900"></div>
-          </div>
-          <div class="r-arm left bg-white"></div>
-          <div class="r-arm right bg-white"></div>
-        `
-      },
-      {
-        id: 'orca',
-        name: '범고래 후드 🐋',
-        tag: '상대: 범고래 캐릭터',
-        hp: 130,
-        lethalChance: 0.18,
-        lines: {
-          start: '바다의 포식자 범고래 등장!',
-          hit: '크윽! 물살을 가르는 단어로 반격한다!',
-          attack: '해일 같은 단어 폭풍!',
-          lethal: '심해의 한방단어 수심 속으로 침몰해라!',
-          defeat: '물속으로 퇴각한다...'
-        },
-        html: `
-          <div class="r-head bg-slate-900 border-2 border-white flex justify-center items-center text-[9px]">🐋</div>
-          <div class="r-torso bg-black"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-slate-800"></div>
-            <div class="r-leg bg-slate-800"></div>
-          </div>
-          <div class="r-arm left bg-slate-900"></div>
-          <div class="r-arm right bg-slate-900"></div>
-        `
-      },
-      {
-        id: 'sukuna',
-        name: '스쿠나 누브 👹',
-        tag: '상대: 주왕 스쿠나',
-        hp: 150,
-        lethalChance: 0.25,
-        lines: {
-          start: '복마어주자에 온 것을 환영한다!',
-          hit: '네 단어 따위 해체해 주마!',
-          attack: '팔적경 썰기 단어 공격!',
-          lethal: '푸가(開)! 한방 단어로 가루로 만들어주마!',
-          defeat: '건방진... 꼬맹이가...!'
-        },
-        html: `
-          <div class="r-head bg-pink-300 border-2 border-red-600 flex justify-center items-center text-[9px]">👹</div>
-          <div class="r-torso bg-black border border-red-500"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-stone-900"></div>
-            <div class="r-leg bg-stone-900"></div>
-          </div>
-          <div class="r-arm left bg-pink-300"></div>
-          <div class="r-arm right bg-pink-300"></div>
-        `
-      },
-      {
-        id: 'kkondae',
-        name: '꼰대 부장님 👴',
-        tag: '상대: 꼰대 캐릭터',
-        hp: 140,
-        lethalChance: 0.2,
-        lines: {
-          start: '내가 너만 할 때는 단어를 100개씩 댔어!',
-          hit: '라떼는 말이야! 이런 단어로 안 졌어!',
-          attack: '훈수 단어 받아라!',
-          lethal: '결재 불허! 완벽한 한방 단어다!',
-          defeat: '요즘 애들은 무섭구만...'
-        },
-        html: `
-          <div class="r-head bg-amber-200 flex justify-center items-center text-[9px]">👴</div>
-          <div class="r-torso bg-amber-900"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-slate-800"></div>
-            <div class="r-leg bg-slate-800"></div>
-          </div>
-          <div class="r-arm left bg-amber-200"></div>
-          <div class="r-arm right bg-amber-200"></div>
-        `
-      },
-      {
-        id: 'wolf',
-        name: '질풍의 늑대 🐺',
-        tag: '상대: 늑대 캐릭터',
-        hp: 145,
-        lethalChance: 0.22,
-        lines: {
-          start: '달빛 아래서 너의 단어를 찢어주마! 아우우!',
-          hit: '크르르... 날카로운 단어였군!',
-          attack: '늑대 무리의 어택!',
-          lethal: '야성의 한방 단어 이빨을 받아라!',
-          defeat: '크윽... 밤하늘로 돌아간다...'
-        },
-        html: `
-          <div class="r-head bg-gray-600 flex justify-center items-center text-[9px]">🐺</div>
-          <div class="r-torso bg-gray-800"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-gray-900"></div>
-            <div class="r-leg bg-gray-900"></div>
-          </div>
-          <div class="r-arm left bg-gray-600"></div>
-          <div class="r-arm right bg-gray-600"></div>
-        `
-      },
-      {
-        id: 'tiger',
-        name: '맹호 호랑이 🐯',
-        tag: '상대: 호랑이 캐릭터',
-        hp: 160,
-        lethalChance: 0.24,
-        lines: {
-          start: '어흥! 산신령 호랑이님의 일갈을 들어라!',
-          hit: '네 놈의 공격에 털끝 하나 안 건드린다!',
-          attack: '호랑이 덮치기 공격!',
-          lethal: '호사유피! 강력한 한방 단어로 끝낸다!',
-          defeat: '산속으로 쫓겨나다니...'
-        },
-        html: `
-          <div class="r-head bg-orange-500 flex justify-center items-center text-[9px]">🐯</div>
-          <div class="r-torso bg-amber-600"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-amber-900"></div>
-            <div class="r-leg bg-amber-900"></div>
-          </div>
-          <div class="r-arm left bg-orange-500"></div>
-          <div class="r-arm right bg-orange-500"></div>
-        `
-      },
-      {
-        id: 'retro',
-        name: '클래식 2006 🏛️',
-        tag: '상대: 과거 로블록스',
-        hp: 135,
-        lethalChance: 0.15,
-        lines: {
-          start: '2006년 전설의 도트 단어가 돌아왔다.',
-          hit: '구관이 명관이다!',
-          attack: '레트로 픽셀 공격!',
-          lethal: '고전 레전드 한방 단어!',
-          defeat: '과거의 유물로 돌아가겠다...'
-        },
-        html: `
-          <div class="r-head bg-amber-300"></div>
-          <div class="r-torso bg-yellow-600"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-red-800"></div>
-            <div class="r-leg bg-red-800"></div>
-          </div>
-          <div class="r-arm left bg-amber-300"></div>
-          <div class="r-arm right bg-amber-300"></div>
-        `
-      },
-      {
-        id: 'angel',
-        name: '천사 블록맨 👼',
-        tag: '상대: 천사 캐릭터',
-        hp: 170,
-        lethalChance: 0.28,
-        lines: {
-          start: '신성한 한글의 심판을 받으라!',
-          hit: '천상의 빛이 날 보호한다!',
-          attack: '천사 날개 단어 공격!',
-          lethal: '최후의 신성한 한방 단어!',
-          defeat: '하늘로 승천합니다...'
-        },
-        html: `
-          <div class="r-head bg-amber-100 flex justify-center items-center text-[9px]">👼</div>
-          <div class="r-torso bg-sky-200"></div>
-          <div class="r-limbs">
-            <div class="r-leg bg-white"></div>
-            <div class="r-leg bg-white"></div>
-          </div>
-          <div class="r-arm left bg-amber-100"></div>
-          <div class="r-arm right bg-amber-100"></div>
-        `
-      }
-    ];
-
-    /* ===================================================================
-       2. KOREAN WORD DATABASE & RULES (두음법칙 & 한방단어)
-       =================================================================== */
-    const LETHAL_WORDS = {
-      '스': ['스팀', ['스프링'], ['스파이더맨']],
-      '라': ['라듐', '라뤔'],
-      '나': ['나트륨'],
-      '칼': ['칼륨', '칼슘'],
-      '마': ['마그네슘'],
-      '헬': ['헬륨'],
-      '베': ['베릴륨'],
-      '바': ['바륨'],
-      '게': ['게르마늄'],
-      '우': ['우라늄'],
-      '플': ['플루토늄'],
-      '세': ['세슘'],
-      '프': ['프랑슘'],
-      '해': ['해녘'],
-      '들': ['들녘'],
-      '새': ['새녘'],
-      '아': ['아침녘'],
-      '티': ['티타늄'],
-      '지': ['지르코늄']
-    };
-
-    const WORD_DATABASE = [
-      "로블록스", "스튜디오", "오징어게임", "스킨", "스피드", "스피커", "스트리머", "스위치",
-      "드래곤", "곤충", "충전기", "기차", "차량", "양말", "말풍선", "선물", "물고기", "기사",
-      "사자", "자전거", "거북이", "이발소", "소나무", "무지개", "개구리", "리듬", "듬직",
-      "직장", "장난감", "감자", "자두", "두부", "부메랑", "랑데부", "부모님", "님카지",
-      "지도", "도시", "시계", "계란", "란제리", "리본", "본사", "사탕", "탕수육", "육군",
-      "군대", "대통령", "영웅", "웅덩이", "이불", "불꽃", "꽃밭", "밭일", "일기장", "장미",
-      "미소", "소녀", "여우", "우주", "주스", "스노우", "우산", "산길", "길거리", "리코더",
-      "더위", "위성", "성당", "당근", "근육", "육지", "지구", "구름", "름바", "바다",
-      "다람쥐", "쥐잡기", "기타", "타자", "자석", "석양", "양파", "파도", "도둑", "둑방",
-      "방패", "패배", "배구", "구슬", "슬기", "기억", "억수", "수박", "박수", "수영장",
-      "장수풍뎅이", "이빨", "빨강", "강아지", "지렁이", "이유", "유리", "리유저블", "블록",
-      "록스타", "타이어", "어린이", "이름", "름료", "요리사", "사슴", "슴가", "가방",
-      "방학", "학원", "원숭이", "이글루", "루비", "비행기", "기풍", "풍선", "선장", "장갑"
-    ];
-
-    const DUEUM_RULES = {
-      '라': '나', '락': '낙', '란': '난', '랄': '날', '람': '남', '랍': '납', '랑': '낭',
-      '래': '내', '랭': '냉', '롸': '놔', '뢰': '뇌', '롼': '난', '림': '임', '립': '입',
-      '려': '여', '령': '영', '렬': '열', '렴': '염', '엽': '엽', '로': '노', '록': '녹',
-      '론': '논', '롱': '농', '뢰': '뇌', '루': '누', '류': '유', '육': '육', '륜': '윤',
-      '률': '율', '륭': '융', '리': '이', '린': '인', '릴': '일', '림': '임', '립': '입',
-      '녀': '여', '뇨': '요', '뉴': '유', '니': '이', '닌': '인'
-    };
-
-    function getPossibleStartChars(char) {
-      const results = [char];
-      if (DUEUM_RULES[char]) {
-        results.push(DUEUM_RULES[char]);
-      }
-      return results;
-    }
-
-    function getLastChar(word) {
-      return word.charAt(word.length - 1);
-    }
-
-    function getFirstChar(word) {
-      return word.charAt(0);
-    }
-
-    /* ===================================================================
-       3. AUDIO SYNTHESIZER & UI TOAST
-       =================================================================== */
-    let audioCtx = null;
-    let audioEnabled = true;
-
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-    }
-
-    function playSound(type) {
-      if (!audioEnabled) return;
-      initAudio();
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-
-      const now = audioCtx.currentTime;
-
-      if (type === 'click') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(450, now);
-        osc.frequency.exponentialRampToValueAtTime(850, now + 0.05);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.05);
-      } 
-      else if (type === 'correct') {
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
-          gain.gain.setValueAtTime(0.2, now + idx * 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.2);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + idx * 0.05);
-          osc.stop(now + idx * 0.05 + 0.2);
-        });
-      } 
-      else if (type === 'oof') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(320, now);
-        osc.frequency.exponentialRampToValueAtTime(150, now + 0.22);
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.22);
-      } 
-      else if (type === 'lethal') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(140, now);
-        osc.frequency.linearRampToValueAtTime(650, now + 0.3);
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      }
-      else if (type === 'heal') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.3);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-      }
-      else if (type === 'stage_clear') {
-        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-        notes.forEach((f, i) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, now + i * 0.08);
-          gain.gain.setValueAtTime(0.25, now + i * 0.08);
-          gain.gain.linearRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now + i * 0.08);
-          osc.stop(now + i * 0.08 + 0.25);
-        });
-      }
-    }
-
-    function showToast(msg) {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'bg-black/90 border-2 border-yellow-400 text-yellow-300 px-4 py-2 rounded-xl text-sm font-bold shadow-lg transform transition-all duration-300 translate-y-[-10px] opacity-0';
-      toast.innerText = msg;
-      container.appendChild(toast);
-
-      setTimeout(() => {
-        toast.classList.remove('translate-y-[-10px]', 'opacity-0');
-      }, 50);
-
-      setTimeout(() => {
-        toast.classList.add('opacity-0');
-        setTimeout(() => toast.remove(), 300);
-      }, 2500);
-    }
-
-    function toggleAudio() {
-      audioEnabled = !audioEnabled;
-      const btn = document.getElementById('audio-btn');
-      btn.innerText = audioEnabled ? '🔊 소리 ON' : '🔇 소리 OFF';
-    }
-
-    /* ===================================================================
-       4. GAME STATE & SELECTION LOGIC
-       =================================================================== */
-    let selectedHeroId = 'classic';
-    let maxTime = 20;
-    let timerInterval = null;
-    let timeLeft = 20;
-
-    let currentStage = 1;
-    let currentOpponent = null;
-    let nextOpponent = null;
-
-    let playerMaxHp = 100;
-    let playerHp = 100;
-    let opponentMaxHp = 100;
-    let opponentHp = 100;
-
-    let score = 0;
-    let wordCount = 0;
-
-    let usedWords = new Set();
-    let currentWord = "로블록스";
-    let isMidStageHeroSelect = false;
-
-    function renderHeroGrid() {
-      const gridContainer = document.getElementById('character-grid');
-      gridContainer.innerHTML = '';
-
-      HEROES.forEach(hero => {
-        const isSelected = (hero.id === selectedHeroId);
-        const card = document.createElement('div');
-        card.className = `char-card cursor-pointer roblox-card p-2 rounded-xl border-4 transition-all hover:scale-105 flex flex-col items-center justify-between ${
-          isSelected ? 'bg-indigo-900 border-yellow-400 scale-105' : 'bg-gray-800 border-gray-600'
-        }`;
-        card.onclick = () => selectHero(hero.id);
-
-        card.innerHTML = `
-          <div class="text-[10px] bg-yellow-400 text-black font-black px-1.5 py-0.5 rounded-full mb-1 truncate max-w-full">
-            ${hero.title}
-          </div>
-          <div class="roblox-avatar scale-75 origin-top my-1">
-            ${hero.html}
-          </div>
-          <div class="text-center w-full mt-1">
-            <h4 class="font-black text-xs sm:text-sm text-yellow-300 truncate">${hero.name}</h4>
-          </div>
-        `;
-
-        gridContainer.appendChild(card);
-      });
-
-      updateDetailCard();
-    }
-
-    function selectHero(id) {
-      playSound('click');
-      selectedHeroId = id;
-      renderHeroGrid();
-
-      if (isMidStageHeroSelect) {
-        const hero = HEROES.find(c => c.id === selectedHeroId);
-        playerMaxHp = 100 + hero.hpBonus;
-        playerHp = playerMaxHp;
-
-        document.getElementById('player-avatar-container').innerHTML = hero.html;
-        document.getElementById('player-name-tag').innerText = `${hero.name} HP`;
-        document.getElementById('skill-badge').innerText = hero.skill.split('(')[0];
-
-        updateHpDisplays();
-        playSound('heal');
-        showToast(`✨ ${hero.name}(으)로 교체 완료! 체력이 100% 회복되었습니다.`);
-
-        isMidStageHeroSelect = false;
-        advanceToNextStage();
-      }
-    }
-
-    function updateDetailCard() {
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-      if (!hero) return;
-
-      document.getElementById('detail-avatar-preview').innerHTML = `<div class="roblox-avatar scale-75 origin-top">${hero.html}</div>`;
-      document.getElementById('detail-name').innerText = hero.name;
-      document.getElementById('detail-title').innerText = hero.title;
-      document.getElementById('detail-desc').innerText = hero.desc;
-      document.getElementById('detail-skill').innerText = `✨ 패시브: ${hero.skill}`;
-    }
-
-    function setTimer(seconds) {
-      playSound('click');
-      maxTime = seconds;
-      [20, 12, 7].forEach(s => {
-        const btn = document.getElementById(`time-${s}`);
-        if (s === seconds) {
-          btn.className = "px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-green-500 text-black";
-        } else {
-          btn.className = "px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white";
-        }
-      });
-    }
-
-    /* ===================================================================
-       5. STAGE & GAMEPLAY CORE LOGIC
-       =================================================================== */
-    function startGame() {
-      playSound('click');
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-
-      document.getElementById('select-screen').classList.add('hidden');
-      document.getElementById('game-screen').classList.remove('hidden');
-
-      // Setup Hero
-      document.getElementById('player-avatar-container').innerHTML = hero.html;
-      document.getElementById('player-name-tag').innerText = `${hero.name} HP`;
-      document.getElementById('skill-badge').innerText = hero.skill.split('(')[0];
-
-      // Reset Match Variables
-      currentStage = 1;
-      score = 0;
-      wordCount = 0;
-      playerMaxHp = 100 + hero.hpBonus;
-      playerHp = playerMaxHp;
-
-      // Stage 1 always starts with Bacon Boy
-      currentOpponent = OPPONENTS[0];
-      setupStage(currentStage);
-    }
-
-    function setupStage(stageNum) {
-      usedWords = new Set();
-      currentWord = "로블록스";
-      usedWords.add(currentWord);
-
-      opponentMaxHp = 100 + (stageNum - 1) * 20;
-      opponentHp = opponentMaxHp;
-
-      document.getElementById('stage-badge').innerText = `STAGE ${stageNum}`;
-      document.getElementById('opponent-title-tag').innerText = currentOpponent.tag;
-      document.getElementById('opponent-avatar-container').innerHTML = currentOpponent.html;
-      document.getElementById('opponent-name-tag').innerText = currentOpponent.name;
-      document.getElementById('opponent-hp-label').innerText = `${currentOpponent.name} HP`;
-
-      setOpponentSpeech(currentOpponent.lines.start);
-
-      updateHpDisplays();
-      updateScoreDisplay();
-
-      const historyBox = document.getElementById('history-box');
-      historyBox.innerHTML = `<span class="bg-indigo-900 border border-indigo-500 text-indigo-200 px-2 py-0.5 rounded-md">로블록스</span>`;
-
-      updateTargetWordDisplay();
-      resetTimer();
-    }
-
-    function getRandomNextOpponent() {
-      const filtered = OPPONENTS.filter(o => o.id !== currentOpponent.id);
-      return filtered[Math.floor(Math.random() * filtered.length)];
-    }
-
-    function updateTargetWordDisplay() {
-      document.getElementById('current-word-display').innerText = currentWord;
-      const last = getLastChar(currentWord);
-      const possible = getPossibleStartChars(last);
-      
-      if (possible.length > 1) {
-        document.getElementById('target-char').innerText = `${possible[0]} 또는 ${possible[1]}`;
-      } else {
-        document.getElementById('target-char').innerText = possible[0];
-      }
-    }
-
-    function resetTimer() {
-      clearInterval(timerInterval);
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-      
-      let timeLimit = maxTime;
-      if (hero.id === 'cat') timeLimit += 3;
-
-      timeLeft = timeLimit;
-      updateTimerUI();
-
-      timerInterval = setInterval(() => {
-        timeLeft--;
-        updateTimerUI();
-
-        if (timeLeft <= 0) {
-          clearInterval(timerInterval);
-          handleTimeOut();
-        }
-      }, 1000);
-    }
-
-    function updateTimerUI() {
-      const timerBox = document.getElementById('timer-box');
-      timerBox.innerText = timeLeft;
-      if (timeLeft <= 3) {
-        timerBox.className = "absolute top-2 right-2 bg-red-600 border-2 border-black text-white font-black w-10 h-10 rounded-full flex items-center justify-center text-lg animate-ping";
-      } else {
-        timerBox.className = "absolute top-2 right-2 bg-yellow-400 border-2 border-black text-black font-black w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-[2px_2px_0px_#000]";
-      }
-    }
-
-    function submitWord(e) {
-      e.preventDefault();
-      const inputEl = document.getElementById('word-input');
-      const val = inputEl.value.trim();
-      inputEl.value = '';
-
-      if (!val) return;
-
-      if (val.length < 2) {
-        shakeInput("2글자 이상의 단어를 입력하세요!");
-        return;
-      }
-
-      if (!/^[가-힣]+$/.test(val)) {
-        shakeInput("한글 단어만 입력 가능합니다!");
-        return;
-      }
-
-      const lastC = getLastChar(currentWord);
-      const validStarts = getPossibleStartChars(lastC);
-      const inputFirst = getFirstChar(val);
-
-      if (!validStarts.includes(inputFirst)) {
-        shakeInput(`'${validStarts.join("' 또는 '")}'(으)로 시작해야 합니다!`);
-        return;
-      }
-
-      if (usedWords.has(val)) {
-        shakeInput("이미 사용된 단어입니다!");
-        return;
-      }
-
-      // PLAYER ATTACK SUCCESS
-      clearInterval(timerInterval);
-      playSound('correct');
-      confetti({ particleCount: 20, spread: 50, origin: { y: 0.8 } });
-
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-
-      usedWords.add(val);
-      currentWord = val;
-      wordCount++;
-
-      let scoreMult = (hero.id === 'rainbow') ? 1.5 : 1.0;
-      const earnedScore = Math.floor((val.length * 100 + timeLeft * 10) * scoreMult);
-      score += earnedScore;
-      updateScoreDisplay();
-
-      addHistoryChip(val, 'player');
-
-      // Damage Calculation
-      let baseDmg = 14 + val.length * 4;
-      let finalDmg = Math.min(Math.floor(baseDmg * hero.dmgBonus), 50);
-      
-      opponentHp = Math.max(0, opponentHp - finalDmg);
-
-      // Puppy Passive Healing
-      if (hero.id === 'puppy') {
-        playerHp = Math.min(playerMaxHp, playerHp + 3);
-      }
-
-      updateHpDisplays();
-
-      animatePlayerAttack();
-      animateOpponentDamage();
-      playSound('oof');
-
-      setOpponentSpeech(currentOpponent.lines.hit);
-
-      if (opponentHp <= 0) {
-        setTimeout(() => triggerStageVictoryChoice(), 600);
-        return;
-      }
-
-      document.getElementById('submit-btn').disabled = true;
-      updateTargetWordDisplay();
-
-      // Opponent Turn
-      setTimeout(() => {
-        opponentTurn();
-      }, 1100);
-    }
-
-    function opponentTurn() {
-      const lastC = getLastChar(currentWord);
-      const validStarts = getPossibleStartChars(lastC);
-
-      let chosenWord = "";
-      let isLethal = false;
-
-      const lethalProb = currentOpponent.lethalChance + (currentStage * 0.03);
-      const triggerLethalChance = (opponentHp < opponentMaxHp * 0.4 || Math.random() < lethalProb);
-      
-      if (triggerLethalChance) {
-        for (let start of validStarts) {
-          if (LETHAL_WORDS[start]) {
-            const unusedLethals = LETHAL_WORDS[start].filter(w => !usedWords.has(w));
-            if (unusedLethals.length > 0) {
-              chosenWord = unusedLethals[Math.floor(Math.random() * unusedLethals.length)];
-              isLethal = true;
-              break;
+    <!-- 일시정지 오버레이 -->
+    <div id="pause-overlay" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl max-w-xs w-full p-6 text-center shadow-2xl">
+            <h2 class="font-display text-2xl font-black text-white mb-2">PAUSED</h2>
+            <p class="text-slate-300 text-xs mb-6">게임이 일시정지되었습니다.</p>
+            <div class="flex flex-col gap-2.5">
+                <button onclick="togglePause()" class="w-full py-3.5 rounded-xl font-display font-bold text-sm bg-sky-500 hover:bg-sky-400 text-slate-950 transition cursor-pointer">
+                    계속 달리기 (RESUME)
+                </button>
+                <button onclick="startGame()" class="w-full py-3 rounded-xl font-semibold text-sm bg-white/10 hover:bg-white/15 text-white transition cursor-pointer">
+                    처음부터 다시하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 게임 오버 모달 -->
+    <div id="gameover-overlay" class="fixed inset-0 z-30 hidden items-center justify-center p-4 bg-slate-950/65 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border border-rose-500/30">
+            <div id="new-best-badge" class="hidden inline-block px-3.5 py-1 rounded-full bg-amber-400/20 border border-amber-400 text-amber-300 text-xs font-extrabold tracking-widest uppercase mb-2 animate-bounce">
+                ★ NEW BEST RECORD! ★
+            </div>
+            <h2 class="font-display text-3xl sm:text-4xl font-black text-white tracking-tight mb-1">
+                GAME OVER
+            </h2>
+            <p class="text-slate-400 text-xs sm:text-sm mb-6">장애물과 충돌했습니다!</p>
+
+            <!-- 결과 요약 그리드 -->
+            <div class="grid grid-cols-3 gap-2.5 mb-6">
+                <div class="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
+                    <div class="text-[10px] font-semibold text-sky-300 uppercase">FINAL SCORE</div>
+                    <div id="over-score" class="font-display text-xl sm:text-2xl font-black text-white mt-1">0</div>
+                </div>
+                <div class="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
+                    <div class="text-[10px] font-semibold text-emerald-300 uppercase">DISTANCE</div>
+                    <div id="over-distance" class="font-display text-xl sm:text-2xl font-black text-emerald-300 mt-1">0m</div>
+                </div>
+                <div class="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
+                    <div class="text-[10px] font-semibold text-amber-300 uppercase">ORBS</div>
+                    <div id="over-orbs" class="font-display text-xl sm:text-2xl font-black text-amber-300 mt-1">0</div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-4 py-2.5 mb-6 text-xs">
+                <span class="text-slate-400">역대 최고 점수</span>
+                <span id="over-best" class="font-display font-bold text-amber-300 text-sm">0</span>
+            </div>
+
+            <button onclick="startGame()" class="w-full py-4 rounded-2xl font-display font-extrabold text-lg tracking-wider bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-slate-950 shadow-[0_0_25px_rgba(52,211,153,0.4)] active:scale-[0.98] transition cursor-pointer">
+                PLAY AGAIN
+            </button>
+            <div class="text-[11px] text-slate-400 mt-3">
+                또는 <span class="text-slate-200 font-semibold">SPACE / ENTER</span> 키로 즉시 재시작
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * SKYLINE RUNNER 3D - 뒤쪽 위 3인칭 시점 무한 장애물 피하기 게임
+         * ============================================================================
+         */
+
+        // ==========================================
+        // 1. 전역 상수 및 게임 상태 변수
+        // ==========================================
+        const LANE_WIDTH = 2.6;
+        const LANES = [-LANE_WIDTH, 0, LANE_WIDTH]; // 0: 좌측, 1: 중앙, 2: 우측
+        const BASE_SPEED = 24;
+        const MAX_SPEED = 56;
+        const GRAVITY = -58;
+        const JUMP_VELOCITY = 20.5;
+        const SLIDE_DURATION = 0.68;
+
+        const STORAGE_BEST_KEY = 'skyline_runner_3d_best_v1';
+
+        let gameState = 'START'; // 'START' | 'PLAYING' | 'PAUSED' | 'GAMEOVER'
+        let score = 0;
+        let distance = 0;
+        let orbsCollected = 0;
+        let comboCount = 0;
+        let comboTimer = 0;
+        let bestScore = Number(localStorage.getItem(STORAGE_BEST_KEY) || 0);
+        let currentSpeed = BASE_SPEED;
+        let isMuted = false;
+
+        // 플레이어 물리 상태
+        let currentLane = 1;
+        let playerX = 0;
+        let playerY = 0;
+        let playerVy = 0;
+        let isJumping = false;
+        let isSliding = false;
+        let slideTimer = 0;
+        let runCycle = 0;
+        let footstepTimer = 0;
+
+        // 카메라 쉐이크
+        let cameraShakeTime = 0;
+        let cameraShakeIntensity = 0;
+
+        // Three.js 핵심 객체
+        let scene, camera, renderer, clock;
+        let dirLight, hemiLight;
+        let runnerGroup, runnerParts = {};
+        let groundGridGroup, roadStripes = [];
+        let sceneryItems = [];
+        let obstacles = [];
+        let collectibles = [];
+        let particles = [];
+
+        // 오브젝트 스폰 타이머
+        let nextSpawnZ = -45;
+        let lastPatternLane = 1;
+
+        // Web Audio API 컨텍스트
+        let audioCtx = null;
+
+        // ==========================================
+        // 2. Web Audio API 프로시저럴 사운드 엔진
+        // ==========================================
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
-          }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
         }
-      }
 
-      if (!chosenWord) {
-        const candidates = WORD_DATABASE.filter(w => {
-          return validStarts.includes(getFirstChar(w)) && !usedWords.has(w);
+        function playSound(type) {
+            if (isMuted) return;
+            try {
+                initAudio();
+                const now = audioCtx.currentTime;
+
+                if (type === 'lane') {
+                    // 차선 이동 바람 가르는 소리 (Whoosh)
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.exponentialRampToValueAtTime(520, now + 0.09);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.09);
+                } else if (type === 'jump') {
+                    // 점프 사운드
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(640, now + 0.18);
+                    gain.gain.setValueAtTime(0.14, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.19);
+                } else if (type === 'slide') {
+                    // 슬라이드 마찰음
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(360, now);
+                    osc.frequency.exponentialRampToValueAtTime(95, now + 0.22);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.22);
+                } else if (type === 'orb') {
+                    // 에너지 오브 획득 차임 (콤보에 따라 음정 상승)
+                    const pitchBoost = Math.min(comboCount * 22, 350);
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(660 + pitchBoost, now);
+                    osc.frequency.setValueAtTime(990 + pitchBoost, now + 0.055);
+                    gain.gain.setValueAtTime(0.11, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.18);
+                } else if (type === 'step') {
+                    // 가벼운 발걸음 틱
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(110, now);
+                    osc.frequency.exponentialRampToValueAtTime(45, now + 0.04);
+                    gain.gain.setValueAtTime(0.035, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.04);
+                } else if (type === 'crash') {
+                    // 충돌 임팩트 사운드
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(32, now + 0.42);
+                    gain.gain.setValueAtTime(0.24, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.42);
+                }
+            } catch (e) {
+                // 오디오 차단 예외 무시
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', isMuted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !isMuted);
+            document.getElementById('btn-sound').blur();
+        }
+
+        // ==========================================
+        // 3. Three.js 씬, 카메라, 조명 및 3D 에셋 구축
+        // ==========================================
+        function initThreeScene() {
+            const canvas = document.getElementById('game-canvas');
+            clock = new THREE.Clock();
+
+            // 씬 및 원거리 안개(Fog)로 지평선 깊이감 극대화
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d152d);
+            scene.fog = new THREE.FogExp2(0x131d3b, 0.0092);
+
+            // 뒤쪽 위에서 전방 아래를 내려다보는 3인칭 체이스/쿼터뷰 카메라
+            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 220);
+            camera.position.set(0, 6.2, 10.5);
+            camera.lookAt(0, 1.4, -14);
+
+            // 렌더러 설정
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // 조명 세팅 (하늘/지면 반사광 + 입체 그림자용 태양광)
+            hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.85);
+            hemiLight.position.set(0, 40, 0);
+            scene.add(hemiLight);
+
+            dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+            dirLight.position.set(14, 28, 16);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 1;
+            dirLight.shadow.camera.far = 90;
+            const d = 18;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            // 지평선 글로우 돔 & 태양/달 오브젝트
+            buildHorizonBackdrop();
+
+            // 3차선 트랙 및 차선 마커 생성
+            buildTrack();
+
+            // 양옆 도시 빌딩, 나무, 가로등 배경 풀 생성
+            buildInitialScenery();
+
+            // 뒤에서 바라보는 관절 애니메이션 3D 러너 캐릭터 생성
+            buildRunnerCharacter();
+
+            // 리사이즈 이벤트 대응
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function buildHorizonBackdrop() {
+            // 먼 지평선에 빛나는 네온 태양/행성 배치
+            const sunGeo = new THREE.CircleGeometry(24, 32);
+            const sunMat = new THREE.MeshBasicMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.25,
+                fog: false
+            });
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.set(0, 22, -165);
+            scene.add(sunMesh);
+
+            const innerSunGeo = new THREE.CircleGeometry(13, 32);
+            const innerSunMat = new THREE.MeshBasicMaterial({
+                color: 0xe0f2fe,
+                transparent: true,
+                opacity: 0.45,
+                fog: false
+            });
+            const innerSun = new THREE.Mesh(innerSunGeo, innerSunMat);
+            innerSun.position.set(0, 22, -164);
+            scene.add(innerSun);
+        }
+
+        function buildTrack() {
+            // 메인 아스팔트/테크 트랙 바닥
+            const trackWidth = LANE_WIDTH * 3 + 1.4;
+            const trackGeo = new THREE.PlaneGeometry(trackWidth, 260);
+            const trackMat = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                roughness: 0.75,
+                metalness: 0.15
+            });
+            const trackMesh = new THREE.Mesh(trackGeo, trackMat);
+            trackMesh.rotation.x = -Math.PI / 2;
+            trackMesh.position.set(0, 0, -105);
+            trackMesh.receiveShadow = true;
+            scene.add(trackMesh);
+
+            // 트랙 좌우 경계 레일 (네온 시안 엣지)
+            const railGeo = new THREE.BoxGeometry(0.35, 0.35, 260);
+            const railMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.7,
+                roughness: 0.3
+            });
+
+            const leftRail = new THREE.Mesh(railGeo, railMat);
+            leftRail.position.set(-trackWidth / 2, 0.17, -105);
+            leftRail.receiveShadow = true;
+            scene.add(leftRail);
+
+            const rightRail = new THREE.Mesh(railGeo, railMat);
+            rightRail.position.set(trackWidth / 2, 0.17, -105);
+            rightRail.receiveShadow = true;
+            scene.add(rightRail);
+
+            // 트랙 바깥쪽 지면
+            const outerGroundGeo = new THREE.PlaneGeometry(240, 260);
+            const outerGroundMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.9
+            });
+            const outerGround = new THREE.Mesh(outerGroundGeo, outerGroundMat);
+            outerGround.rotation.x = -Math.PI / 2;
+            outerGround.position.set(0, -0.05, -105);
+            scene.add(outerGround);
+
+            // 움직이는 차선 점선 마커 (속도감 전달)
+            const stripeGeo = new THREE.PlaneGeometry(0.16, 3.2);
+            const stripeMat = new THREE.MeshBasicMaterial({
+                color: 0x64748b,
+                transparent: true,
+                opacity: 0.65
+            });
+
+            const dividerXs = [-LANE_WIDTH / 2, LANE_WIDTH / 2];
+            for (let z = 15; z > -185; z -= 8) {
+                dividerXs.forEach(dx => {
+                    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+                    stripe.rotation.x = -Math.PI / 2;
+                    stripe.position.set(dx, 0.015, z);
+                    scene.add(stripe);
+                    roadStripes.push(stripe);
+                });
+            }
+        }
+
+        function buildInitialScenery() {
+            // 양쪽 측면 스카이라인 빌딩, 가로등, 나무 배치
+            for (let z = 10; z > -190; z -= 11) {
+                spawnSceneryPair(z);
+            }
+        }
+
+        function spawnSceneryPair(zPos) {
+            [-1, 1].forEach(side => {
+                const group = new THREE.Group();
+                const baseX = side * (LANE_WIDTH * 1.5 + 3.8 + Math.random() * 4.5);
+
+                // 스타일리시 도시 빌딩
+                const bWidth = 3.2 + Math.random() * 3.5;
+                const bDepth = 4.0 + Math.random() * 4.0;
+                const bHeight = 8 + Math.random() * 22;
+
+                const buildingColors = [0x1e293b, 0x172554, 0x1e1b4b, 0x0f172a];
+                const bColor = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+                const bGeo = new THREE.BoxGeometry(bWidth, bHeight, bDepth);
+                const bMat = new THREE.MeshStandardMaterial({
+                    color: bColor,
+                    roughness: 0.6,
+                    metalness: 0.2
+                });
+                const building = new THREE.Mesh(bGeo, bMat);
+                building.position.set(baseX, bHeight / 2, 0);
+                building.castShadow = true;
+                building.receiveShadow = true;
+                group.add(building);
+
+                // 빌딩 창문 네온 스트립 장식
+                if (Math.random() > 0.35) {
+                    const winGeo = new THREE.PlaneGeometry(0.25, bHeight * 0.72);
+                    const winColor = Math.random() > 0.5 ? 0x38bdf8 : 0xfbbf24;
+                    const winMat = new THREE.MeshBasicMaterial({
+                        color: winColor,
+                        transparent: true,
+                        opacity: 0.55
+                    });
+                    const winStrip = new THREE.Mesh(winGeo, winMat);
+                    winStrip.position.set(baseX - side * (bWidth / 2 + 0.02), bHeight * 0.52, 0);
+                    winStrip.rotation.y = side === 1 ? -Math.PI / 2 : Math.PI / 2;
+                    group.add(winStrip);
+                }
+
+                // 트랙 바로 옆 가로등 기둥
+                const poleX = side * (LANE_WIDTH * 1.5 + 1.25);
+                const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 4.4, 8);
+                const poleMat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+                const pole = new THREE.Mesh(poleGeo, poleMat);
+                pole.position.set(poleX, 2.2, 0);
+                group.add(pole);
+
+                const lampGeo = new THREE.BoxGeometry(0.7, 0.14, 0.24);
+                const lampMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc });
+                const lamp = new THREE.Mesh(lampGeo, lampMat);
+                lamp.position.set(poleX - side * 0.3, 4.35, 0);
+                group.add(lamp);
+
+                group.position.z = zPos;
+                scene.add(group);
+                sceneryItems.push(group);
+            });
+        }
+
+        /**
+         * 뒤쪽 위에서 바라볼 때 역동적이고 명확히 보이는 3D 러너 캐릭터 구축
+         */
+        function buildRunnerCharacter() {
+            runnerGroup = new THREE.Group();
+
+            // 재질 정의 (밝고 시인성 높은 스포츠웨어 컬러)
+            const jacketMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35 }); // 밝은 시안 자켓
+            const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x38bdf8, emissiveIntensity: 0.3 });
+            const pantsMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfcd34d, roughness: 0.5 });
+            const hairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+            const shoeMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.4 });
+            const backpackMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.4 });
+
+            // 캐릭터 중심 피벗 (슬라이드 시 회전/축소 용이)
+            const bodyPivot = new THREE.Group();
+            bodyPivot.position.y = 1.05;
+            runnerGroup.add(bodyPivot);
+            runnerParts.bodyPivot = bodyPivot;
+
+            // 몸통 (Torso)
+            const torsoGeo = new THREE.BoxGeometry(0.76, 0.92, 0.44);
+            const torso = new THREE.Mesh(torsoGeo, jacketMat);
+            torso.position.y = 0.35;
+            torso.castShadow = true;
+            bodyPivot.add(torso);
+            runnerParts.torso = torso;
+
+            // 등 뒤 슬림 백팩 & 발광 코어 (3인칭 후면 시점에서 시각적 포인트)
+            const packGeo = new THREE.BoxGeometry(0.46, 0.56, 0.22);
+            const pack = new THREE.Mesh(packGeo, backpackMat);
+            pack.position.set(0, 0.38, 0.28);
+            pack.castShadow = true;
+            bodyPivot.add(pack);
+
+            const coreGeo = new THREE.BoxGeometry(0.22, 0.28, 0.05);
+            const core = new THREE.Mesh(coreGeo, stripeMat);
+            core.position.set(0, 0.38, 0.40);
+            bodyPivot.add(core);
+
+            // 머리 (Head)
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 1.08, 0);
+            bodyPivot.add(headGroup);
+            runnerParts.head = headGroup;
+
+            const headGeo = new THREE.BoxGeometry(0.52, 0.52, 0.52);
+            const headMesh = new THREE.Mesh(headGeo, skinMat);
+            headMesh.castShadow = true;
+            headGroup.add(headMesh);
+
+            // 헤어/헬멧 바이저 (뒤통수 & 윗부분)
+            const hairGeo = new THREE.BoxGeometry(0.56, 0.34, 0.56);
+            const hairMesh = new THREE.Mesh(hairGeo, hairMat);
+            hairMesh.position.set(0, 0.14, 0.03);
+            headGroup.add(hairMesh);
+
+            // 왼팔 / 오른팔
+            function createArm(xOffset) {
+                const armPivot = new THREE.Group();
+                armPivot.position.set(xOffset, 0.72, 0);
+
+                const armGeo = new THREE.BoxGeometry(0.24, 0.74, 0.24);
+                const armMesh = new THREE.Mesh(armGeo, jacketMat);
+                armMesh.position.y = -0.3;
+                armMesh.castShadow = true;
+                armPivot.add(armMesh);
+
+                const handGeo = new THREE.BoxGeometry(0.22, 0.2, 0.22);
+                const handMesh = new THREE.Mesh(handGeo, skinMat);
+                handMesh.position.y = -0.7;
+                armPivot.add(handMesh);
+
+                bodyPivot.add(armPivot);
+                return armPivot;
+            }
+            runnerParts.leftArm = createArm(-0.54);
+            runnerParts.rightArm = createArm(0.54);
+
+            // 왼다리 / 오른다리
+            function createLeg(xOffset) {
+                const legPivot = new THREE.Group();
+                legPivot.position.set(xOffset, -0.08, 0);
+
+                const legGeo = new THREE.BoxGeometry(0.28, 0.78, 0.28);
+                const legMesh = new THREE.Mesh(legGeo, pantsMat);
+                legMesh.position.y = -0.36;
+                legMesh.castShadow = true;
+                legPivot.add(legMesh);
+
+                // 운동화 (발뒤꿈치에 하얀 포인트로 달릴 때 역동감 강조)
+                const shoeGeo = new THREE.BoxGeometry(0.3, 0.22, 0.44);
+                const shoeMesh = new THREE.Mesh(shoeGeo, shoeMat);
+                shoeMesh.position.set(0, -0.82, -0.06);
+                shoeMesh.castShadow = true;
+                legPivot.add(shoeMesh);
+
+                bodyPivot.add(legPivot);
+                return legPivot;
+            }
+            runnerParts.leftLeg = createLeg(-0.21);
+            runnerParts.rightLeg = createLeg(0.21);
+
+            // 바닥 접지 그림자 디스크 (점프 높이에 따라 크기 조절)
+            const shadowGeo = new THREE.CircleGeometry(0.68, 20);
+            const shadowMat = new THREE.MeshBasicMaterial({
+                color: 0x020617,
+                transparent: true,
+                opacity: 0.55
+            });
+            const groundShadow = new THREE.Mesh(shadowGeo, shadowMat);
+            groundShadow.rotation.x = -Math.PI / 2;
+            groundShadow.position.y = 0.02;
+            scene.add(groundShadow);
+            runnerParts.groundShadow = groundShadow;
+
+            runnerGroup.position.set(0, 0, 0);
+            scene.add(runnerGroup);
+        }
+
+        // ==========================================
+        // 4. 장애물 및 에너지 오브(코인) 생성 시스템
+        // ==========================================
+        function clearWorldEntities() {
+            obstacles.forEach(obs => scene.remove(obs.mesh));
+            obstacles = [];
+
+            collectibles.forEach(col => scene.remove(col.mesh));
+            collectibles = [];
+
+            particles.forEach(p => scene.remove(p.mesh));
+            particles = [];
+
+            nextSpawnZ = -42;
+        }
+
+        /**
+         * 3가지 유형의 장애물 생성:
+         * - 'LOW'  : 낮은 바리케이드 (점프로 넘어야 함)
+         * - 'HIGH' : 공중 횡단 표지판/레이저 게이트 (슬라이드로 통과해야 함)
+         * - 'TALL' : 높은 기둥/차량 블록 (다른 차선으로 피해야 함)
+         */
+        function createObstacleMesh(type) {
+            const group = new THREE.Group();
+
+            if (type === 'LOW') {
+                // 낮은 허들 바리케이드 (높이 약 1.15)
+                const barGeo = new THREE.BoxGeometry(2.1, 0.55, 0.45);
+                const barMat = new THREE.MeshStandardMaterial({
+                    color: 0xf43f5e,
+                    emissive: 0x9f1239,
+                    emissiveIntensity: 0.4,
+                    roughness: 0.35
+                });
+                const bar = new THREE.Mesh(barGeo, barMat);
+                bar.position.y = 0.85;
+                bar.castShadow = true;
+                bar.receiveShadow = true;
+                group.add(bar);
+
+                // 위쪽 위아래 화살표 느낌의 노란 경고 띠
+                const stripeGeo = new THREE.BoxGeometry(2.14, 0.16, 0.48);
+                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+                const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+                stripe.position.y = 0.85;
+                group.add(stripe);
+
+                // 양쪽 지지대 다리
+                const legGeo = new THREE.BoxGeometry(0.22, 1.1, 0.45);
+                const legMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+                [-0.88, 0.88].forEach(lx => {
+                    const leg = new THREE.Mesh(legGeo, legMat);
+                    leg.position.set(lx, 0.55, 0);
+                    leg.castShadow = true;
+                    group.add(leg);
+                });
+
+                return {
+                    mesh: group,
+                    type: 'LOW',
+                    minY: 0,
+                    maxY: 1.15,
+                    halfWidth: 0.95,
+                    halfDepth: 0.35
+                };
+            } else if (type === 'HIGH') {
+                // 높은 오버헤드 게이트 (바닥에서 1.25 ~ 2.85 높이 -> 슬라이드 시 통과 가능!)
+                const pillarGeo = new THREE.BoxGeometry(0.24, 2.9, 0.42);
+                const pillarMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.4 });
+                [-1.02, 1.02].forEach(px => {
+                    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                    pillar.position.set(px, 1.45, 0);
+                    pillar.castShadow = true;
+                    group.add(pillar);
+                });
+
+                // 상단 차단 패널
+                const boardGeo = new THREE.BoxGeometry(2.2, 1.45, 0.48);
+                const boardMat = new THREE.MeshStandardMaterial({
+                    color: 0xf59e0b,
+                    emissive: 0xb45309,
+                    emissiveIntensity: 0.35,
+                    roughness: 0.3
+                });
+                const board = new THREE.Mesh(boardGeo, boardMat);
+                board.position.y = 2.08;
+                board.castShadow = true;
+                group.add(board);
+
+                // 하단 네온 경고 바 (슬라이드 유도 시각 표시)
+                const laserGeo = new THREE.BoxGeometry(1.9, 0.14, 0.5);
+                const laserMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+                const laser = new THREE.Mesh(laserGeo, laserMat);
+                laser.position.y = 1.34;
+                group.add(laser);
+
+                return {
+                    mesh: group,
+                    type: 'HIGH',
+                    minY: 1.28, // 슬라이드 상태의 플레이어 높이(약 0.95)보다 높음
+                    maxY: 2.9,
+                    halfWidth: 0.92,
+                    halfDepth: 0.35
+                };
+            } else {
+                // TALL: 피해야 하는 거대 미래형 차량/컨테이너 블록 (높이 2.6)
+                const bodyGeo = new THREE.BoxGeometry(2.05, 2.4, 3.2);
+                const bodyMat = new THREE.MeshStandardMaterial({
+                    color: 0x6366f1,
+                    roughness: 0.3,
+                    metalness: 0.35
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 1.2;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                group.add(body);
+
+                // 후면 테일램프 (플레이어가 다가갈 때 붉게 빛남)
+                const tailGeo = new THREE.BoxGeometry(1.75, 0.24, 0.08);
+                const tailMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+                const tail = new THREE.Mesh(tailGeo, tailMat);
+                tail.position.set(0, 0.95, 1.61);
+                group.add(tail);
+
+                // 상단 루프 라이트
+                const topGeo = new THREE.BoxGeometry(1.5, 0.25, 2.2);
+                const topMat = new THREE.MeshStandardMaterial({ color: 0x312e81 });
+                const top = new THREE.Mesh(topGeo, topMat);
+                top.position.set(0, 2.5, 0);
+                group.add(top);
+
+                return {
+                    mesh: group,
+                    type: 'TALL',
+                    minY: 0,
+                    maxY: 2.65,
+                    halfWidth: 0.95,
+                    halfDepth: 1.55
+                };
+            }
+        }
+
+        function spawnOrb(laneIdx, yPos, zPos) {
+            const orbGeo = new THREE.OctahedronGeometry(0.36, 1);
+            const orbMat = new THREE.MeshStandardMaterial({
+                color: 0xfbbf24,
+                emissive: 0xf59e0b,
+                emissiveIntensity: 0.85,
+                roughness: 0.15,
+                metalness: 0.3
+            });
+            const orbMesh = new THREE.Mesh(orbGeo, orbMat);
+            orbMesh.position.set(LANES[laneIdx], yPos, zPos);
+            scene.add(orbMesh);
+
+            collectibles.push({
+                mesh: orbMesh,
+                lane: laneIdx,
+                baseY: yPos,
+                z: zPos,
+                collected: false
+            });
+        }
+
+        /**
+         * 항상 피할 수 있는 경로가 보장되도록 패턴 단위로 장애물 & 오브 배치
+         */
+        function spawnWaveAt(zPos) {
+            const laneIndices = [0, 1, 2];
+            // 최소 1개 이상의 안전 차선 확보
+            const safeLane = Math.floor(Math.random() * 3);
+            lastPatternLane = safeLane;
+
+            const types = ['LOW', 'HIGH', 'TALL'];
+
+            laneIndices.forEach(lane => {
+                if (lane === safeLane) {
+                    // 안전 차선에는 가끔 낮은 장애물(점프 가능) 또는 에너지 오브 라인 배치
+                    if (Math.random() < 0.35) {
+                        const jumpType = Math.random() < 0.55 ? 'LOW' : 'HIGH';
+                        const obs = createObstacleMesh(jumpType);
+                        obs.mesh.position.set(LANES[lane], 0, zPos);
+                        scene.add(obs.mesh);
+                        obstacles.push({ ...obs, lane, z: zPos });
+
+                        // 점프 장애물 위나 슬라이드 아래에 보너스 오브 배치
+                        const orbY = jumpType === 'LOW' ? 2.15 : 0.55;
+                        spawnOrb(lane, orbY, zPos);
+                    } else {
+                        // 안전 차선에 오브 3개 연속 라인
+                        for (let i = 0; i < 3; i++) {
+                            spawnOrb(lane, 0.95, zPos - i * 2.4);
+                        }
+                    }
+                } else {
+                    // 나머지 2개 차선에는 랜덤하게 장애물 배치
+                    if (Math.random() < 0.78) {
+                        const randomType = types[Math.floor(Math.random() * types.length)];
+                        const obs = createObstacleMesh(randomType);
+                        obs.mesh.position.set(LANES[lane], 0, zPos);
+                        scene.add(obs.mesh);
+                        obstacles.push({ ...obs, lane, z: zPos });
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 5. 파티클 이펙트 시스템 (먼지, 스파크, 충돌 파편)
+        // ==========================================
+        function emitParticles(x, y, z, colorHex, count, speedScale = 1) {
+            const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+            for (let i = 0; i < count; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(
+                    x + (Math.random() - 0.5) * 0.5,
+                    y + (Math.random() - 0.5) * 0.4,
+                    z + (Math.random() - 0.5) * 0.5
+                );
+                scene.add(mesh);
+
+                particles.push({
+                    mesh,
+                    vx: (Math.random() - 0.5) * 7 * speedScale,
+                    vy: (Math.random() * 5 + 2) * speedScale,
+                    vz: (Math.random() - 0.5) * 7 * speedScale,
+                    life: 0.45 + Math.random() * 0.25,
+                    maxLife: 0.7
+                });
+            }
+        }
+
+        // ==========================================
+        // 6. 플레이어 입력 처리 (키보드 + 터치 스와이프)
+        // ==========================================
+        function handleActionInput(action, e) {
+            if (e) e.preventDefault();
+
+            if (gameState !== 'PLAYING') return;
+
+            if (action === 'LEFT') {
+                if (currentLane > 0) {
+                    currentLane--;
+                    playSound('lane');
+                    emitParticles(playerX, playerY + 0.3, 0, 0x38bdf8, 4, 0.5);
+                }
+            } else if (action === 'RIGHT') {
+                if (currentLane < 2) {
+                    currentLane++;
+                    playSound('lane');
+                    emitParticles(playerX, playerY + 0.3, 0, 0x38bdf8, 4, 0.5);
+                }
+            } else if (action === 'JUMP') {
+                if (!isJumping) {
+                    // 슬라이드 중 점프 입력 시 즉시 슬라이드 해제 후 점프
+                    isSliding = false;
+                    slideTimer = 0;
+                    isJumping = true;
+                    playerVy = JUMP_VELOCITY;
+                    playSound('jump');
+                    emitParticles(playerX, 0.1, 0, 0xe2e8f0, 7, 0.6);
+                }
+            } else if (action === 'SLIDE') {
+                if (isJumping) {
+                    // 공중에서 아래 입력 시 빠른 착지(Fast Fall) 후 슬라이드
+                    playerVy = -38;
+                }
+                if (!isSliding) {
+                    isSliding = true;
+                    slideTimer = SLIDE_DURATION;
+                    playSound('slide');
+                    emitParticles(playerX, 0.15, 0.2, 0x38bdf8, 6, 0.5);
+                } else {
+                    slideTimer = SLIDE_DURATION;
+                }
+            }
+        }
+
+        // 키보드 이벤트 리스너
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+
+            if (gameState === 'START' || gameState === 'GAMEOVER') {
+                if (e.code === 'Space' || e.code === 'Enter') {
+                    e.preventDefault();
+                    startGame();
+                }
+                return;
+            }
+
+            if (e.code === 'KeyP' || e.code === 'Escape') {
+                e.preventDefault();
+                togglePause();
+                return;
+            }
+
+            if (gameState !== 'PLAYING') return;
+
+            switch (e.code) {
+                case 'ArrowLeft':
+                case 'KeyA':
+                    e.preventDefault();
+                    handleActionInput('LEFT');
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    e.preventDefault();
+                    handleActionInput('RIGHT');
+                    break;
+                case 'ArrowUp':
+                case 'KeyW':
+                case 'Space':
+                    e.preventDefault();
+                    handleActionInput('JUMP');
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    e.preventDefault();
+                    handleActionInput('SLIDE');
+                    break;
+            }
         });
 
-        if (candidates.length > 0) {
-          chosenWord = candidates[Math.floor(Math.random() * candidates.length)];
-        } else {
-          const dynamicSuffixes = ["기", "스", "리", "차", "가", "나", "자", "타", "파", "하", "폰", "링", "방", "동"];
-          for (let s of validStarts) {
-            for (let suff of dynamicSuffixes) {
-              let candidate = s + suff;
-              if (!usedWords.has(candidate)) {
-                chosenWord = candidate;
-                break;
-              }
+        // 터치 & 마우스 드래그 스와이프 제스처 인식
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isPointerDown = false;
+
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                isPointerDown = true;
             }
-            if (chosenWord) break;
-          }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isPointerDown || gameState !== 'PLAYING') return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+            const threshold = 28;
+
+            if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    handleActionInput(dx > 0 ? 'RIGHT' : 'LEFT');
+                } else {
+                    handleActionInput(dy < 0 ? 'JUMP' : 'SLIDE');
+                }
+                isPointerDown = false;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            isPointerDown = false;
+        });
+
+        // ==========================================
+        // 7. 게임 루프 상태 제어 (시작, 일시정지, 종료)
+        // ==========================================
+        function startGame() {
+            initAudio();
+            clearWorldEntities();
+
+            // 상태 초기화
+            gameState = 'PLAYING';
+            score = 0;
+            distance = 0;
+            orbsCollected = 0;
+            comboCount = 0;
+            comboTimer = 0;
+            currentSpeed = BASE_SPEED;
+
+            currentLane = 1;
+            playerX = 0;
+            playerY = 0;
+            playerVy = 0;
+            isJumping = false;
+            isSliding = false;
+            slideTimer = 0;
+            runCycle = 0;
+
+            // 캐릭터 자세 원복
+            runnerGroup.position.set(0, 0, 0);
+            runnerGroup.rotation.set(0, 0, 0);
+            runnerParts.bodyPivot.rotation.set(0, 0, 0);
+            runnerParts.bodyPivot.scale.set(1, 1, 1);
+            runnerParts.bodyPivot.position.y = 1.05;
+
+            // 초기 장애물 웨이브 생성
+            for (let z = -45; z >= -165; z -= 24) {
+                spawnWaveAt(z);
+            }
+
+            // UI 오버레이 정리
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('gameover-overlay').classList.add('hidden');
+            document.getElementById('pause-overlay').classList.add('hidden');
+            document.getElementById('pause-overlay').classList.remove('flex');
+            document.getElementById('btn-pause').classList.remove('hidden');
+            document.getElementById('icon-pause').classList.remove('hidden');
+            document.getElementById('icon-play-small').classList.add('hidden');
+            document.getElementById('combo-container').classList.add('hidden');
+
+            updateHUD();
+            clock.getDelta();
         }
-      }
 
-      if (!chosenWord) {
-        setOpponentSpeech(currentOpponent.lines.defeat);
-        setTimeout(() => triggerStageVictoryChoice(), 800);
-        return;
-      }
-
-      usedWords.add(chosenWord);
-      currentWord = chosenWord;
-
-      addHistoryChip(chosenWord, 'opponent', isLethal);
-      updateTargetWordDisplay();
-
-      animateOpponentAttack();
-      animatePlayerDamage();
-
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-
-      if (isLethal) {
-        playSound('lethal');
-        let baseDmg = 32 + Math.floor(Math.random() * 10);
-        let actualDmg = Math.floor(baseDmg * hero.defBonus);
-        playerHp = Math.max(0, playerHp - actualDmg);
-        
-        setOpponentSpeech(`'${chosenWord}'! ${currentOpponent.lines.lethal}`);
-      } else {
-        playSound('oof');
-        let baseDmg = 12 + Math.floor(Math.random() * 8);
-        let actualDmg = Math.floor(baseDmg * hero.defBonus);
-        playerHp = Math.max(0, playerHp - actualDmg);
-
-        setOpponentSpeech(`'${chosenWord}'! ${currentOpponent.lines.attack}`);
-      }
-
-      updateHpDisplays();
-      document.getElementById('submit-btn').disabled = false;
-
-      if (playerHp <= 0) {
-        setTimeout(() => triggerGameOver(), 600);
-        return;
-      }
-
-      resetTimer();
-    }
-
-    function handleTimeOut() {
-      playSound('oof');
-      animatePlayerDamage();
-      
-      const hero = HEROES.find(c => c.id === selectedHeroId);
-      let penalty = Math.floor(25 * hero.defBonus);
-
-      playerHp = Math.max(0, playerHp - penalty);
-      updateHpDisplays();
-
-      setOpponentSpeech("시간 초과! ⏰ 망설이다가 공격기회를 날렸구나!");
-
-      if (playerHp <= 0) {
-        triggerGameOver();
-      } else {
-        setTimeout(() => {
-          resetTimer();
-        }, 1000);
-      }
-    }
-
-    /* ===================================================================
-       6. STAGE CLEAR & VICTORY REWARD MODAL FLOW
-       =================================================================== */
-    function triggerStageVictoryChoice() {
-      clearInterval(timerInterval);
-      playSound('stage_clear');
-      confetti({ particleCount: 80, spread: 80, origin: { y: 0.5 } });
-
-      const stageBonus = currentStage * 300;
-      score += stageBonus;
-      updateScoreDisplay();
-
-      nextOpponent = getRandomNextOpponent();
-      const currentHero = HEROES.find(h => h.id === selectedHeroId);
-
-      document.getElementById('victoryHeroName').innerText = currentHero.name;
-      document.getElementById('victoryNextOpponent').innerText = nextOpponent.name;
-
-      document.getElementById('victoryModal').classList.remove('hidden');
-    }
-
-    function handleVictoryChoice(choice) {
-      document.getElementById('victoryModal').classList.add('hidden');
-
-      if (choice === 'keep') {
-        playerHp = playerMaxHp;
-        updateHpDisplays();
-        playSound('heal');
-        showToast(`💖 ${HEROES.find(h => h.id === selectedHeroId).name}의 체력이 100% 회복되었습니다!`);
-        advanceToNextStage();
-      } else if (choice === 'change') {
-        isMidStageHeroSelect = true;
-        document.getElementById('game-screen').classList.add('hidden');
-        document.getElementById('select-screen').classList.remove('hidden');
-        renderHeroGrid();
-        showToast(`🔄 원하시는 교체 영웅을 클릭하세요!`);
-      }
-    }
-
-    function advanceToNextStage() {
-      currentStage++;
-      currentOpponent = nextOpponent;
-
-      document.getElementById('select-screen').classList.add('hidden');
-      document.getElementById('game-screen').classList.remove('hidden');
-      document.getElementById('submit-btn').disabled = false;
-
-      setupStage(currentStage);
-    }
-
-    function triggerGameOver() {
-      clearInterval(timerInterval);
-      playSound('oof');
-
-      document.getElementById('final-stage').innerText = `STAGE ${currentStage}`;
-      document.getElementById('final-score').innerText = `${score}점`;
-      document.getElementById('final-count').innerText = `${wordCount}개`;
-
-      document.getElementById('result-modal').classList.remove('hidden');
-    }
-
-    function surrender() {
-      if (confirm("정말 항복하고 캐릭터 선택으로 돌아가시겠습니까?")) {
-        clearInterval(timerInterval);
-        backToSelect();
-      }
-    }
-
-    /* ===================================================================
-       7. UI & ANIMATION HELPERS
-       =================================================================== */
-    function shakeInput(msg) {
-      playSound('oof');
-      const inputEl = document.getElementById('word-input');
-      inputEl.classList.add('border-red-500', 'animate-shake');
-      setOpponentSpeech(`⚠️ ${msg}`);
-      setTimeout(() => {
-        inputEl.classList.remove('border-red-500', 'animate-shake');
-      }, 500);
-    }
-
-    function setOpponentSpeech(text) {
-      document.getElementById('opponent-speech').innerText = text;
-    }
-
-    function updateHpDisplays() {
-      const pPct = Math.max(0, Math.floor((playerHp / playerMaxHp) * 100));
-      document.getElementById('player-hp-bar').style.width = `${pPct}%`;
-      document.getElementById('player-hp-text').innerText = `${playerHp} / ${playerMaxHp}`;
-
-      const oPct = Math.max(0, Math.floor((opponentHp / opponentMaxHp) * 100));
-      document.getElementById('opponent-hp-bar').style.width = `${oPct}%`;
-      document.getElementById('opponent-hp-text').innerText = `${opponentHp} / ${opponentMaxHp}`;
-    }
-
-    function updateScoreDisplay() {
-      document.getElementById('total-score-badge').innerText = score;
-      document.getElementById('combo-text').innerText = wordCount;
-    }
-
-    function addHistoryChip(word, owner, isLethal = false) {
-      const historyBox = document.getElementById('history-box');
-      const chip = document.createElement('span');
-      if (owner === 'player') {
-        chip.className = "bg-green-900 border border-green-500 text-green-200 px-2 py-0.5 rounded-md font-bold";
-        chip.innerText = `나: ${word}`;
-      } else {
-        if (isLethal) {
-          chip.className = "bg-yellow-500 border-2 border-red-600 text-black px-2 py-0.5 rounded-md font-black animate-pulse";
-          chip.innerText = `⚡한방: ${word}`;
-        } else {
-          chip.className = "bg-red-900 border border-red-500 text-red-200 px-2 py-0.5 rounded-md font-bold";
-          chip.innerText = `${currentOpponent.name.split(' ')[0]}: ${word}`;
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('pause-overlay').classList.remove('hidden');
+                document.getElementById('pause-overlay').classList.add('flex');
+                document.getElementById('icon-pause').classList.add('hidden');
+                document.getElementById('icon-play-small').classList.remove('hidden');
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('pause-overlay').classList.add('hidden');
+                document.getElementById('pause-overlay').classList.remove('flex');
+                document.getElementById('icon-pause').classList.remove('hidden');
+                document.getElementById('icon-play-small').classList.add('hidden');
+                clock.getDelta();
+            }
+            document.getElementById('btn-pause').blur();
         }
-      }
-      historyBox.appendChild(chip);
-      historyBox.scrollTop = historyBox.scrollHeight;
-    }
 
-    function animatePlayerAttack() {
-      const el = document.getElementById('player-avatar-container');
-      el.classList.add('animate-bounce-short');
-      setTimeout(() => el.classList.remove('animate-bounce-short'), 400);
-    }
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            playSound('crash');
 
-    function animateOpponentDamage() {
-      const el = document.getElementById('opponent-avatar-container');
-      el.classList.add('animate-shake');
-      setTimeout(() => el.classList.remove('animate-shake'), 400);
-    }
+            // 카메라 흔들림 & 파편 폭발 이펙트
+            cameraShakeTime = 0.45;
+            cameraShakeIntensity = 0.65;
+            emitParticles(playerX, playerY + 1.0, 0, 0x38bdf8, 18, 1.4);
+            emitParticles(playerX, playerY + 1.0, 0, 0xf43f5e, 14, 1.3);
 
-    function animateOpponentAttack() {
-      const el = document.getElementById('opponent-avatar-container');
-      el.classList.add('animate-bounce-short');
-      setTimeout(() => el.classList.remove('animate-bounce-short'), 400);
-    }
+            const finalScore = Math.floor(score);
+            const finalDistance = Math.floor(distance);
+            let isNewBest = false;
 
-    function animatePlayerDamage() {
-      const el = document.getElementById('player-avatar-container');
-      el.classList.add('animate-shake');
-      setTimeout(() => el.classList.remove('animate-shake'), 400);
-    }
+            if (finalScore > bestScore) {
+                bestScore = finalScore;
+                localStorage.setItem(STORAGE_BEST_KEY, String(bestScore));
+                isNewBest = true;
+            }
 
-    function restartGame() {
-      document.getElementById('result-modal').classList.add('hidden');
-      startGame();
-    }
+            // 결과 모달 업데이트
+            document.getElementById('over-score').textContent = finalScore.toLocaleString();
+            document.getElementById('over-distance').textContent = `${finalDistance}m`;
+            document.getElementById('over-orbs').textContent = orbsCollected;
+            document.getElementById('over-best').textContent = bestScore.toLocaleString();
+            document.getElementById('new-best-badge').classList.toggle('hidden', !isNewBest);
+            document.getElementById('btn-pause').classList.add('hidden');
+            document.getElementById('speed-vignette').style.opacity = '0';
 
-    function backToSelect() {
-      document.getElementById('result-modal').classList.add('hidden');
-      document.getElementById('game-screen').classList.add('hidden');
-      document.getElementById('select-screen').classList.remove('hidden');
-      isMidStageHeroSelect = false;
-      renderHeroGrid();
-    }
+            setTimeout(() => {
+                if (gameState === 'GAMEOVER') {
+                    document.getElementById('gameover-overlay').classList.remove('hidden');
+                }
+            }, 420);
+        }
 
-    // Window Onload Init
-    window.onload = function() {
-      renderHeroGrid();
-    };
-  </script>
+        // ==========================================
+        // 8. 매 프레임 업데이트 및 충돌 판정
+        // ==========================================
+        function updateSimulation(dt) {
+            // 파티클 업데이트는 게임오버 직후에도 계속 재생
+            updateParticles(dt);
+
+            // 카메라 쉐이크 업데이트
+            if (cameraShakeTime > 0) {
+                cameraShakeTime -= dt;
+            }
+
+            if (gameState !== 'PLAYING') {
+                // 시작 화면에서는 캐릭터가 제자리에서 가볍게 뛰는 데모 애니메이션
+                if (gameState === 'START') {
+                    runCycle += dt * 9;
+                    animateRunnerLimbs(dt, 0);
+                    scrollEnvironment(dt, 14);
+                }
+                updateCamera(dt);
+                return;
+            }
+
+            // 1. 속도 및 거리/점수 증가
+            currentSpeed = Math.min(MAX_SPEED, BASE_SPEED + distance * 0.024);
+            const stepDist = currentSpeed * dt;
+            distance += stepDist;
+            score += stepDist * (1 + Math.min(comboCount * 0.1, 1.5));
+
+            // 콤보 타이머 감소
+            if (comboCount > 0) {
+                comboTimer -= dt;
+                if (comboTimer <= 0) {
+                    comboCount = 0;
+                    document.getElementById('combo-container').classList.add('hidden');
+                }
+            }
+
+            // 2. 좌우 차선 부드러운 이동 및 기울기(Roll)
+            const targetX = LANES[currentLane];
+            const prevX = playerX;
+            playerX += (targetX - playerX) * Math.min(1, dt * 16);
+            const lateralVel = (playerX - prevX) / Math.max(dt, 0.001);
+
+            // 3. 점프 물리 계산
+            if (isJumping) {
+                playerY += playerVy * dt;
+                playerVy += GRAVITY * dt;
+                if (playerY <= 0) {
+                    playerY = 0;
+                    playerVy = 0;
+                    isJumping = false;
+                    emitParticles(playerX, 0.08, 0, 0x94a3b8, 6, 0.45);
+                    playSound('step');
+                }
+            }
+
+            // 4. 슬라이드 타이머 및 히트박스 높이 계산
+            if (isSliding) {
+                slideTimer -= dt;
+                if (slideTimer <= 0) {
+                    isSliding = false;
+                }
+            }
+
+            // 5. 캐릭터 위치 및 관절 애니메이션 반영
+            runnerGroup.position.set(playerX, playerY, 0);
+            animateRunnerLimbs(dt, lateralVel);
+
+            // 바닥 그림자 위치 및 높이에 따른 스케일
+            runnerParts.groundShadow.position.set(playerX, 0.02, 0);
+            const shadowScale = Math.max(0.45, 1 - playerY * 0.14);
+            runnerParts.groundShadow.scale.set(shadowScale, shadowScale, 1);
+
+            // 6. 트랙 마커, 도시 배경 스크롤
+            scrollEnvironment(dt, currentSpeed);
+
+            // 7. 장애물 이동 및 AABB 정밀 충돌 검사
+            updateObstaclesAndCollisions(dt, stepDist);
+
+            // 8. 에너지 오브 회전 및 획득 판정
+            updateCollectibles(dt, stepDist);
+
+            // 9. 카메라 추적 및 속도감 비네트 업데이트
+            updateCamera(dt);
+            updateHUD();
+        }
+
+        function animateRunnerLimbs(dt, lateralVel) {
+            const speedRatio = currentSpeed / BASE_SPEED;
+            runCycle += dt * 13 * speedRatio;
+
+            // 좌우 차선 변경 시 몸체 기울임
+            const targetLeanZ = -lateralVel * 0.028;
+            runnerParts.bodyPivot.rotation.z += (targetLeanZ - runnerParts.bodyPivot.rotation.z) * Math.min(1, dt * 14);
+
+            if (isSliding) {
+                // 낮은 슬라이드 자세 (뒤로 젖히며 낮아짐)
+                runnerParts.bodyPivot.position.y += (0.52 - runnerParts.bodyPivot.position.y) * Math.min(1, dt * 18);
+                runnerParts.bodyPivot.rotation.x += (1.15 - runnerParts.bodyPivot.rotation.x) * Math.min(1, dt * 18);
+                runnerParts.leftLeg.rotation.x = -1.2;
+                runnerParts.rightLeg.rotation.x = -0.5;
+                runnerParts.leftArm.rotation.x = -0.8;
+                runnerParts.rightArm.rotation.x = -0.8;
+            } else if (isJumping) {
+                // 점프 공중 자세 (역동적인 도약 포즈)
+                runnerParts.bodyPivot.position.y += (1.05 - runnerParts.bodyPivot.position.y) * Math.min(1, dt * 15);
+                runnerParts.bodyPivot.rotation.x += (-0.18 - runnerParts.bodyPivot.rotation.x) * Math.min(1, dt * 12);
+                runnerParts.leftLeg.rotation.x = 0.65;
+                runnerParts.rightLeg.rotation.x = -0.55;
+                runnerParts.leftArm.rotation.x = -0.95;
+                runnerParts.rightArm.rotation.x = 0.75;
+            } else {
+                // 일반 질주 자세 (팔다리 교차 스윙 + 상하 바운스)
+                const bounce = Math.abs(Math.sin(runCycle)) * 0.14;
+                runnerParts.bodyPivot.position.y += ((1.02 + bounce) - runnerParts.bodyPivot.position.y) * Math.min(1, dt * 18);
+                runnerParts.bodyPivot.rotation.x += (-0.16 - runnerParts.bodyPivot.rotation.x) * Math.min(1, dt * 15);
+
+                const swing = Math.sin(runCycle) * 0.95;
+                runnerParts.leftLeg.rotation.x = swing;
+                runnerParts.rightLeg.rotation.x = -swing;
+                runnerParts.leftArm.rotation.x = -swing * 0.85;
+                runnerParts.rightArm.rotation.x = swing * 0.85;
+
+                // 달리기 발걸음 사운드
+                if (gameState === 'PLAYING') {
+                    footstepTimer += dt * speedRatio;
+                    if (footstepTimer >= 0.27) {
+                        footstepTimer = 0;
+                        playSound('step');
+                    }
+                }
+            }
+        }
+
+        function scrollEnvironment(dt, speed) {
+            const moveZ = speed * dt;
+
+            // 차선 점선 순환
+            for (let i = 0; i < roadStripes.length; i++) {
+                roadStripes[i].position.z += moveZ;
+                if (roadStripes[i].position.z > 18) {
+                    roadStripes[i].position.z -= 200;
+                }
+            }
+
+            // 양옆 빌딩 & 가로등 순환
+            for (let i = 0; i < sceneryItems.length; i++) {
+                sceneryItems[i].position.z += moveZ;
+                if (sceneryItems[i].position.z > 22) {
+                    sceneryItems[i].position.z -= 209;
+                }
+            }
+        }
+
+        function updateObstaclesAndCollisions(dt, stepDist) {
+            // 플레이어 현재 바운딩 박스
+            const pHalfW = 0.34;
+            const pHalfD = 0.32;
+            const pMinY = playerY;
+            const pMaxY = playerY + (isSliding ? 0.92 : 2.05);
+
+            let furthestZ = -40;
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.z += stepDist;
+                obs.mesh.position.z = obs.z;
+
+                if (obs.z < furthestZ) {
+                    furthestZ = obs.z;
+                }
+
+                // AABB 3D 충돌 검사
+                const obsX = LANES[obs.lane];
+                const overlapX = Math.abs(playerX - obsX) < (pHalfW + obs.halfWidth);
+                const overlapZ = Math.abs(0 - obs.z) < (pHalfD + obs.halfDepth);
+                const overlapY = (pMaxY > obs.minY) && (pMinY < obs.maxY);
+
+                if (overlapX && overlapZ && overlapY) {
+                    triggerGameOver();
+                    return;
+                }
+
+                // 카메라 뒤로 지나간 장애물 제거
+                if (obs.z > 16) {
+                    scene.remove(obs.mesh);
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // 새로운 장애물 웨이브 지속 생성 (속도에 따라 간격 조절)
+            const waveGap = 22 + (currentSpeed - BASE_SPEED) * 0.32;
+            if (furthestZ > -155) {
+                spawnWaveAt(furthestZ - waveGap);
+            }
+        }
+
+        function updateCollectibles(dt, stepDist) {
+            const pHalfW = 0.55;
+            const pMinY = playerY;
+            const pMaxY = playerY + (isSliding ? 1.05 : 2.2);
+
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const col = collectibles[i];
+                col.z += stepDist;
+                col.mesh.position.z = col.z;
+                col.mesh.rotation.y += dt * 3.4;
+                col.mesh.position.y = col.baseY + Math.sin(col.z * 0.3 + clock.elapsedTime * 5) * 0.14;
+
+                // 획득 충돌 판정
+                const colX = LANES[col.lane];
+                const hitX = Math.abs(playerX - colX) < (pHalfW + 0.42);
+                const hitZ = Math.abs(0 - col.z) < 0.85;
+                const hitY = (pMaxY >= col.mesh.position.y - 0.4) && (pMinY <= col.mesh.position.y + 0.4);
+
+                if (hitX && hitZ && hitY) {
+                    orbsCollected++;
+                    comboCount++;
+                    comboTimer = 2.8;
+                    const bonus = 50 * Math.min(comboCount, 10);
+                    score += bonus;
+
+                    playSound('orb');
+                    emitParticles(colX, col.mesh.position.y, col.z, 0xfbbf24, 9, 0.8);
+
+                    // 콤보 배지 애니메이션 표시
+                    if (comboCount >= 2) {
+                        const comboContainer = document.getElementById('combo-container');
+                        const comboText = document.getElementById('hud-combo');
+                        comboText.textContent = `COMBO x${comboCount}`;
+                        comboContainer.classList.remove('hidden', 'combo-pop');
+                        void comboContainer.offsetWidth;
+                        comboContainer.classList.add('combo-pop');
+                    }
+
+                    scene.remove(col.mesh);
+                    collectibles.splice(i, 1);
+                    continue;
+                }
+
+                if (col.z > 15) {
+                    scene.remove(col.mesh);
+                    collectibles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                p.mesh.position.x += p.vx * dt;
+                p.mesh.position.y += p.vy * dt;
+                p.mesh.position.z += p.vz * dt;
+                p.vy -= 18 * dt;
+
+                const s = Math.max(0.01, p.life / p.maxLife);
+                p.mesh.scale.set(s, s, s);
+            }
+        }
+
+        /**
+         * 뒤쪽 위에서 내려다보는 3인칭 추적 카메라 업데이트
+         */
+        function updateCamera(dt) {
+            // 플레이어 좌우 이동을 부드럽게 따라가며 전방 아래를 비춤
+            const targetCamX = playerX * 0.45;
+            const targetCamY = 6.1 + playerY * 0.35;
+            const targetCamZ = 10.4;
+
+            camera.position.x += (targetCamX - camera.position.x) * Math.min(1, dt * 8);
+            camera.position.y += (targetCamY - camera.position.y) * Math.min(1, dt * 8);
+            camera.position.z = targetCamZ;
+
+            // 속도가 빨라질수록 시야각(FOV)을 넓혀 역동적인 질주감 연출
+            const speedProgress = Math.max(0, (currentSpeed - BASE_SPEED) / (MAX_SPEED - BASE_SPEED));
+            const targetFov = gameState === 'PLAYING' ? (58 + speedProgress * 11) : 58;
+            if (Math.abs(camera.fov - targetFov) > 0.05) {
+                camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 5);
+                camera.updateProjectionMatrix();
+            }
+
+            // 고속 주행 시 가장자리 비네트 표시
+            const vignette = document.getElementById('speed-vignette');
+            if (gameState === 'PLAYING' && speedProgress > 0.35) {
+                vignette.style.opacity = String(Math.min(1, (speedProgress - 0.35) * 1.4));
+            } else {
+                vignette.style.opacity = '0';
+            }
+
+            // 카메라 흔들림(충돌 시)
+            let shakeX = 0, shakeY = 0;
+            if (cameraShakeTime > 0) {
+                shakeX = (Math.random() - 0.5) * cameraShakeIntensity;
+                shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
+            }
+
+            camera.position.x += shakeX;
+            camera.position.y += shakeY;
+            camera.lookAt(playerX * 0.25, 1.35 + playerY * 0.2, -14);
+        }
+
+        function updateHUD() {
+            const displayScore = Math.floor(score).toLocaleString();
+            const displayDist = `${Math.floor(distance)}m`;
+            const displaySpeed = `${(currentSpeed / BASE_SPEED).toFixed(1)}x`;
+
+            document.getElementById('hud-score').textContent = displayScore;
+            document.getElementById('hud-orbs').textContent = orbsCollected;
+
+            document.getElementById('hud-distance-md').textContent = displayDist;
+            document.getElementById('hud-speed-md').textContent = displaySpeed;
+            document.getElementById('hud-best-md').textContent = Math.max(bestScore, Math.floor(score)).toLocaleString();
+
+            document.getElementById('hud-distance-sm').textContent = displayDist;
+            document.getElementById('hud-speed-sm').textContent = displaySpeed;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 메인 애니메이션 루프
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+            updateSimulation(dt);
+            renderer.render(scene, camera);
+        }
+
+        // 페이지 로드 시 초기화
+        window.onload = function () {
+            document.getElementById('start-best-score').textContent = bestScore.toLocaleString();
+            document.getElementById('hud-best-md').textContent = bestScore.toLocaleString();
+            initThreeScene();
+            animate();
+        };
+    </script>
 </body>
 </html>

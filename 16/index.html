@@ -1,1062 +1,968 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Neon Obstacle Runner - Hard Mode</title>
-    <!-- Tailwind CSS CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBER ARENA 3D - 1인칭 슈팅 게임</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js CDN -->
+    <!-- Three.js (3D 렌더링 엔진) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js (신디사이저 효과음) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700;800&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #050510;
-            font-family: 'Inter', sans-serif;
+        * {
+            box-sizing: border-box;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
-        #game-canvas {
-            width: 100vw;
-            height: 100vh;
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050811;
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: none;
+        }
+        #gameCanvas {
             display: block;
+            width: 100%;
+            height: 100%;
         }
-        /* Custom Glowing & Retro Effects */
-        .neon-text-red {
-            text-shadow: 0 0 10px #ff0055, 0 0 20px #ff0055, 0 0 40px #ff0055;
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
         }
-        .neon-text-blue {
-            text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff;
+
+        /* 조준점 (Crosshair) */
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 24px;
+            height: 24px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+            transition: transform 0.08s ease-out;
         }
-        .neon-box {
-            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.2);
-            border: 1px solid #00f0ff;
+        .crosshair::before, .crosshair::after {
+            content: '';
+            position: absolute;
+            background: #22d3ee;
+            box-shadow: 0 0 6px #22d3ee;
         }
-        .retro-btn {
-            background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
-            box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
-            transition: all 0.2s ease;
+        .crosshair::before {
+            top: 11px; left: 2px; width: 20px; height: 2px;
         }
-        .retro-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 25px rgba(255, 0, 85, 0.9);
+        .crosshair::after {
+            left: 11px; top: 2px; width: 2px; height: 20px;
         }
-        .retro-btn:active {
-            transform: scale(0.95);
+        .crosshair.hit {
+            transform: translate(-50%, -50%) scale(1.45) rotate(45deg);
         }
-        .character-card {
-            transition: all 0.25s ease;
-            cursor: pointer;
+        .crosshair.hit::before, .crosshair.hit::after {
+            background: #f43f5e;
+            box-shadow: 0 0 10px #f43f5e;
         }
-        .character-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+
+        /* 피격 시 화면 붉은 비네트 효과 */
+        #damageOverlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 55%, rgba(225, 29, 72, 0.55) 100%);
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+            z-index: 15;
         }
-        .character-card.selected {
-            border-color: #00f0ff;
-            background: rgba(0, 240, 255, 0.15);
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+
+        /* 버튼 입체 스타일 */
+        .cyber-btn {
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5), inset 0 1px 1px rgba(255,255,255,0.4);
+            transition: all 0.15s ease;
         }
-        /* Laser Warning Effect */
-        @keyframes laserGlow {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 0.9; }
+        .cyber-btn:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
         }
-        .laser-warning {
-            animation: laserGlow 0.4s infinite;
+        .cyber-btn:active {
+            transform: translateY(1px);
         }
     </style>
 </head>
-<body class="relative w-screen h-screen overflow-hidden select-none">
+<body>
 
-    <!-- 3D Canvas -->
-    <canvas id="game-canvas"></canvas>
+    <!-- 3D 캔버스 -->
+    <canvas id="gameCanvas"></canvas>
 
-    <!-- UI Overlay: HUD -->
-    <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none z-10 hidden">
-        <div class="flex gap-3">
-            <div class="bg-black/60 backdrop-blur-md p-4 rounded-xl border border-cyan-500/30 text-white flex flex-col gap-1">
-                <div class="text-xs text-cyan-400 font-bold uppercase tracking-wider">SCORE</div>
-                <div id="score-text" class="text-3xl font-extrabold text-white neon-text-blue">0</div>
+    <!-- 피격 오버레이 -->
+    <div id="damageOverlay"></div>
+
+    <!-- 중앙 조준점 -->
+    <div id="crosshair" class="crosshair hidden"></div>
+
+    <!-- 상단 & 하단 인게임 HUD -->
+    <div id="hud" class="hidden fixed inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 sm:p-6">
+        <!-- 상단 상태바 -->
+        <div class="flex justify-between items-start">
+            <!-- 체력 & 웨이브 -->
+            <div class="bg-slate-950/75 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-3 sm:p-4 min-w-[160px] sm:min-w-[200px]">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs font-bold text-cyan-400 tracking-wider">HP / SHIELD</span>
+                    <span id="hpText" class="mono text-sm sm:text-base font-extrabold text-white">100</span>
+                </div>
+                <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="hpBar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-150" style="width: 100%;"></div>
+                </div>
+                <div class="mt-2 flex justify-between items-center text-xs text-slate-300">
+                    <span>WAVE <strong id="waveText" class="text-amber-400 mono">1</strong></span>
+                    <span>적 남은 수: <strong id="enemyCountText" class="text-rose-400 mono">0</strong></span>
+                </div>
             </div>
-            <div id="active-char-badge" class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-pink-500/30 text-pink-400 font-bold flex items-center self-center text-sm">
-                <!-- Selected character badge -->
+
+            <!-- 점수 & 일시정지 안내 -->
+            <div class="flex flex-col items-end gap-2">
+                <div class="bg-slate-950/75 backdrop-blur-md border border-indigo-500/30 rounded-2xl px-4 py-2.5 text-right">
+                    <span class="block text-[10px] font-bold text-indigo-300 tracking-widest">SCORE</span>
+                    <span id="scoreText" class="mono text-xl sm:text-2xl font-black text-white">0</span>
+                </div>
+                <button id="pauseBtn" class="pointer-events-auto px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-700 text-xs text-slate-300 hover:text-white">
+                    ⏸ 일시정지 (ESC)
+                </button>
             </div>
         </div>
-        
-        <div class="flex gap-3 pointer-events-auto">
-            <button id="audio-toggle-btn" class="bg-black/60 hover:bg-black/80 backdrop-blur-md p-3 rounded-xl border border-cyan-500/30 text-cyan-400 transition">
-                <i id="audio-icon" class="fas fa-volume-up text-xl"></i>
-            </button>
-            <div class="bg-red-500/20 backdrop-blur-md px-4 py-2 rounded-xl border border-red-500/50 flex items-center gap-2 text-red-400 font-bold">
-                <i class="fas fa-bolt"></i> HARD MODE
-            </div>
+
+        <!-- 중앙 알림 배너 (웨이브 클리어 등) -->
+        <div id="waveBanner" class="self-center bg-slate-950/85 border border-amber-400/50 text-amber-300 px-6 py-2.5 rounded-full font-black text-sm sm:text-lg tracking-wider shadow-lg opacity-0 transition-opacity duration-300">
+            WAVE 1 START!
         </div>
-    </div>
 
-    <!-- On-screen Controls Guide (In Game) -->
-    <div id="controls-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none z-10 hidden text-center">
-        <div class="bg-black/60 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white/70 text-sm flex gap-4 items-center">
-            <span><kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">A</kbd> / <kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">D</kbd> 이동</span>
-            <span class="text-white/30">|</span>
-            <span><kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">Space</kbd> 점프</span>
-        </div>
-    </div>
-
-    <!-- Start / Game Over Screen Overlay -->
-    <div id="menu-overlay" class="absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-        <div class="max-w-xl w-full text-center flex flex-col items-center gap-5 p-6 sm:p-8 rounded-2xl neon-box bg-slate-950/90 my-auto">
-            
-            <div class="space-y-1">
-                <h1 class="text-4xl sm:text-5xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-pink-500 to-red-500">
-                    CYBER RUNNER
-                </h1>
-                <p class="text-red-400 font-semibold tracking-widest text-xs sm:text-sm uppercase">Difficulty: Extreme Hard</p>
+        <!-- 하단 탄약 & 모바일 컨트롤 -->
+        <div class="flex justify-between items-end w-full">
+            <!-- 모바일 가상 조이스틱 영역 (터치 기기 및 마우스 드래그 지원) -->
+            <div id="joystickZone" class="pointer-events-auto relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-slate-900/50 border-2 border-cyan-500/30 flex items-center justify-center md:opacity-40 hover:opacity-100 transition">
+                <div id="joystickKnob" class="w-12 h-12 rounded-full bg-cyan-400/80 shadow-[0_0_15px_#22d3ee] pointer-events-none"></div>
+                <span class="absolute -top-5 text-[10px] text-slate-400 font-bold">MOVE</span>
             </div>
 
-            <!-- Game Over Details (Hidden initially) -->
-            <div id="game-over-info" class="hidden w-full bg-red-950/30 border border-red-500/30 rounded-xl p-3 my-1">
-                <p class="text-red-400 text-xs font-bold uppercase mb-1">GAME OVER</p>
-                <div class="text-gray-300 text-xs">최종 스코어</div>
-                <div id="final-score" class="text-3xl font-black text-white neon-text-red">0</div>
-            </div>
+            <!-- 우측 탄약 표시 & 사격/재장전 버튼 -->
+            <div class="flex flex-col items-end gap-3">
+                <!-- 모바일/클릭용 액션 버튼 -->
+                <div class="pointer-events-auto flex items-center gap-2.5">
+                    <button id="mobileJumpBtn" class="w-12 h-12 rounded-2xl bg-slate-800/85 border border-slate-600 text-white font-bold text-xs active:scale-90 flex items-center justify-center shadow-lg">
+                        점프
+                    </button>
+                    <button id="mobileReloadBtn" class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-amber-300 font-bold text-xs active:scale-90 flex items-center justify-center shadow-lg">
+                        재장전
+                    </button>
+                    <button id="mobileFireBtn" class="w-16 h-16 rounded-2xl bg-rose-600/90 border-2 border-rose-400 text-white font-black text-sm active:scale-90 flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.6)]">
+                        FIRE
+                    </button>
+                </div>
 
-            <!-- Character Selection -->
-            <div class="w-full space-y-2">
-                <div class="text-left text-xs text-cyan-400 font-bold uppercase tracking-wider flex justify-between items-center">
-                    <span><i class="fas fa-rocket mr-1"></i> 캐릭터 선택</span>
-                    <span id="char-desc-type" class="text-pink-400 font-normal">밸런스형</span>
-                </div>
-                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2" id="character-selector">
-                    <!-- Cards added via JS -->
-                </div>
-            </div>
-
-            <!-- Rules & Controls -->
-            <div class="w-full bg-slate-900/60 rounded-xl p-3 text-left text-xs text-gray-300 space-y-2 border border-slate-800">
-                <div class="font-bold text-cyan-400 text-sm pb-1 border-b border-slate-800 flex justify-between items-center">
-                    <span><i class="fas fa-gamepad mr-2"></i>조작 및 장애물 회피법</span>
-                    <span id="char-perk" class="text-amber-300 text-xs font-normal">특성: 없음</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-400">
-                    <div><span class="text-pink-400 font-bold">긴 바닥 벽:</span> SPACE 점프</div>
-                    <div><span class="text-cyan-400 font-bold">높은 기둥:</span> A/D 좌우 회피</div>
-                    <div><span class="text-amber-400 font-bold">공중 가로막:</span> 점프 금지 (지상 유지)</div>
-                    <div><span class="text-purple-400 font-bold">이동식 블록:</span> 타이밍 예측 회피</div>
-                </div>
-                <div class="flex justify-between items-center pt-1 border-t border-slate-800">
-                    <span>좌우 이동: <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">A</kbd> / <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">D</kbd></span>
-                    <span>점프: <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">SPACE</kbd></span>
+                <!-- 탄창 HUD -->
+                <div class="bg-slate-950/80 backdrop-blur-md border border-cyan-500/30 rounded-2xl px-4 py-2.5 flex items-center gap-3">
+                    <div>
+                        <span class="block text-[10px] font-bold text-slate-400">PLASMA RIFLE</span>
+                        <div class="mono text-xl sm:text-2xl font-black text-white">
+                            <span id="ammoText" class="text-cyan-400">30</span> <span class="text-slate-500 text-base">/ 30</span>
+                        </div>
+                    </div>
+                    <div id="reloadBadge" class="hidden px-2 py-1 rounded bg-amber-500/20 border border-amber-400 text-amber-300 text-xs font-bold animate-pulse">
+                        RELOADING...
+                    </div>
                 </div>
             </div>
-
-            <button id="start-btn" class="w-full py-3.5 rounded-xl text-white font-extrabold text-lg retro-btn tracking-wider uppercase cursor-pointer">
-                게임 시작 (START)
-            </button>
         </div>
     </div>
 
-    <!-- Mobile Touch Controls Overlay -->
-    <div id="touch-controls" class="absolute bottom-4 inset-x-4 z-10 flex justify-between pointer-events-none md:hidden hidden">
-        <div class="flex gap-2 pointer-events-auto">
-            <button id="btn-left" class="w-16 h-16 rounded-full bg-white/10 active:bg-cyan-500/40 backdrop-blur border border-white/20 text-white text-2xl flex items-center justify-center">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <button id="btn-right" class="w-16 h-16 rounded-full bg-white/10 active:bg-cyan-500/40 backdrop-blur border border-white/20 text-white text-2xl flex items-center justify-center">
-                <i class="fas fa-chevron-right"></i>
+    <!-- 시작 / 일시정지 / 게임오버 메뉴 모달 -->
+    <div id="menuOverlay" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-30 flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-slate-900/90 border border-cyan-500/40 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+            <div class="inline-block px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold tracking-widest mb-3">
+                WEBGL 3D SHOOTER
+            </div>
+            <h1 id="menuTitle" class="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+                CYBER ARENA <span class="text-cyan-400">3D</span>
+            </h1>
+            <p id="menuSubtitle" class="text-sm text-slate-300 mb-6">
+                사방에서 몰려오는 전투 드론을 격추하고 최대한 많은 웨이브를 생존하세요!
+            </p>
+
+            <!-- 게임 오버 시 최종 점수판 -->
+            <div id="finalStats" class="hidden bg-slate-950/90 border border-slate-800 rounded-2xl p-4 mb-6 grid grid-cols-2 gap-4">
+                <div>
+                    <span class="block text-xs text-slate-400">도달 웨이브</span>
+                    <span id="finalWave" class="mono text-2xl font-black text-amber-400">1</span>
+                </div>
+                <div>
+                    <span class="block text-xs text-slate-400">최종 점수</span>
+                    <span id="finalScore" class="mono text-2xl font-black text-cyan-400">0</span>
+                </div>
+            </div>
+
+            <!-- 조작법 안내 카드 -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 mb-6 text-left text-xs text-slate-300 space-y-2">
+                <div class="font-bold text-cyan-400 mb-1">🎮 조작 방법</div>
+                <p>• <strong>PC 키보드/마우스:</strong> 화면 클릭 후 마우스로 조준, <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">WASD</kbd> 이동, <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Space</kbd> 점프, <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">좌클릭</kbd> 사격, <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">R</kbd> 재장전</p>
+                <p>• <strong>모바일 / 터치:</strong> 좌측 스틱으로 이동, 빈 화면 드래그로 시점 회전, 우측 버튼으로 사격/점프</p>
+            </div>
+
+            <button id="startBtn" class="cyber-btn w-full py-4 rounded-2xl text-slate-950 font-black text-lg tracking-wide cursor-pointer">
+                전투 시작 (PLAY)
             </button>
         </div>
-        <button id="btn-jump" class="w-20 h-16 rounded-2xl bg-pink-500/30 active:bg-pink-500/60 backdrop-blur border border-pink-500/50 text-white font-bold text-lg flex items-center justify-center pointer-events-auto">
-            JUMP
-        </button>
     </div>
 
     <script>
-        // --- Web Audio API Synth Sound Generator ---
-        class SoundEngine {
-            constructor() {
-                this.ctx = null;
-                this.isMuted = false;
-                this.bgmTimer = null;
-            }
+        // ==========================================
+        // 1. 전역 변수 및 오디오 시스템 설정
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const menuOverlay = document.getElementById('menuOverlay');
+        const menuTitle = document.getElementById('menuTitle');
+        const menuSubtitle = document.getElementById('menuSubtitle');
+        const startBtn = document.getElementById('startBtn');
+        const finalStats = document.getElementById('finalStats');
+        const finalWaveEl = document.getElementById('finalWave');
+        const finalScoreEl = document.getElementById('finalScore');
 
-            init() {
-                if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (this.ctx.state === 'suspended') {
-                    this.ctx.resume();
-                }
-            }
+        const hud = document.getElementById('hud');
+        const crosshair = document.getElementById('crosshair');
+        const damageOverlay = document.getElementById('damageOverlay');
+        const hpText = document.getElementById('hpText');
+        const hpBar = document.getElementById('hpBar');
+        const waveText = document.getElementById('waveText');
+        const enemyCountText = document.getElementById('enemyCountText');
+        const scoreText = document.getElementById('scoreText');
+        const ammoText = document.getElementById('ammoText');
+        const reloadBadge = document.getElementById('reloadBadge');
+        const waveBanner = document.getElementById('waveBanner');
+        const pauseBtn = document.getElementById('pauseBtn');
 
-            toggleMute() {
-                this.isMuted = !this.isMuted;
-                return this.isMuted;
-            }
-
-            // Jump Sound Effect
-            playJump() {
-                if (this.isMuted || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
-                
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-                
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.15);
-            }
-
-            // Crash Sound Effect
-            playCrash() {
-                if (this.isMuted || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
-                osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.4);
-                
-                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
-                
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                
-                osc.start();
-                osc.stop(this.ctx.currentTime + 0.4);
-            }
-
-            // Synthesized BGM Loop (Retro synthwave arpeggio)
-            startBGM() {
-                if (this.bgmTimer || !this.ctx) return;
-                
-                const notes = [130.81, 146.83, 164.81, 196.00, 220.00, 196.00, 164.81, 146.83]; // C3, D3, E3, G3, A3...
-                let noteIndex = 0;
-
-                this.bgmTimer = setInterval(() => {
-                    if (this.isMuted || !this.ctx) return;
-                    
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(notes[noteIndex], this.ctx.currentTime);
-                    
-                    // Lowpass filter for synthwave effect
-                    const filter = this.ctx.createBiquadFilter();
-                    filter.type = 'lowpass';
-                    filter.frequency.setValueAtTime(800, this.ctx.currentTime);
-
-                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
-                    
-                    osc.connect(filter);
-                    filter.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + 0.12);
-                    
-                    noteIndex = (noteIndex + 1) % notes.length;
-                }, 130); // BPM tempo
-            }
-
-            stopBGM() {
-                if (this.bgmTimer) {
-                    clearInterval(this.bgmTimer);
-                    this.bgmTimer = null;
-                }
-            }
-        }
-
-        const audio = new SoundEngine();
-
-        // --- Character Definitions ---
-        const CHARACTERS = [
-            {
-                id: 'neon-runner',
-                name: '네온 랜서',
-                icon: 'fa-shuttle-space',
-                color: 0x00f0ff,
-                emissive: 0x004466,
-                accentColor: '#00f0ff',
-                desc: '밸런스형 표준 기체',
-                speedMultiplier: 1.0,
-                jumpForce: 0.48,
-                scoreMultiplier: 1.0,
-                perkText: '특성: 올라운더 표준 스펙'
-            },
-            {
-                id: 'speed-phantom',
-                name: '팬텀 블레이드',
-                icon: 'fa-bolt',
-                color: 0xff0055,
-                emissive: 0x660022,
-                accentColor: '#ff0055',
-                desc: '초고속 & 고득점 기체',
-                speedMultiplier: 1.2,
-                jumpForce: 0.46,
-                scoreMultiplier: 1.5,
-                perkText: '특성: 속도 +20%, 스코어 +50%'
-            },
-            {
-                id: 'gravity-hopper',
-                name: '그라비티 호퍼',
-                icon: 'fa-angles-up',
-                color: 0x00ff88,
-                emissive: 0x004422,
-                accentColor: '#00ff88',
-                desc: '고점프 & 하이테크 기체',
-                speedMultiplier: 0.95,
-                jumpForce: 0.58,
-                scoreMultiplier: 1.0,
-                perkText: '특성: 높은 점프 및 체공시간'
-            },
-            {
-                id: 'heavy-titan',
-                name: '타이탄 아머',
-                icon: 'fa-shield-halved',
-                color: 0xffaa00,
-                emissive: 0x664400,
-                accentColor: '#ffaa00',
-                desc: '중장갑 & 보너스 기체',
-                speedMultiplier: 0.9,
-                jumpForce: 0.45,
-                scoreMultiplier: 1.25,
-                perkText: '특성: 안정적 조작감 & 스코어 +25%'
-            },
-            {
-                id: 'quantum-glider',
-                name: '퀀텀 글라이더',
-                icon: 'fa-paper-plane',
-                color: 0xcc00ff,
-                emissive: 0x550066,
-                accentColor: '#cc00ff',
-                desc: '경량형 곡예 기체',
-                speedMultiplier: 1.1,
-                jumpForce: 0.52,
-                scoreMultiplier: 1.2,
-                perkText: '특성: 빠른 반응속도 & 유연한 점프'
-            },
-            {
-                id: 'solar-phoenix',
-                name: '솔라 피닉스',
-                icon: 'fa-fire-flame-curved',
-                color: 0xff5500,
-                emissive: 0x662200,
-                accentColor: '#ff5500',
-                desc: '에너지 차장 기체',
-                speedMultiplier: 1.05,
-                jumpForce: 0.50,
-                scoreMultiplier: 1.3,
-                perkText: '특성: 화려한 광원 & 스코어 +30%'
-            },
-            {
-                id: 'cyber-plasma',
-                name: '플라즈마 드론',
-                icon: 'fa-atom',
-                color: 0xffff00,
-                emissive: 0x666600,
-                accentColor: '#ffff00',
-                desc: '에너지 테크 기체',
-                speedMultiplier: 1.02,
-                jumpForce: 0.49,
-                scoreMultiplier: 1.15,
-                perkText: '특성: 높은 가시성 & 제어력'
-            },
-            {
-                id: 'vortex-striker',
-                name: '볼텍스 스트라이커',
-                icon: 'fa-meteor',
-                color: 0x00ffff,
-                emissive: 0x006666,
-                accentColor: '#00ffff',
-                desc: '공격형 추진 기체',
-                speedMultiplier: 1.15,
-                jumpForce: 0.47,
-                scoreMultiplier: 1.35,
-                perkText: '특성: 고속 비행 & 높은 점수율'
-            }
-        ];
-
-        let selectedCharIndex = 0;
-
-        // --- Game Logic & 3D Variables ---
-        let scene, camera, renderer;
-        let player, playerBox;
-        let obstacles = [];
-        let particles = [];
-        let roadGrid;
-
-        // Config & State
-        const LANE_WIDTH = 3.2; // Width of movement range
-        const MAX_X = LANE_WIDTH * 1.5;
-        
-        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'GAMEOVER'
+        // 게임 상태
+        let isPlaying = false;
+        let isGameOver = false;
         let score = 0;
-        let speed = 0.8; // Hard mode initial speed
-        const maxSpeed = 1.6;
-        
-        // Player Physics
-        let playerPos = { x: 0, y: 0, z: 0 };
-        let playerVelY = 0;
-        const GRAVITY = -0.022;
-        let currentJumpForce = 0.48;
-        let isGrounded = true;
+        let wave = 1;
+        let hp = 100;
+        let ammo = 30;
+        const maxAmmo = 30;
+        let isReloading = false;
+        let lastShotTime = 0;
 
-        // Keys state
-        const keys = { a: false, d: false, left: false, right: false, space: false };
+        // Tone.js 사운드 효과
+        let shootSynth, hitSynth, explosionSynth;
+        function initAudio() {
+            if (shootSynth || !window.Tone) return;
+            try {
+                shootSynth = new Tone.MembraneSynth({
+                    pitchDecay: 0.02, octaves: 4,
+                    envelope: { attack: 0.001, decay: 0.12, sustain: 0 }
+                }).toDestination();
+                shootSynth.volume.value = -10;
 
-        // Obstacle Spawn Timers
-        let lastSpawnZ = -50;
-        const SPAWN_INTERVAL_Z = 22; // Harder mode: obstacles closer together
+                hitSynth = new Tone.Synth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.005, decay: 0.08, sustain: 0 }
+                }).toDestination();
+                hitSynth.volume.value = -8;
 
-        // --- Character UI Setup ---
-        function setupCharacterSelector() {
-            const container = document.getElementById('character-selector');
-            container.innerHTML = '';
-
-            CHARACTERS.forEach((char, idx) => {
-                const card = document.createElement('div');
-                card.className = `character-card p-3 rounded-xl border border-slate-700 bg-slate-900/80 flex flex-col items-center gap-1.5 text-center ${idx === selectedCharIndex ? 'selected' : ''}`;
-                card.onclick = () => selectCharacter(idx);
-
-                card.innerHTML = `
-                    <div class="text-2xl my-1" style="color: ${char.accentColor};">
-                        <i class="fas ${char.icon}"></i>
-                    </div>
-                    <div class="font-bold text-xs text-white">${char.name}</div>
-                    <div class="text-[10px] text-gray-400 line-clamp-1">${char.desc}</div>
-                `;
-                container.appendChild(card);
-            });
-
-            updateCharInfo();
+                explosionSynth = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.01, decay: 0.25, sustain: 0 }
+                }).toDestination();
+                explosionSynth.volume.value = -8;
+            } catch (e) {
+                console.warn('Audio init failed:', e);
+            }
         }
 
-        function selectCharacter(index) {
-            selectedCharIndex = index;
-            const cards = document.querySelectorAll('.character-card');
-            cards.forEach((card, idx) => {
-                if (idx === index) {
-                    card.classList.add('selected');
-                } else {
-                    card.classList.remove('selected');
+        function playSFX(type) {
+            if (!window.Tone) return;
+            try {
+                if (Tone.context.state !== 'running') Tone.start();
+                initAudio();
+                if (type === 'shoot') shootSynth.triggerAttackRelease('C2', '32n');
+                else if (type === 'hit') hitSynth.triggerAttackRelease('A5', '32n');
+                else if (type === 'kill') explosionSynth.triggerAttackRelease('8n');
+                else if (type === 'reload') hitSynth.triggerAttackRelease('E4', '16n');
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // 2. Three.js 3D 씬, 카메라, 조명 및 맵 구성
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x060b19);
+        scene.fog = new THREE.FogExp2(0x060b19, 0.016);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.rotation.order = 'YXZ'; // FPS 시점 회전을 위한 오일러 순서
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // 조명 설정
+        const ambientLight = new THREE.AmbientLight(0x4f46e5, 0.75);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.1);
+        dirLight.position.set(20, 40, 20);
+        scene.add(dirLight);
+
+        // 아레나 바닥 (네온 그리드)
+        const arenaSize = 90;
+        const floorGeo = new THREE.PlaneGeometry(arenaSize, arenaSize);
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x0f172a,
+            roughness: 0.7,
+            metalness: 0.3
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const gridHelper = new THREE.GridHelper(arenaSize, 30, 0x06b6d4, 0x1e293b);
+        gridHelper.position.y = 0.02;
+        scene.add(gridHelper);
+
+        // 아레나 외벽 및 엄폐물 장애물 생성
+        const obstacles = []; // 충돌 박스 배열
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.6 });
+        const neonEdgeMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+
+        function createBoxObstacle(x, y, z, w, h, d, isWall = false) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, wallMat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+
+            // 네온 라인 장식
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: isWall ? 0x3b82f6 : 0x22d3ee }));
+            mesh.add(line);
+
+            obstacles.push({
+                minX: x - w / 2 - 0.6,
+                maxX: x + w / 2 + 0.6,
+                minZ: z - d / 2 - 0.6,
+                maxZ: z + d / 2 + 0.6,
+                topY: y + h / 2
+            });
+        }
+
+        // 외벽 4면
+        const halfArena = arenaSize / 2;
+        createBoxObstacle(0, 4, -halfArena, arenaSize, 8, 2, true);
+        createBoxObstacle(0, 4, halfArena, arenaSize, 8, 2, true);
+        createBoxObstacle(-halfArena, 4, 0, 2, 8, arenaSize, true);
+        createBoxObstacle(halfArena, 4, 0, 2, 8, arenaSize, true);
+
+        // 전술 엄폐물 기둥 배치
+        const pillarPositions = [
+            [-14, -14], [14, -14], [-14, 14], [14, 14],
+            [0, -24], [0, 24], [-24, 0], [24, 0]
+        ];
+        pillarPositions.forEach(([px, pz]) => {
+            createBoxObstacle(px, 2.2, pz, 4.5, 4.4, 4.5, false);
+        });
+
+        // ==========================================
+        // 3. 1인칭 플라즈마 라이플 모델 (카메라 부착)
+        // ==========================================
+        const gunGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(0.14, 0.16, 0.65);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+        const gunBody = new THREE.Mesh(bodyGeo, bodyMat);
+        gunGroup.add(gunBody);
+
+        // 총신 네온 코어
+        const coreGeo = new THREE.BoxGeometry(0.06, 0.05, 0.68);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+        const gunCore = new THREE.Mesh(coreGeo, coreMat);
+        gunCore.position.set(0, 0.07, -0.02);
+        gunGroup.add(gunCore);
+
+        // 총구 섬광 (Muzzle Flash)
+        const muzzleLight = new THREE.PointLight(0x22d3ee, 0, 8);
+        muzzleLight.position.set(0, 0.05, -0.5);
+        gunGroup.add(muzzleLight);
+
+        gunGroup.position.set(0.28, -0.26, -0.45);
+        camera.add(gunGroup);
+        scene.add(camera);
+
+        // ==========================================
+        // 4. 플레이어 물리 & 조작 컨트롤러 (PC + 모바일)
+        // ==========================================
+        const player = {
+            pos: new THREE.Vector3(0, 1.8, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            yaw: 0,
+            pitch: 0,
+            speed: 14,
+            jumpForce: 11,
+            onGround: true
+        };
+
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyR' && isPlaying) reloadWeapon();
+            if (e.code === 'Space' && isPlaying && player.onGround) {
+                player.vel.y = player.jumpForce;
+                player.onGround = false;
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // PC Pointer Lock (마우스 시점 회전)
+        canvas.addEventListener('click', () => {
+            if (isPlaying && document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock?.();
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPlaying || document.pointerLockElement !== canvas) return;
+            const sensitivity = 0.0022;
+            player.yaw -= e.movementX * sensitivity;
+            player.pitch -= e.movementY * sensitivity;
+            player.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.pitch));
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (isPlaying && e.button === 0 && document.pointerLockElement === canvas) {
+                shoot();
+            }
+        });
+
+        // 일시정지 감지 (Pointer Lock 해제 시)
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== canvas && isPlaying && !isGameOver) {
+                // 모바일 터치 환경이 아닐 때만 일시정지 메뉴 표시
+                if (!isTouchDevice) {
+                    pauseGame();
                 }
+            }
+        });
+
+        // 모바일 / 터치 컨트롤 (가상 조이스틱 & 시점 드래그)
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+        let joyInput = { x: 0, y: 0 };
+        let joyTouchId = null;
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            joyTouchId = touch.identifier;
+            updateJoystick(touch);
+        }, { passive: false });
+
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let t of e.changedTouches) {
+                if (t.identifier === joyTouchId) updateJoystick(t);
+            }
+        }, { passive: false });
+
+        const resetJoystick = () => {
+            joyTouchId = null;
+            joyInput = { x: 0, y: 0 };
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+        };
+        joystickZone.addEventListener('touchend', resetJoystick);
+        joystickZone.addEventListener('touchcancel', resetJoystick);
+
+        function updateJoystick(touch) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxRadius = rect.width / 2 - 20;
+
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > maxRadius) {
+                dx = (dx / dist) * maxRadius;
+                dy = (dy / dist) * maxRadius;
+            }
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joyInput.x = dx / maxRadius;
+            joyInput.y = dy / maxRadius;
+        }
+
+        // 화면 터치 드래그 시점 회전
+        let lookTouchId = null;
+        let lastLookX = 0, lastLookY = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isPlaying) return;
+            const touch = e.changedTouches[0];
+            lookTouchId = touch.identifier;
+            lastLookX = touch.clientX;
+            lastLookY = touch.clientY;
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isPlaying) return;
+            for (let t of e.changedTouches) {
+                if (t.identifier === lookTouchId) {
+                    const dx = t.clientX - lastLookX;
+                    const dy = t.clientY - lastLookY;
+                    lastLookX = t.clientX;
+                    lastLookY = t.clientY;
+
+                    player.yaw -= dx * 0.0055;
+                    player.pitch -= dy * 0.0055;
+                    player.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.pitch));
+                }
+            }
+        }, { passive: false });
+
+        // 모바일 액션 버튼 연결
+        document.getElementById('mobileFireBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (isPlaying) shoot();
+        });
+        document.getElementById('mobileFireBtn').addEventListener('mousedown', () => {
+            if (isPlaying) shoot();
+        });
+        document.getElementById('mobileReloadBtn').addEventListener('click', () => {
+            if (isPlaying) reloadWeapon();
+        });
+        document.getElementById('mobileJumpBtn').addEventListener('click', () => {
+            if (isPlaying && player.onGround) {
+                player.vel.y = player.jumpForce;
+                player.onGround = false;
+            }
+        });
+
+        // ==========================================
+        // 5. 적(드론), 탄환, 파티클 시스템
+        // ==========================================
+        let enemies = [];
+        let projectiles = [];
+        let particles = [];
+
+        // 적 드론 생성 함수
+        function spawnEnemy() {
+            const enemyGroup = new THREE.Group();
+
+            // 드론 본체 (붉은 네온 다면체)
+            const coreGeo = new THREE.OctahedronGeometry(1.1, 0);
+            const coreMat = new THREE.MeshStandardMaterial({
+                color: 0xf43f5e,
+                emissive: 0x9f1239,
+                roughness: 0.3,
+                metalness: 0.7
             });
-            updateCharInfo();
-            createPlayer(); // Re-create player preview
-        }
+            const body = new THREE.Mesh(coreGeo, coreMat);
+            enemyGroup.add(body);
 
-        function updateCharInfo() {
-            const currentChar = CHARACTERS[selectedCharIndex];
-            document.getElementById('char-desc-type').innerText = currentChar.desc;
-            document.getElementById('char-perk').innerText = currentChar.perkText;
-            document.getElementById('active-char-badge').innerHTML = `<i class="fas ${currentChar.icon} mr-2" style="color: ${currentChar.accentColor}"></i> ${currentChar.name}`;
-        }
+            // 회전하는 링
+            const ringGeo = new THREE.TorusGeometry(1.45, 0.08, 8, 24);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xfb7185 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            enemyGroup.add(ring);
 
-        // --- Initialization ---
-        function initThree() {
-            const container = document.getElementById('game-canvas');
-            
-            // Scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050510);
-            scene.fog = new THREE.FogExp2(0x050510, 0.018);
+            // 맵 가장자리 근처 무작위 스폰 (플레이어와 일정 거리 유지)
+            let sx, sz;
+            do {
+                sx = (Math.random() - 0.5) * (arenaSize - 12);
+                sz = (Math.random() - 0.5) * (arenaSize - 12);
+            } while (Math.hypot(sx - player.pos.x, sz - player.pos.z) < 18);
 
-            // Camera
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 4, 9);
-            camera.lookAt(0, 1.5, -5);
+            enemyGroup.position.set(sx, 1.8, sz);
+            scene.add(enemyGroup);
 
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xff007f, 0.8);
-            dirLight.position.set(10, 20, 10);
-            scene.add(dirLight);
-
-            const pointLight = new THREE.PointLight(0x00f0ff, 1.5, 30);
-            pointLight.position.set(0, 5, 0);
-            scene.add(pointLight);
-
-            // Environment: Infinite Road Grid
-            createRoad();
-
-            // Player Creation
-            createPlayer();
-
-            // Handle Resize
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        // Road & Cyber Grid
-        function createRoad() {
-            const roadGeo = new THREE.PlaneGeometry(12, 300);
-            const roadMat = new THREE.MeshStandardMaterial({ 
-                color: 0x0a0a16, 
-                roughness: 0.2, 
-                metalness: 0.8 
+            const maxHp = 40 + (wave - 1) * 15;
+            enemies.push({
+                mesh: enemyGroup,
+                body: body,
+                ring: ring,
+                hp: maxHp,
+                speed: 4.5 + Math.min(wave * 0.45, 5.5),
+                attackCooldown: 0
             });
-            const road = new THREE.Mesh(roadGeo, roadMat);
-            road.rotation.x = -Math.PI / 2;
-            road.position.z = -100;
-            scene.add(road);
-
-            // Side Glowing Rails
-            const railGeo = new THREE.BoxGeometry(0.3, 0.3, 300);
-            const railMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-            
-            const leftRail = new THREE.Mesh(railGeo, railMat);
-            leftRail.position.set(-6, 0.15, -100);
-            scene.add(leftRail);
-
-            const rightRail = new THREE.Mesh(railGeo, railMat);
-            rightRail.position.set(6, 0.15, -100);
-            scene.add(rightRail);
-
-            // Grid Lines texture simulation
-            roadGrid = new THREE.GridHelper(300, 60, 0xff0055, 0x1a1a3a);
-            roadGrid.position.set(0, 0.01, -100);
-            scene.add(roadGrid);
         }
 
-        // Distinct Player Models based on selected Character
-        function createPlayer() {
-            if (player) {
-                scene.remove(player);
+        // 웨이브 시작
+        function startWave(waveNum) {
+            wave = waveNum;
+            waveText.textContent = wave;
+            const count = 3 + wave * 2;
+            for (let i = 0; i < count; i++) {
+                spawnEnemy();
             }
+            enemyCountText.textContent = enemies.length;
 
-            player = new THREE.Group();
-            const char = CHARACTERS[selectedCharIndex];
-
-            if (char.id === 'neon-runner') {
-                // Sleek jet shape
-                const bodyGeo = new THREE.ConeGeometry(0.7, 2, 4);
-                const bodyMat = new THREE.MeshStandardMaterial({ 
-                    color: char.color, roughness: 0.1, metalness: 0.9, emissive: char.emissive 
-                });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.rotation.x = Math.PI / 2;
-                body.rotation.z = Math.PI;
-                player.add(body);
-
-                const wingGeo = new THREE.BoxGeometry(1.8, 0.1, 0.8);
-                const wingMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
-                const wings = new THREE.Mesh(wingGeo, wingMat);
-                wings.position.set(0, 0, 0.2);
-                player.add(wings);
-
-            } else if (char.id === 'speed-phantom') {
-                // Sharp Needle shape
-                const bodyGeo = new THREE.ConeGeometry(0.4, 2.6, 3);
-                const bodyMat = new THREE.MeshStandardMaterial({ 
-                    color: char.color, roughness: 0.1, metalness: 0.9, emissive: char.emissive 
-                });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.rotation.x = Math.PI / 2;
-                player.add(body);
-
-                const ringGeo = new THREE.TorusGeometry(0.8, 0.05, 8, 16);
-                const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-                const ring = new THREE.Mesh(ringGeo, ringMat);
-                ring.position.set(0, 0, 0.3);
-                player.add(ring);
-
-            } else if (char.id === 'gravity-hopper') {
-                // UFO / Disk like shape
-                const discGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.3, 8);
-                const discMat = new THREE.MeshStandardMaterial({ 
-                    color: char.color, roughness: 0.2, metalness: 0.8, emissive: char.emissive 
-                });
-                const disc = new THREE.Mesh(discGeo, discMat);
-                player.add(disc);
-
-                const topGeo = new THREE.SphereGeometry(0.5, 8, 8);
-                const topMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-                const topDome = new THREE.Mesh(topGeo, topMat);
-                topDome.position.set(0, 0.2, 0);
-                player.add(topDome);
-
-            } else if (char.id === 'heavy-titan') {
-                // Bulky Blocky Mecha shape
-                const coreGeo = new THREE.BoxGeometry(1.4, 0.8, 1.8);
-                const coreMat = new THREE.MeshStandardMaterial({ 
-                    color: char.color, roughness: 0.3, metalness: 0.7, emissive: char.emissive 
-                });
-                const core = new THREE.Mesh(coreGeo, coreMat);
-                player.add(core);
-
-                const sideGeo = new THREE.BoxGeometry(0.4, 0.9, 2.2);
-                const sideMat = new THREE.MeshStandardMaterial({ color: 0x333344 });
-                const leftSide = new THREE.Mesh(sideGeo, sideMat);
-                leftSide.position.set(-0.9, 0, 0);
-                const rightSide = leftSide.clone();
-                rightSide.position.set(0.9, 0, 0);
-                player.add(leftSide);
-                player.add(rightSide);
-
-            } else if (char.id === 'quantum-glider') {
-                // Tri-wing glider shape
-                const bodyGeo = new THREE.ConeGeometry(0.6, 2.2, 3);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, roughness: 0.2 });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.rotation.x = Math.PI / 2;
-                player.add(body);
-
-                const ringGeo = new THREE.TorusGeometry(0.9, 0.04, 8, 16);
-                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-                const ring = new THREE.Mesh(ringGeo, ringMat);
-                ring.position.set(0, 0, -0.2);
-                player.add(ring);
-
-            } else if (char.id === 'solar-phoenix') {
-                // Diamond Arrow Fighter
-                const bodyGeo = new THREE.OctahedronGeometry(0.9);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, metalness: 0.8 });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.scale.set(0.7, 0.4, 1.8);
-                player.add(body);
-
-                const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 4);
-                const flameMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                const flame = new THREE.Mesh(flameGeo, flameMat);
-                flame.rotation.x = -Math.PI / 2;
-                flame.position.set(0, 0, 1.2);
-                player.add(flame);
-
-            } else if (char.id === 'cyber-plasma') {
-                // Spherical Orb Carrier
-                const orbGeo = new THREE.SphereGeometry(0.8, 16, 16);
-                const orbMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, roughness: 0.1 });
-                const orb = new THREE.Mesh(orbGeo, orbMat);
-                player.add(orb);
-
-                const ringGeo = new THREE.TorusGeometry(1.2, 0.08, 8, 24);
-                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
-                const ring = new THREE.Mesh(ringGeo, ringMat);
-                ring.rotation.x = Math.PI / 3;
-                player.add(ring);
-
-            } else if (char.id === 'vortex-striker') {
-                // Twin-engine Jet
-                const bodyGeo = new THREE.BoxGeometry(0.6, 0.5, 2.0);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                player.add(body);
-
-                const engGeo = new THREE.CylinderGeometry(0.25, 0.25, 1.8, 8);
-                const engMat = new THREE.MeshStandardMaterial({ color: 0x111122, metalness: 0.9 });
-                const leftEng = new THREE.Mesh(engGeo, engMat);
-                leftEng.rotation.x = Math.PI / 2;
-                leftEng.position.set(-0.6, 0, 0);
-                const rightEng = leftEng.clone();
-                rightEng.position.set(0.6, 0, 0);
-                player.add(leftEng);
-                player.add(rightEng);
-            }
-
-            // Thruster Light
-            const light = new THREE.PointLight(char.color, 2, 5);
-            light.position.set(0, 0, 1);
-            player.add(light);
-
-            player.position.set(playerPos.x, playerPos.y || 0.8, playerPos.z);
-            scene.add(player);
-
-            // Bounding Box for Collision
-            playerBox = new THREE.Box3();
+            // 배너 알림
+            waveBanner.textContent = `WAVE ${wave} START!`;
+            waveBanner.style.opacity = '1';
+            setTimeout(() => {
+                waveBanner.style.opacity = '0';
+            }, 2000);
         }
 
-        // --- Expanded Obstacle Spawner (New Obstacle Types Added) ---
-        // Types:
-        // 1. 'LONG_WALL': Wide and low wall (Must Jump OVER)
-        // 2. 'HIGH_WALL': Tall narrow pillar (Must Dodge Left/Right)
-        // 3. 'HIGH_GATE': Suspended Overhead Gate (Must stay low / Cannot jump into)
-        // 4. 'MOVING_BLOCK': Block moving horizontally back and forth
-        // 5. 'LASER_GRID': High-contrast neon double barrier
-        // 6. 'PYRAMID_BLOCK': Sharp geometric spike block
-        function spawnObstacle(zPos) {
-            const typeRandom = Math.random();
-            let obstacle, type;
-
-            if (typeRandom < 0.22) {
-                // TYPE 1: LONG LOW WALL (Spans horizontally - Requires JUMP)
-                type = 'LONG_WALL';
-                const geo = new THREE.BoxGeometry(10.5, 1.2, 0.8);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0xff0055, 
-                    emissive: 0x660022, 
-                    roughness: 0.3 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-                obstacle.position.set(0, 0.6, zPos);
-
-                // Top Glowing Neon Trim
-                const edgeGeo = new THREE.BoxGeometry(10.6, 0.12, 0.9);
-                const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                const edge = new THREE.Mesh(edgeGeo, edgeMat);
-                edge.position.set(0, 0.6, 0);
-                obstacle.add(edge);
-
-            } else if (typeRandom < 0.42) {
-                // TYPE 2: TALL NARROW WALL (Dodge Left or Right)
-                type = 'HIGH_WALL';
-                const geo = new THREE.BoxGeometry(3.4, 6.5, 0.8);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0x00f0ff, 
-                    emissive: 0x004466, 
-                    roughness: 0.2 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-        // --- Balanced Obstacle Spawner ---
-        // Spawn distance interval tuned for fair, moderate difficulty
-        const SPAWN_INTERVAL_Z = 28; // Increased gap so players have time to react
-
-        function spawnObstacle(zPos) {
-            const typeRandom = Math.random();
-            let obstacle, type;
-
-            if (typeRandom < 0.35) {
-                // TYPE 1: LONG LOW WALL (Spans horizontally - Requires JUMP)
-                type = 'LONG_WALL';
-                const geo = new THREE.BoxGeometry(10.5, 1.2, 0.8);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0xff0055, 
-                    emissive: 0x660022, 
-                    roughness: 0.3 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-                obstacle.position.set(0, 0.6, zPos);
-
-                // Top Glowing Neon Trim
-                const edgeGeo = new THREE.BoxGeometry(10.6, 0.12, 0.9);
-                const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                const edge = new THREE.Mesh(edgeGeo, edgeMat);
-                edge.position.set(0, 0.6, 0);
-                obstacle.add(edge);
-
-            } else if (typeRandom < 0.65) {
-                // TYPE 2: TALL NARROW WALL (Dodge Left or Right)
-                type = 'HIGH_WALL';
-                const geo = new THREE.BoxGeometry(3.2, 6.5, 0.8);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0x00f0ff, 
-                    emissive: 0x004466, 
-                    roughness: 0.2 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-                
-                const lanes = [-LANE_WIDTH, 0, LANE_WIDTH];
-                const xPos = lanes[Math.floor(Math.random() * lanes.length)];
-                obstacle.position.set(xPos, 3.25, zPos);
-
-            } else if (typeRandom < 0.82) {
-                // TYPE 3: HIGH OVERHEAD GATE (Do NOT Jump / Stay Grounded)
-                type = 'HIGH_GATE';
-                const geo = new THREE.BoxGeometry(11, 3.5, 0.8);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0xffaa00, 
-                    emissive: 0x664400, 
-                    roughness: 0.3 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-                obstacle.position.set(0, 3.8, zPos);
-
-                const stripeGeo = new THREE.BoxGeometry(11.1, 0.15, 0.9);
-                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
-                const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-                stripe.position.set(0, -1.6, 0);
-                obstacle.add(stripe);
-
-            } else {
-                // TYPE 4: HORIZONTALLY MOVING BLOCK (Predictable moderate speed)
-                type = 'MOVING_BLOCK';
-                const geo = new THREE.BoxGeometry(3.0, 2.2, 1.2);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0xaa00ff, 
-                    emissive: 0x440066 
-                });
-                obstacle = new THREE.Mesh(geo, mat);
-                obstacle.position.set(0, 1.1, zPos);
-                obstacle.userData.moveDirection = Math.random() > 0.5 ? 1 : -1;
-                obstacle.userData.moveSpeed = 0.05; // Moderate movement speed
-            }
-
-            obstacle.userData = Object.assign(obstacle.userData || {}, { type: type, box: new THREE.Box3() });
-            scene.add(obstacle);
-            obstacles.push(obstacle);
-        }
-
-        // Spawns explosion particles on collision
-        function createExplosion(pos) {
-            for (let i = 0; i < 30; i++) {
-                const pGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-                const pMat = new THREE.MeshBasicMaterial({ 
-                    color: Math.random() > 0.5 ? 0xff0055 : 0x00f0ff 
-                });
-                const particle = new THREE.Mesh(pGeo, pMat);
-                particle.position.copy(pos);
-                
-                particle.userData = {
+        // 폭발 파티클 생성
+        function createExplosion(pos, colorHex) {
+            const geo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            for (let i = 0; i < 14; i++) {
+                const p = new THREE.Mesh(geo, mat);
+                p.position.copy(pos);
+                scene.add(p);
+                particles.push({
+                    mesh: p,
                     vel: new THREE.Vector3(
-                        (Math.random() - 0.5) * 0.8,
-                        (Math.random() - 0.5) * 0.8 + 0.3,
-                        (Math.random() - 0.5) * 0.8
-                    )
-                };
-                
-                scene.add(particle);
-                particles.push(particle);
+                        (Math.random() - 0.5) * 14,
+                        Math.random() * 10 + 2,
+                        (Math.random() - 0.5) * 14
+                    ),
+                    life: 0.6
+                });
             }
         }
 
-        // --- Controls Handlers ---
-        function setupControls() {
-            setupCharacterSelector();
+        // 재장전 기능
+        function reloadWeapon() {
+            if (isReloading || ammo === maxAmmo) return;
+            isReloading = true;
+            reloadBadge.classList.remove('hidden');
+            playSFX('reload');
 
-            // Keyboard
-            window.addEventListener('keydown', (e) => {
-                if (gameState !== 'PLAYING') return;
-                const code = e.code;
-                if (code === 'KeyA' || code === 'ArrowLeft') keys.a = true;
-                if (code === 'KeyD' || code === 'ArrowRight') keys.d = true;
-                if (code === 'Space') {
-                    e.preventDefault();
-                    triggerJump();
+            // 총기 기울이기 애니메이션
+            gunGroup.rotation.x = -0.5;
+
+            setTimeout(() => {
+                ammo = maxAmmo;
+                ammoText.textContent = ammo;
+                isReloading = false;
+                reloadBadge.classList.add('hidden');
+                gunGroup.rotation.x = 0;
+            }, 1100);
+        }
+
+        // 사격 기능 (레이캐스팅 + 레이저 빔 시각 효과)
+        const raycaster = new THREE.Raycaster();
+        function shoot() {
+            const now = performance.now();
+            if (isReloading || now - lastShotTime < 140) return;
+
+            if (ammo <= 0) {
+                reloadWeapon();
+                return;
+            }
+
+            lastShotTime = now;
+            ammo--;
+            ammoText.textContent = ammo;
+            playSFX('shoot');
+
+            // 총기 반동 및 총구 섬광
+            gunGroup.position.z = -0.32;
+            muzzleLight.intensity = 4;
+            setTimeout(() => {
+                muzzleLight.intensity = 0;
+            }, 60);
+
+            // 카메라 정중앙 방향으로 레이캐스트 발사
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+            // 적 피격 판정
+            let hitPoint = raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(60));
+            let hitEnemyIndex = -1;
+            let closestDist = Infinity;
+
+            enemies.forEach((enemy, idx) => {
+                const distToRay = raycaster.ray.distanceSqToPoint(enemy.mesh.position);
+                const distFromCam = camera.position.distanceTo(enemy.mesh.position);
+                // 드론 히트박스 반경 약 1.45
+                if (distToRay < 2.1 && distFromCam < closestDist) {
+                    closestDist = distFromCam;
+                    hitEnemyIndex = idx;
+                    hitPoint = enemy.mesh.position.clone();
                 }
             });
 
-            window.addEventListener('keyup', (e) => {
-                const code = e.code;
-                if (code === 'KeyA' || code === 'ArrowLeft') keys.a = false;
-                if (code === 'KeyD' || code === 'ArrowRight') keys.d = false;
-            });
+            // 플라즈마 레이저 궤적 그리기
+            const startPos = new THREE.Vector3();
+            gunCore.getWorldPosition(startPos);
+            const beamGeo = new THREE.BufferGeometry().setFromPoints([startPos, hitPoint]);
+            const beamMat = new THREE.LineBasicMaterial({ color: 0x22d3ee });
+            const beam = new THREE.Line(beamGeo, beamMat);
+            scene.add(beam);
+            setTimeout(() => scene.remove(beam), 55);
 
-            // Touch UI Buttons
-            const btnLeft = document.getElementById('btn-left');
-            const btnRight = document.getElementById('btn-right');
-            const btnJump = document.getElementById('btn-jump');
+            // 명중 시 데미지 처리
+            if (hitEnemyIndex !== -1) {
+                const target = enemies[hitEnemyIndex];
+                target.hp -= 25;
+                playSFX('hit');
 
-            const bindTouch = (elem, keyName) => {
-                elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
-                elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
-            };
+                // 조준점 히트 마커 애니메이션
+                crosshair.classList.add('hit');
+                setTimeout(() => crosshair.classList.remove('hit'), 110);
 
-            bindTouch(btnLeft, 'left');
-            bindTouch(btnRight, 'right');
-            
-            btnJump.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (gameState === 'PLAYING') triggerJump();
-            });
+                // 피격 시 잠시 하얗게 점멸
+                target.body.material.emissive.setHex(0xffffff);
+                setTimeout(() => {
+                    if (target.body) target.body.material.emissive.setHex(0x9f1239);
+                }, 70);
 
-            // UI Buttons
-            document.getElementById('start-btn').addEventListener('click', startGame);
-            
-            document.getElementById('audio-toggle-btn').addEventListener('click', () => {
-                const muted = audio.toggleMute();
-                document.getElementById('audio-icon').className = muted ? 'fas fa-volume-mute text-red-400' : 'fas fa-volume-up text-cyan-400';
-            });
-        }
+                // 적 파괴
+                if (target.hp <= 0) {
+                    playSFX('kill');
+                    createExplosion(target.mesh.position, 0xf43f5e);
+                    scene.remove(target.mesh);
+                    enemies.splice(hitEnemyIndex, 1);
 
-        function triggerJump() {
-            if (isGrounded) {
-                playerVelY = currentJumpForce;
-                isGrounded = false;
-                audio.playJump();
+                    score += 100 * wave;
+                    scoreText.textContent = score;
+                    enemyCountText.textContent = enemies.length;
+
+                    // 체력 소량 회복 보너스
+                    hp = Math.min(100, hp + 5);
+                    updateHpUI();
+
+                    // 모든 적 처치 시 다음 웨이브
+                    if (enemies.length === 0) {
+                        setTimeout(() => {
+                            if (isPlaying) startWave(wave + 1);
+                        }, 1200);
+                    }
+                }
+            }
+
+            if (ammo === 0) {
+                reloadWeapon();
             }
         }
 
-        // --- Game Loop & Logic ---
-        function startGame() {
-            audio.init();
-            audio.startBGM();
-
-            // Clear Existing Obstacles
-            obstacles.forEach(obs => scene.remove(obs));
-            obstacles = [];
-            particles.forEach(p => scene.remove(p));
-            particles = [];
-
-            // Apply selected character stats
-            const char = CHARACTERS[selectedCharIndex];
-            speed = 0.85 * char.speedMultiplier; 
-            currentJumpForce = char.jumpForce;
-
-            // Reset Stats
-            score = 0;
-            playerPos = { x: 0, y: 0.8, z: 0 };
-            playerVelY = 0;
-            isGrounded = true;
-            lastSpawnZ = -30;
-
-            // Re-create player model for selected character
-            createPlayer();
-
-            // Pre-spawn initial obstacles ahead
-            for (let z = -40; z > -150; z -= SPAWN_INTERVAL_Z) {
-                spawnObstacle(z);
-                lastSpawnZ = z;
+        function updateHpUI() {
+            hpText.textContent = Math.max(0, Math.ceil(hp));
+            hpBar.style.width = `${Math.max(0, hp)}%`;
+            if (hp <= 30) {
+                hpBar.className = 'h-full bg-rose-500 transition-all duration-150';
+            } else {
+                hpBar.className = 'h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-150';
             }
-
-            // Update UI
-            document.getElementById('menu-overlay').classList.add('hidden');
-            document.getElementById('hud').classList.remove('hidden');
-            document.getElementById('controls-hint').classList.remove('hidden');
-            document.getElementById('touch-controls').classList.remove('hidden');
-
-            gameState = 'PLAYING';
         }
 
-        function gameOver() {
-            gameState = 'GAMEOVER';
-            audio.stopBGM();
-            audio.playCrash();
+        // ==========================================
+        // 6. 메인 게임 루프 (물리 연산 & 렌더링)
+        // ==========================================
+        let prevTime = performance.now();
 
-            createExplosion(player.position);
+        function animate() {
+            requestAnimationFrame(animate);
 
-            // Update Overlay UI
-            document.getElementById('final-score').innerText = Math.floor(score);
-            document.getElementById('game-over-info').classList.remove('hidden');
-            document.getElementById('start-btn').innerText = '다시 시도 (RETRY)';
-            document.getElementById('menu-overlay').classList.remove('hidden');
-            document.getElementById('controls-hint').classList.add('hidden');
-            document.getElementById('touch-controls').classList.add('hidden');
-        }
+            const now = performance.now();
+            const dt = Math.min((now - prevTime) / 1000, 0.1);
+            prevTime = now;
 
-        function update() {
-            if (gameState === 'PLAYING') {
-                const char = CHARACTERS[selectedCharIndex];
-                
-                // 1. Score & Speed Progression
-                score += speed * 0.5 * char.scoreMultiplier;
-                document.getElementById('score-text').innerText = Math.floor(score);
-                
-                // Hard mode gets progressively faster up to maxSpeed
-                if (speed < maxSpeed * char.speedMultiplier) speed += 0.0003;
+            if (isPlaying) {
+                // 1) 카메라 시점 적용
+                camera.rotation.y = player.yaw;
+                camera.rotation.x = player.pitch;
 
-                // 2. Horizontal Movement Logic (A/D or Touch)
-                const moveSpeed = 0.22;
-                if ((keys.a || keys.left) && playerPos.x > -MAX_X) {
-                    playerPos.x -= moveSpeed;
-                }
-                if ((keys.d || keys.right) && playerPos.x < MAX_X) {
-                    playerPos.x += moveSpeed;
+                // 2) 플레이어 이동 계산
+                const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+                const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+                const moveDir = new THREE.Vector3();
+
+                if (keys['KeyW'] || keys['ArrowUp']) moveDir.add(forward);
+                if (keys['KeyS'] || keys['ArrowDown']) moveDir.sub(forward);
+                if (keys['KeyD'] || keys['ArrowRight']) moveDir.add(right);
+                if (keys['KeyA'] || keys['ArrowLeft']) moveDir.sub(right);
+
+                // 가상 조이스틱 입력 합산
+                if (Math.abs(joyInput.x) > 0.05 || Math.abs(joyInput.y) > 0.05) {
+                    moveDir.addScaledVector(forward, -joyInput.y);
+                    moveDir.addScaledVector(right, joyInput.x);
                 }
 
-                // Smooth Bank/Tilt Angle when turning
-                const targetTilt = (keys.a || keys.left) ? 0.4 : ((keys.d || keys.right) ? -0.4 : 0);
-                player.rotation.z += (targetTilt - player.rotation.z) * 0.15;
-
-                // 3. Jump Physics
-                playerPos.y += playerVelY;
-                playerVelY += GRAVITY;
-
-                if (playerPos.y <= 0.8) {
-                    playerPos.y = 0.8;
-                    playerVelY = 0;
-                    isGrounded = true;
+                if (moveDir.lengthSq() > 0) {
+                    moveDir.normalize();
+                    // 걸을 때 총기 흔들림(Head/Gun Bobbing)
+                    gunGroup.position.y = -0.26 + Math.sin(now * 0.012) * 0.012;
                 }
 
-                // Update Player Model Position
-                player.position.set(playerPos.x, playerPos.y, playerPos.z);
-                
-                // Update Player Collision Box (Slightly smaller than mesh for forgiving gameplay)
-                playerBox.setFromObject(player);
-                playerBox.expandByScalar(-0.15); 
+                // 총기 반동 복귀
+                gunGroup.position.z += (-0.45 - gunGroup.position.z) * 12 * dt;
 
-                // 4. Move Road Grid to give illusion of speed
-                roadGrid.position.z += speed;
-                if (roadGrid.position.z > 5) roadGrid.position.z = 0;
+                // X, Z 이동 및 장애물 충돌 체크
+                const nextX = player.pos.x + moveDir.x * player.speed * dt;
+                const nextZ = player.pos.z + moveDir.z * player.speed * dt;
 
-                // 5. Update & Spawn Obstacles
-                for (let i = obstacles.length - 1; i >= 0; i--) {
-                    const obs = obstacles[i];
-                    obs.position.z += speed;
+                let canMoveX = true;
+                let canMoveZ = true;
+                for (const obs of obstacles) {
+                    if (nextX > obs.minX && nextX < obs.maxX && player.pos.z > obs.minZ && player.pos.z < obs.maxZ) {
+                        canMoveX = false;
+                    }
+                    if (player.pos.x > obs.minX && player.pos.x < obs.maxX && nextZ > obs.minZ && nextZ < obs.maxZ) {
+                        canMoveZ = false;
+                    }
+                }
+                if (canMoveX) player.pos.x = nextX;
+                if (canMoveZ) player.pos.z = nextZ;
 
-                    // Moving obstacle special logic
-                    if (obs.userData.type === 'MOVING_BLOCK') {
-                        obs.position.x += obs.userData.moveDirection * obs.userData.moveSpeed;
-                        if (obs.position.x > MAX_X) {
-                            obs.position.x = MAX_X;
-                            obs.userData.moveDirection = -1;
-                        } else if (obs.position.x < -MAX_X) {
-                            obs.position.x = -MAX_X;
-                            obs.userData.moveDirection = 1;
+                // 중력 및 점프 처리
+                player.vel.y -= 28 * dt;
+                player.pos.y += player.vel.y * dt;
+                if (player.pos.y <= 1.8) {
+                    player.pos.y = 1.8;
+                    player.vel.y = 0;
+                    player.onGround = true;
+                }
+
+                camera.position.copy(player.pos);
+
+                // 3) 적 드론 AI 업데이트
+                enemies.forEach((enemy) => {
+                    enemy.body.rotation.y += 2.5 * dt;
+                    enemy.ring.rotation.z += 3.5 * dt;
+                    enemy.mesh.position.y = 1.8 + Math.sin(now * 0.004 + enemy.speed) * 0.35;
+
+                    const toPlayer = new THREE.Vector3().subVectors(player.pos, enemy.mesh.position);
+                    toPlayer.y = 0;
+                    const dist = toPlayer.length();
+
+                    if (dist > 2.4) {
+                        toPlayer.normalize();
+                        enemy.mesh.position.addScaledVector(toPlayer, enemy.speed * dt);
+                    } else {
+                        // 근접 공격
+                        enemy.attackCooldown -= dt;
+                        if (enemy.attackCooldown <= 0) {
+                            enemy.attackCooldown = 0.9;
+                            hp -= 12;
+                            updateHpUI();
+                            damageOverlay.style.opacity = '1';
+                            setTimeout(() => { damageOverlay.style.opacity = '0'; }, 180);
+
+                            if (hp <= 0) {
+                                triggerGameOver();
+                            }
                         }
                     }
+                });
 
-                    // Collision Detection
-                    obs.userData.box.setFromObject(obs);
-                    if (playerBox.intersectsBox(obs.userData.box)) {
-                        gameOver();
-                        return;
+                // 4) 파티클 애니메이션
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.life -= dt;
+                    p.vel.y -= 22 * dt;
+                    p.mesh.position.addScaledVector(p.vel, dt);
+                    p.mesh.scale.setScalar(Math.max(0.01, p.life));
+                    if (p.life <= 0) {
+                        scene.remove(p.mesh);
+                        particles.splice(i, 1);
                     }
-
-                    // Remove off-screen obstacles
-                    if (obs.position.z > 10) {
-                        scene.remove(obs);
-                        obstacles.splice(i, 1);
-                    }
-                }
-
-                // Spawn New Obstacles ahead (Fair progression rate)
-                const currentSpawnInterval = Math.max(20, SPAWN_INTERVAL_Z - Math.floor(score / 600));
-                if (lastSpawnZ + speed > -160) {
-                    lastSpawnZ -= currentSpawnInterval;
-                    spawnObstacle(lastSpawnZ);
                 }
             }
 
-            // Update Explosion Particle FX
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.position.add(p.userData.vel);
-                p.scale.multiplyScalar(0.95); // shrink
-                if (p.scale.x < 0.01) {
-                    scene.remove(p);
-                    particles.splice(i, 1);
-                }
-            }
-        }
-
-        function render() {
-            requestAnimationFrame(render);
-            update();
             renderer.render(scene, camera);
         }
 
-        function onWindowResize() {
+        // ==========================================
+        // 7. 게임 흐름 제어 (시작 / 일시정지 / 오버)
+        // ==========================================
+        function startGame() {
+            if (isGameOver) {
+                // 완전 초기화
+                enemies.forEach(e => scene.remove(e.mesh));
+                enemies = [];
+                score = 0;
+                hp = 100;
+                ammo = maxAmmo;
+                isReloading = false;
+                player.pos.set(0, 1.8, 0);
+                player.yaw = 0;
+                player.pitch = 0;
+                scoreText.textContent = '0';
+                ammoText.textContent = maxAmmo;
+                reloadBadge.classList.add('hidden');
+                updateHpUI();
+                isGameOver = false;
+                startWave(1);
+            } else if (enemies.length === 0) {
+                startWave(1);
+            }
+
+            isPlaying = true;
+            menuOverlay.classList.add('hidden');
+            hud.classList.remove('hidden');
+            crosshair.classList.remove('hidden');
+
+            if (!isTouchDevice) {
+                canvas.requestPointerLock?.();
+            }
+        }
+
+        function pauseGame() {
+            isPlaying = false;
+            menuOverlay.classList.remove('hidden');
+            hud.classList.add('hidden');
+            crosshair.classList.add('hidden');
+            finalStats.classList.add('hidden');
+            menuTitle.innerHTML = 'PAUSED <span class="text-cyan-400">3D</span>';
+            menuSubtitle.textContent = '게임이 일시정지되었습니다. 계속하려면 버튼을 누르세요.';
+            startBtn.textContent = '계속하기 (RESUME)';
+        }
+
+        function triggerGameOver() {
+            isPlaying = false;
+            isGameOver = true;
+            document.exitPointerLock?.();
+
+            menuOverlay.classList.remove('hidden');
+            hud.classList.add('hidden');
+            crosshair.classList.add('hidden');
+
+            finalStats.classList.remove('hidden');
+            finalWaveEl.textContent = wave;
+            finalScoreEl.textContent = score;
+
+            menuTitle.innerHTML = '<span class="text-rose-500">MISSION FAILED</span>';
+            menuSubtitle.textContent = '드론의 공격을 버티지 못했습니다. 다시 도전해보세요!';
+            startBtn.textContent = '다시 도전 (RETRY)';
+        }
+
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', () => {
+            document.exitPointerLock?.();
+            pauseGame();
+        });
+
+        // 브라우저 창 크기 변경 대응
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+        });
 
-        // --- Start Application ---
-        window.onload = () => {
-            initThree();
-            setupControls();
-            render();
+        // 렌더링 루프 시작
+        window.onload = function() {
+            animate();
         };
     </script>
 </body>

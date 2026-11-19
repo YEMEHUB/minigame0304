@@ -1,736 +1,1411 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>검 강화하기 게임</title>
-    <!-- Tailwind CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>문민석 1인칭 픽셀 슈팅 - PIXEL FPS</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Tone.js for Sound Effects & BGM -->
+    <!-- 효과음을 위한 Tone.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
-            background-color: #0b0f19;
-            color: #f3f4f6;
-            touch-action: manipulation;
+            background-color: #070b12;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
         }
-
-        .title-font {
-            font-family: 'Orbitron', 'Noto Sans KR', sans-serif;
+        .font-pixel {
+            font-family: 'Press Start 2P', monospace;
         }
-
-        /* 깔롱한 검 디스플레이 애니메이션 */
-        @keyframes float-sword {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-12px) rotate(2deg); }
+        #pixelCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            touch-action: none;
         }
-
-        .sword-float {
-            animation: float-sword 3.5s ease-in-out infinite;
+        .pixel-frame {
+            box-shadow:
+                0 0 0 2px #1e293b,
+                0 0 0 4px #0f172a,
+                0 14px 35px rgba(0, 0, 0, 0.75);
         }
-
-        /* 화면 진동 효과 */
-        @keyframes shake-anim {
-            0% { transform: translate(0, 0); }
-            20% { transform: translate(-8px, 6px); }
-            40% { transform: translate(8px, -6px); }
-            60% { transform: translate(-6px, -4px); }
-            80% { transform: translate(6px, 4px); }
-            100% { transform: translate(0, 0); }
+        @keyframes hit-pulse {
+            0% { opacity: 0.55; }
+            100% { opacity: 0; }
         }
-
-        .shake {
-            animation: shake-anim 0.35s ease-in-out;
-        }
-
-        /* 화려한 오라 효과 */
-        @keyframes aura-glow {
-            0%, 100% { filter: drop-shadow(0 0 15px var(--aura-color, #38bdf8)); }
-            50% { filter: drop-shadow(0 0 35px var(--aura-color, #38bdf8)) drop-shadow(0 0 50px var(--aura-color, #38bdf8)); }
-        }
-
-        .sword-aura {
-            animation: aura-glow 2s infinite ease-in-out;
-        }
-
-        /* 충격파 효과 */
-        @keyframes shockwave-anim {
-            0% { opacity: 1; transform: scale(0.2); }
-            100% { opacity: 0; transform: scale(2.5); }
-        }
-
-        .shockwave {
-            position: absolute;
-            border-radius: 50%;
-            border: 4px solid var(--sw-color, #38bdf8);
-            box-shadow: 0 0 25px var(--sw-color, #38bdf8), inset 0 0 25px var(--sw-color, #38bdf8);
-            pointer-events: none;
-            animation: shockwave-anim 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
-            z-index: 50;
-        }
-
-        /* 초월 3단 승급 애니메이션 */
-        @keyframes super-critical {
-            0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
-            20% { transform: scale(1.4) rotate(-15deg); filter: brightness(3) drop-shadow(0 0 50px #facc15); }
-            40% { transform: scale(1.5) rotate(15deg); filter: brightness(3) drop-shadow(0 0 80px #f59e0b); }
-            100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
-        }
-
-        .super-critical-anim {
-            animation: super-critical 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        /* 파티클 효과 */
-        .particle {
-            position: absolute;
-            pointer-events: none;
-            border-radius: 50%;
-            animation: particle-move 0.8s ease-out forwards;
-            z-index: 60;
-        }
-
-        @keyframes particle-move {
-            0% { opacity: 1; transform: translate(0, 0) scale(1); }
-            100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.1); }
-        }
-
-        /* 스크롤바 커스텀 */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 3px;
-        }
-
-        /* 터미널 커스텀 스타일 */
-        .terminal-box {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #030712;
-            border: 1px solid #1f2937;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
-            height: 120px;
-            overflow-y: auto;
-        }
-        
-        .terminal-cursor {
-            display: inline-block;
-            width: 6px;
-            height: 12px;
-            background-color: #22c55e;
-            animation: blink 1s step-start infinite;
-            vertical-align: middle;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            50% { opacity: 0; }
+        .hurt-flash {
+            animation: hit-pulse 0.26s steps(4) forwards;
         }
     </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-between p-3 md:p-6 overflow-hidden">
+<body class="h-screen w-screen flex flex-col items-center justify-between p-1.5 sm:p-2.5 text-slate-100 bg-gradient-to-b from-slate-950 via-slate-900 to-black">
 
-    <!-- 글로벌 배경 빛 연출 -->
-    <div id="bgGlow" class="fixed inset-0 pointer-events-none opacity-20 transition-all duration-700 bg-gradient-to-b from-indigo-900/30 via-slate-950 to-slate-950"></div>
-
-    <!-- 환영합니다 오버레이 모달 -->
-    <div id="welcomeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-opacity duration-500">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 max-w-md w-full text-center shadow-2xl flex flex-col items-center gap-4">
-            <div class="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 text-3xl shadow-lg shadow-indigo-500/20 animate-bounce">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <!-- 상단 픽셀 HUD -->
+    <header class="w-full max-w-3xl flex items-center justify-between bg-slate-900/95 border-2 border-slate-700 rounded-lg px-3 py-1.5 z-20 gap-2 pixel-frame">
+        <div class="flex items-center gap-3 sm:gap-4">
+            <!-- HP -->
+            <div class="min-w-[88px] sm:min-w-[116px]">
+                <div class="flex items-center justify-between text-[10px] font-bold">
+                    <span class="font-pixel text-[9px] text-rose-400">HP</span>
+                    <span id="hpText" class="font-pixel text-[10px] text-rose-300">100</span>
+                </div>
+                <div class="w-full h-2.5 bg-slate-950 border border-slate-700 mt-0.5 overflow-hidden">
+                    <div id="hpBar" class="h-full bg-gradient-to-r from-rose-600 via-rose-400 to-emerald-400 transition-all duration-150" style="width: 100%;"></div>
+                </div>
             </div>
+
+            <!-- SCORE -->
             <div>
-                <h1 class="text-2xl md:text-3xl font-black text-amber-300 title-font tracking-wide mb-2">환영합니다!</h1>
-                <p class="text-xs md:text-sm text-slate-300 leading-relaxed">
-                    마법 대장간에 오신 것을 환영합니다.<br>
-                    전설의 검을 강화하여 최고 레벨인 <strong class="text-amber-400">★ 절대신 신화의 검</strong>에 도전해보세요!
-                </p>
+                <div class="font-pixel text-[8px] text-slate-400">SCORE</div>
+                <div id="scoreDisplay" class="font-pixel text-xs sm:text-sm text-amber-400 mt-0.5">0</div>
             </div>
-            <button onclick="startGame()" class="w-full py-3.5 mt-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 active:scale-95 text-white font-black text-base rounded-xl shadow-xl transition border border-indigo-400/40 flex items-center justify-center gap-2">
-                <span>게임 시작하기</span>
-                <i class="fa-solid fa-play text-xs"></i>
-            </button>
-        </div>
-    </div>
 
-    <!-- 상단 헤더 & 정보 패널 -->
-    <header class="w-full max-w-4xl flex items-center justify-between gap-2 p-3 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl shadow-xl z-10 mb-2">
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl">
-                <i class="fa-solid fa-coins text-amber-400"></i>
-                <span id="goldDisplay" class="font-black text-amber-300 title-font text-sm md:text-base">1,000 G</span>
+            <!-- KILLS -->
+            <div class="hidden sm:block">
+                <div class="font-pixel text-[8px] text-slate-400">KILLS</div>
+                <div id="killsDisplay" class="font-pixel text-xs sm:text-sm text-sky-400 mt-0.5">0</div>
             </div>
-            <!-- BGM 토글 버튼 -->
-            <button onclick="toggleBGM()" class="px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-300 flex items-center gap-1.5 transition active:scale-95">
-                <i id="bgmIcon" class="fa-solid fa-volume-xmark text-rose-400"></i>
-                <span id="bgmText">BGM OFF</span>
-            </button>
         </div>
-        <div class="flex items-center gap-3">
+
+        <!-- WAVE, BEST, SOUND -->
+        <div class="flex items-center gap-2 sm:gap-3">
             <div class="text-right">
-                <span class="text-[10px] text-slate-400 block">최고 기록</span>
-                <div id="highScoreDisplay" class="text-sm md:text-base font-black text-indigo-300 title-font">+0 강</div>
+                <div class="font-pixel text-[8px] text-slate-400">WAVE</div>
+                <div id="waveDisplay" class="font-pixel text-[11px] sm:text-xs text-indigo-400 mt-0.5">1</div>
             </div>
+            <div class="hidden md:block text-right">
+                <div class="font-pixel text-[8px] text-slate-400">BEST</div>
+                <div id="bestScoreDisplay" class="font-pixel text-[11px] sm:text-xs text-emerald-400 mt-0.5">0</div>
+            </div>
+            <button id="soundToggleBtn" class="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 active:translate-y-0.5 transition cursor-pointer" title="사운드 전환">
+                <svg id="soundOnIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                </svg>
+                <svg id="soundOffIcon" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path>
+                </svg>
+            </button>
         </div>
     </header>
 
-    <!-- 메인 레이아웃 (상점 - 메인 검 디스플레이 - 로그) -->
-    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-4 my-auto z-10">
+    <!-- 1인칭 픽셀 뷰포트 -->
+    <main id="viewportContainer" class="relative w-full max-w-3xl max-h-[68vh] flex-1 my-1.5 rounded-lg overflow-hidden border-2 border-slate-700 bg-black pixel-frame">
+        <canvas id="pixelCanvas"></canvas>
 
-        <!-- 좌측: 아이템 상점 (3개 칼럼 중 3개 사용) -->
-        <section class="md:col-span-3 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3 shadow-lg backdrop-blur">
-            <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2 pb-2 border-b border-slate-800">
-                <i class="fa-solid fa-store text-emerald-400"></i> 마법 대장간 상점
-            </h3>
+        <!-- 피격 붉은 플래시 -->
+        <div id="damageOverlay" class="absolute inset-0 bg-rose-600/0 pointer-events-none z-10"></div>
 
-            <!-- 행운의 주문서 -->
-            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50 flex flex-col gap-1.5">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-bold text-emerald-300">확률 증가 주문서</span>
-                    <span class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">보유: <span id="luckCount">0</span></span>
+        <!-- 명중/처치 픽셀 팝업 -->
+        <div id="hitFeedback" class="font-pixel absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-[11px] sm:text-xs text-amber-300 drop-shadow-[0_2px_0_rgba(0,0,0,1)] pointer-events-none opacity-0 transition-opacity duration-150 z-15"></div>
+
+        <!-- 조작 힌트 -->
+        <div class="hidden sm:flex flex-col gap-1 absolute top-3 left-3 bg-slate-950/80 border-2 border-slate-800 rounded-lg px-3 py-2 text-[11px] text-slate-300 pointer-events-none z-10">
+            <div><span class="text-sky-400 font-bold">WASD / 방향키</span> : 1인칭 이동</div>
+            <div><span class="text-amber-400 font-bold">마우스 드래그</span> : 시점 회전</div>
+            <div><span class="text-rose-400 font-bold">SPACE / 좌클릭</span> : 사격 · <span class="text-emerald-400 font-bold">R</span> : 재장전</div>
+        </div>
+
+        <!-- 7종 픽셀 몬스터 안내 -->
+        <div class="hidden lg:flex flex-col gap-0.5 absolute top-3 right-3 bg-slate-950/80 border-2 border-slate-800 rounded-lg px-3 py-2 text-[10px] text-slate-300 pointer-events-none z-10">
+            <div class="font-pixel text-[9px] text-amber-300 mb-0.5">MONSTERS (7)</div>
+            <div><span class="text-emerald-400 font-bold">SLIME</span> : 기본 추격</div>
+            <div><span class="text-cyan-400 font-bold">SCOUT</span> : 고속 지그재그</div>
+            <div><span class="text-rose-400 font-bold">OGRE</span> : 고체력 탱커</div>
+            <div><span class="text-purple-400 font-bold">SPECTER</span> : 공간 워프</div>
+            <div><span class="text-orange-400 font-bold">BOMBER</span> : 폭발 &amp; 연쇄</div>
+            <div><span class="text-yellow-300 font-bold">WISP</span> : 부유 정령</div>
+            <div><span class="text-pink-400 font-bold">CRAB</span> : 집게 돌진</div>
+        </div>
+
+        <!-- 모바일/터치 조이스틱 & 버튼 -->
+        <div id="touchControls" class="hidden absolute inset-x-3 bottom-3 flex items-end justify-between pointer-events-none z-20 sm:hidden">
+            <div id="joystickPad" class="relative w-24 h-24 rounded-full bg-slate-900/75 border-2 border-slate-600 pointer-events-auto flex items-center justify-center">
+                <div id="joystickKnob" class="w-9 h-9 rounded-full bg-sky-500 border-2 border-sky-200"></div>
+            </div>
+            <div class="flex flex-col gap-2 pointer-events-auto">
+                <button id="touchReloadBtn" class="px-3 py-2 rounded-lg bg-slate-800/90 border-2 border-slate-600 font-pixel text-[10px] text-sky-300 active:translate-y-0.5">
+                    RELOAD
+                </button>
+                <button id="touchFireBtn" class="w-16 h-16 rounded-full bg-rose-600 border-2 border-rose-200 font-pixel text-[10px] text-white shadow-lg active:scale-90">
+                    FIRE
+                </button>
+            </div>
+        </div>
+
+        <!-- 시작 / 게임오버 모달 -->
+        <div id="overlayModal" class="absolute inset-0 bg-slate-950/88 flex flex-col items-center justify-center p-5 text-center z-30">
+            <div class="font-pixel text-xs sm:text-sm text-sky-400 mb-2 tracking-wider">1ST PERSON PIXEL SHOOTER</div>
+            <h1 id="modalTitle" class="text-2xl sm:text-3xl font-black text-white mb-2">
+                픽셀 1인칭 슈팅 아레나
+            </h1>
+            <p id="modalDesc" class="text-xs sm:text-sm text-slate-300 max-w-md mb-5 leading-relaxed">
+                직접 움직이며 다가오는 5종의 픽셀 몬스터를 처치하세요!<br>
+                <span class="text-sky-400 font-bold">WASD/방향키</span> 이동 · <span class="text-amber-400 font-bold">마우스 드래그</span> 시점 회전 · <span class="text-rose-400 font-bold">SPACE/클릭</span> 발사
+            </p>
+
+            <div id="resultStats" class="hidden grid-cols-3 gap-2.5 w-full max-w-sm bg-slate-900 border-2 border-slate-700 rounded-xl p-3.5 mb-5">
+                <div>
+                    <div class="font-pixel text-[9px] text-slate-400">SCORE</div>
+                    <div id="finalScore" class="font-pixel text-sm sm:text-base text-amber-400 mt-1">0</div>
                 </div>
-                <p class="text-[11px] text-slate-400 leading-tight">다음 1회 강화 성공률 +10% 상승</p>
-                <div class="flex justify-between items-center mt-1">
-                    <span class="text-xs font-bold text-amber-400">500 G</span>
-                    <button onclick="buyItem('luck')" class="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 active:scale-95 font-bold rounded-lg transition">구매</button>
+                <div>
+                    <div class="font-pixel text-[9px] text-slate-400">KILLS</div>
+                    <div id="finalKills" class="font-pixel text-sm sm:text-base text-sky-400 mt-1">0</div>
+                </div>
+                <div>
+                    <div class="font-pixel text-[9px] text-slate-400">WAVE</div>
+                    <div id="finalWave" class="font-pixel text-sm sm:text-base text-emerald-400 mt-1">1</div>
                 </div>
             </div>
 
-            <!-- 파괴 방지권 -->
-            <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50 flex flex-col gap-1.5">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-bold text-sky-300">파괴 방지 주문서</span>
-                    <span class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">보유: <span id="protectCount">0</span></span>
-                </div>
-                <p class="text-[11px] text-slate-400 leading-tight">강화 실패 시 검 파괴 방지</p>
-                <div class="flex justify-between items-center mt-1">
-                    <span class="text-xs font-bold text-amber-400">1,500 G</span>
-                    <button onclick="buyItem('protect')" class="px-2.5 py-1 text-xs bg-sky-600 hover:bg-sky-500 active:scale-95 font-bold rounded-lg transition">구매</button>
-                </div>
-            </div>
-
-            <!-- 비상 골드 수급 -->
-            <button onclick="workForGold()" class="mt-auto w-full py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5">
-                <i class="fa-solid fa-hammer"></i> 광산 알바하기 (+200G)
+            <button id="startBtn" class="font-pixel px-5 py-3 rounded-lg text-[11px] sm:text-xs text-white bg-gradient-to-r from-sky-500 via-indigo-600 to-rose-600 hover:brightness-110 border-2 border-sky-300/50 shadow-xl active:translate-y-0.5 transition cursor-pointer">
+                START GAME
             </button>
-        </section>
-
-        <!-- 중앙: 메인 검 강황 무대 (6개 칼럼 사용) -->
-        <section id="mainDisplay" class="md:col-span-6 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-between min-h-[420px] shadow-2xl relative overflow-hidden backdrop-blur">
-            
-            <!-- 검 정보 헤더 -->
-            <div class="text-center w-full z-10">
-                <div class="inline-block px-3.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs mb-2">
-                    강화 단계 : <span id="swordLevelBadge" class="text-amber-400 font-bold title-font">+0</span>
-                    <span id="jackpotBadge" class="hidden ml-1.5 px-2 py-0.5 rounded bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-[10px] animate-pulse">★ 3단 초월 승급!</span>
-                </div>
-                <h2 id="swordName" class="text-2xl font-black text-slate-100 tracking-wide title-font">
-                    녹슨 단검
-                </h2>
-            </div>
-
-            <!-- 검 그래픽 연출 공간 -->
-            <div class="relative my-6 flex items-center justify-center w-full h-48 cursor-pointer" onclick="triggerSwordSparkles(event)">
-                <div id="swordGraphic" class="sword-float sword-aura transition-all duration-500 flex items-center justify-center">
-                    <!-- SVG 검 모양이 스크립트에 의해 동적으로 변경됨 -->
-                </div>
-            </div>
-
-            <!-- 확률 및 수치 정보 -->
-            <div class="w-full bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 grid grid-cols-3 gap-2 text-center text-xs mb-3 z-10">
-                <div>
-                    <span class="text-slate-400 block text-[10px]">성공 확률</span>
-                    <span id="rateDisplay" class="font-bold text-emerald-400 text-sm">100%</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 block text-[10px]">파괴 확률</span>
-                    <span id="destroyRateDisplay" class="font-bold text-rose-400 text-sm">0%</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 block text-[10px]">판매 시 가치</span>
-                    <span id="sellValueDisplay" class="font-bold text-amber-300 text-sm">100 G</span>
-                </div>
-            </div>
-
-            <!-- 검 강화 버튼 & 검 판매 버튼 -->
-            <div class="w-full flex gap-2 z-10">
-                <button onclick="sellSword()" class="w-1/3 py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-amber-400 font-bold text-xs md:text-sm rounded-xl border border-amber-500/30 transition flex flex-col items-center justify-center">
-                    <span>검 판매하기</span>
-                </button>
-
-                <button onclick="enhanceSword(event)" class="w-2/3 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 active:scale-95 text-white font-black text-sm md:text-base rounded-xl shadow-lg transition flex flex-col items-center justify-center border border-indigo-400/40">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i>
-                        <span>검 강화하기</span>
-                    </div>
-                    <span class="text-[11px] font-normal text-indigo-100 opacity-90">비용: <span id="costDisplay">100</span> G</span>
-                </button>
-            </div>
-
-        </section>
-
-        <!-- 우측: 최소화된 커맨드 창 스타일의 대장간 콘솔 로그 (3개 칼럼 사용) -->
-        <section class="md:col-span-3 bg-slate-900/80 border border-slate-800/90 rounded-2xl p-3 flex flex-col justify-between shadow-lg backdrop-blur overflow-hidden h-full max-h-[420px]">
-            <!-- 터미널 타이틀바 -->
-            <div class="flex items-center justify-between pb-1.5 mb-1 border-b border-slate-800/80 text-[11px] shrink-0">
-                <div class="flex items-center gap-1.5 font-mono text-slate-400">
-                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block"></span>
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
-                    <span class="ml-1 text-[10px] text-slate-500 font-bold">smithy_cmd.sh</span>
-                </div>
-                <button onclick="clearLogs()" class="text-[9px] text-slate-500 hover:text-slate-300 transition uppercase font-mono">CLS</button>
-            </div>
-
-            <!-- 레트로 다크 커맨드 콘솔 박스 -->
-            <div id="logBox" class="terminal-box my-1 flex-1 min-h-0 overflow-y-auto font-mono text-[10.5px] p-2 rounded-lg leading-snug space-y-1">
-                <div class="text-emerald-400">$ system.init()</div>
-                <div class="text-slate-400">&gt; 대장간 시스템 준비 완료.</div>
-            </div>
-
-            <!-- 하단 최소화된 요약 통계 -->
-            <div class="pt-1.5 mt-1 border-t border-slate-800/80 font-mono text-[10px] text-slate-400 flex justify-between items-center px-1 shrink-0">
-                <span class="text-slate-500">TRY: <strong id="statAttempts" class="text-slate-300">0</strong></span>
-                <span class="text-slate-500">SUCCESS: <strong id="statSuccesses" class="text-emerald-400">0</strong></span>
-            </div>
-        </section>
-
+        </div>
     </main>
 
-    <!-- 푸터 -->
-    <footer class="text-center text-slate-500 text-xs py-2 z-10">
-        검 강화하기 게임 &copy; 2026 Magic Sword Smith
+    <!-- 하단 픽셀 탄창 & 재장전 -->
+    <footer class="w-full max-w-3xl flex items-center justify-between bg-slate-900/95 border-2 border-slate-700 rounded-lg px-3 py-1.5 z-20 pixel-frame">
+        <div class="flex flex-col">
+            <div class="flex items-center gap-2 mb-0.5">
+                <span class="font-pixel text-[9px] text-slate-400">AMMO</span>
+                <span id="reloadNotice" class="hidden font-pixel text-[9px] text-rose-400 animate-pulse">RELOAD (R)!</span>
+            </div>
+            <div id="ammoContainer" class="flex items-center gap-1 h-3.5"></div>
+        </div>
+
+        <button id="reloadBtn" class="font-pixel px-3 py-1.5 rounded-md text-[9px] sm:text-[10px] bg-sky-600 hover:bg-sky-500 border border-sky-300/40 text-white active:translate-y-0.5 transition cursor-pointer">
+            RELOAD [R]
+        </button>
     </footer>
 
-    <!-- 자바스크립트 로직 -->
     <script>
-        // --- 게임 시작하기 (환영창 닫기) ---
-        function startGame() {
-            playSound('click');
-            const modal = document.getElementById('welcomeModal');
-            modal.classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 500);
+        // ==========================================
+        // 1. DOM 요소 및 전역 상태 변수 초기화
+        // ==========================================
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const hpText = document.getElementById('hpText');
+        const hpBar = document.getElementById('hpBar');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const killsDisplay = document.getElementById('killsDisplay');
+        const waveDisplay = document.getElementById('waveDisplay');
+        const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundOnIcon = document.getElementById('soundOnIcon');
+        const soundOffIcon = document.getElementById('soundOffIcon');
+        const damageOverlay = document.getElementById('damageOverlay');
+        const hitFeedback = document.getElementById('hitFeedback');
+        const touchControls = document.getElementById('touchControls');
+        const joystickPad = document.getElementById('joystickPad');
+        const joystickKnob = document.getElementById('joystickKnob');
+        const touchReloadBtn = document.getElementById('touchReloadBtn');
+        const touchFireBtn = document.getElementById('touchFireBtn');
+        const overlayModal = document.getElementById('overlayModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalDesc = document.getElementById('modalDesc');
+        const resultStats = document.getElementById('resultStats');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalKillsEl = document.getElementById('finalKills');
+        const finalWaveEl = document.getElementById('finalWave');
+        const startBtn = document.getElementById('startBtn');
+        const ammoContainer = document.getElementById('ammoContainer');
+        const reloadNotice = document.getElementById('reloadNotice');
+        const reloadBtn = document.getElementById('reloadBtn');
+
+        let PIXEL_W = 320;
+        let PIXEL_H = 180;
+
+        function resizePixelCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const w = Math.max(240, Math.floor(rect.width || 640));
+            const h = Math.max(150, Math.floor(rect.height || 360));
+            const ratio = w / h;
+            PIXEL_H = 192;
+            PIXEL_W = Math.max(256, Math.min(420, Math.round(PIXEL_H * ratio)));
+            canvas.width = PIXEL_W;
+            canvas.height = PIXEL_H;
+            ctx.imageSmoothingEnabled = false;
         }
 
-        // --- 검 데이터베이스 (0강 ~ 15강) ---
-        const swordData = [
-            { level: 0, name: "녹슨 단검", cost: 100, rate: 100, destroyRate: 0, sellValue: 100, color: "#94a3b8", svg: `<path d="M12 2L15 12L12 22L9 12Z" fill="#94a3b8" stroke="#64748b" stroke-width="2"/>` },
-            { level: 1, name: "철제 수련검", cost: 200, rate: 95, destroyRate: 0, sellValue: 350, color: "#cbd5e1", svg: `<path d="M12 2L16 14L12 22L8 14Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>` },
-            { level: 2, name: "강철 장검", cost: 400, rate: 90, destroyRate: 0, sellValue: 1000, color: "#38bdf8", svg: `<path d="M12 2L16 15L12 23L8 15Z" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>` },
-            { level: 3, name: "은빛 기사검", cost: 800, rate: 85, destroyRate: 0, sellValue: 2600, color: "#e2e8f0", svg: `<path d="M12 2L17 15L12 24L7 15Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>` },
-            { level: 4, name: "화염 봉인검", cost: 1500, rate: 75, destroyRate: 5, sellValue: 6500, color: "#f97316", svg: `<path d="M12 2L17 16L12 24L7 16Z" fill="#f97316" stroke="#c2410c" stroke-width="2"/>` },
-            { level: 5, name: "빙결 수호검", cost: 3000, rate: 65, destroyRate: 10, sellValue: 16000, color: "#06b6d4", svg: `<path d="M12 2L18 16L12 25L6 16Z" fill="#06b6d4" stroke="#0891b2" stroke-width="2"/>` },
-            { level: 6, name: "번개 마도검", cost: 5500, rate: 55, destroyRate: 15, sellValue: 38000, color: "#eab308", svg: `<path d="M12 2L18 17L12 25L6 17Z" fill="#eab308" stroke="#ca8a04" stroke-width="2"/>` },
-            { level: 7, name: "암흑 처단검", cost: 10000, rate: 45, destroyRate: 20, sellValue: 90000, color: "#a855f7", svg: `<path d="M12 2L19 17L12 26L5 17Z" fill="#a855f7" stroke="#7e22ce" stroke-width="2"/>` },
-            { level: 8, name: "광휘의 용검", cost: 20000, rate: 38, destroyRate: 25, sellValue: 220000, color: "#facc15", svg: `<path d="M12 2L19 18L12 27L5 18Z" fill="#facc15" stroke="#a16207" stroke-width="2"/>` },
-            { level: 9, name: "성검 엑스칼리버", cost: 40000, rate: 30, destroyRate: 30, sellValue: 550000, color: "#38bdf8", svg: `<path d="M12 2L20 18L12 28L4 18Z" fill="#38bdf8" stroke="#1d4ed8" stroke-width="2"/>` },
-            { level: 10, name: "마검 레바테인", cost: 80000, rate: 25, destroyRate: 35, sellValue: 1300000, color: "#ef4444", svg: `<path d="M12 2L20 19L12 28L4 19Z" fill="#ef4444" stroke="#b91c1c" stroke-width="2"/>` },
-            { level: 11, name: "차원의 파멸검", cost: 150000, rate: 20, destroyRate: 40, sellValue: 3000000, color: "#ec4899", svg: `<path d="M12 2L21 19L12 29L3 19Z" fill="#ec4899" stroke="#be185d" stroke-width="2"/>` },
-            { level: 12, name: "신살의 심판검", cost: 300000, rate: 15, destroyRate: 45, sellValue: 7000000, color: "#6366f1", svg: `<path d="M12 2L21 20L12 29L3 20Z" fill="#6366f1" stroke="#4338ca" stroke-width="2"/>` },
-            { level: 13, name: "우주 창조검", cost: 600000, rate: 10, destroyRate: 50, sellValue: 16000000, color: "#14b8a6", svg: `<path d="M12 2L22 20L12 30L2 20Z" fill="#14b8a6" stroke="#0f766e" stroke-width="2"/>` },
-            { level: 14, name: "태초의 에테르검", cost: 1200000, rate: 5, destroyRate: 50, sellValue: 40000000, color: "#f43f5e", svg: `<path d="M12 2L22 21L12 30L2 21Z" fill="#f43f5e" stroke="#be123c" stroke-width="2"/>` },
-            { level: 15, name: "★ 절대신 신화의 검", cost: 0, rate: 0, destroyRate: 0, sellValue: 100000000, color: "#fbbf24", svg: `<path d="M12 2L23 21L12 31L1 21Z" fill="#fbbf24" stroke="#b45309" stroke-width="2"/>` }
+        const ARENA_RADIUS = 28;
+        const MAX_AMMO = 8;
+
+        let isPlaying = false;
+        let soundEnabled = true;
+        let hp = 100;
+        let score = 0;
+        let kills = 0;
+        let wave = 1;
+        let bestScore = parseInt(localStorage.getItem('pixel_fps_best') || '0', 10) || 0;
+        bestScoreDisplay.textContent = bestScore.toLocaleString();
+
+        let ammo = MAX_AMMO;
+        let isReloading = false;
+        let spawnTimer = 1.0;
+        let muzzleFlashTimer = 0;
+        let recoilOffset = 0;
+        let screenShake = 0;
+        let lastTime = 0;
+
+        const player = {
+            x: 0,
+            z: 22,
+            angle: 0,
+            moveSpeed: 7.2,
+            bobTimer: 0
+        };
+
+        const keys = {};
+        const joyVector = { x: 0, y: 0 };
+
+        let enemies = [];
+        let particles = [];
+        let shotTracers = [];
+        let hitIndicators = [];
+
+        // ==========================================
+        // 2. 복잡한 구역형 픽셀 맵 장애물 배치
+        // ==========================================
+        const pillars = [
+            // 중앙 코어 & 십자 회랑
+            { x: 0, z: 0, r: 2.1, kind: 'core' },
+            { x: -7.5, z: 0, r: 1.4, kind: 'pillar' },
+            { x: 7.5, z: 0, r: 1.4, kind: 'pillar' },
+            { x: 0, z: -7.5, r: 1.4, kind: 'pillar' },
+            { x: 0, z: 7.5, r: 1.4, kind: 'pillar' },
+
+            // 북서 네온 회랑 블록
+            { x: -13, z: -13, r: 1.8, kind: 'block' },
+            { x: -18, z: -8, r: 1.4, kind: 'pillar' },
+            { x: -8, z: -18, r: 1.4, kind: 'pillar' },
+            { x: -14, z: -4, r: 1.2, kind: 'block' },
+
+            // 북동 앰버 벙커 블록
+            { x: 13, z: -13, r: 1.8, kind: 'block' },
+            { x: 18, z: -8, r: 1.4, kind: 'pillar' },
+            { x: 8, z: -18, r: 1.4, kind: 'pillar' },
+            { x: 14, z: -4, r: 1.2, kind: 'block' },
+
+            // 남부 에메랄드 미로 통로
+            { x: -11, z: 13, r: 1.6, kind: 'block' },
+            { x: 11, z: 13, r: 1.6, kind: 'block' },
+            { x: -5.5, z: 17, r: 1.3, kind: 'pillar' },
+            { x: 5.5, z: 17, r: 1.3, kind: 'pillar' },
+            { x: 0, z: 13.5, r: 1.2, kind: 'block' },
+
+            // 외곽 순환 엄폐물
+            { x: -21, z: 3, r: 1.35, kind: 'pillar' },
+            { x: 21, z: 3, r: 1.35, kind: 'pillar' },
+            { x: -17, z: 19, r: 1.4, kind: 'block' },
+            { x: 17, z: 19, r: 1.4, kind: 'block' }
         ];
 
-        // --- 게임 변수 ---
-        let gold = 1000;
-        let swordLevel = 0;
-        let highScore = 0;
-        let attempts = 0;
-        let successes = 0;
-
-        let items = {
-            luck: 0,
-            protect: 0
-        };
-
-        let activeBuffs = {
-            luck: false,
-            protect: false
-        };
-
-        // --- 사운드 효과 (Tone.js) ---
+        // ==========================================
+        // 3. 레트로 합성 효과음 (Tone.js)
+        // ==========================================
         let synth = null;
-        let polySynth = null;
-        let bgmLoop = null;
-        let isBgmPlaying = false;
+        let noiseSynth = null;
 
-        function initAudio() {
-            if (!synth) {
-                synth = new Tone.Synth().toDestination();
-                polySynth = new Tone.PolySynth().toDestination();
-            }
-        }
-
-        function toggleBGM() {
-            initAudio();
-            Tone.start();
-
-            const bgmIcon = document.getElementById('bgmIcon');
-            const bgmText = document.getElementById('bgmText');
-
-            if (!isBgmPlaying) {
-                // BGM 생성
-                if (!bgmLoop) {
-                    const notes = ["C3", "E3", "G3", "B3", "C4", "G3", "E3", "G3"];
-                    let index = 0;
-                    bgmLoop = new Tone.Loop(time => {
-                        polySynth.triggerAttackRelease(notes[index % notes.length], "8n", time, 0.15);
-                        index++;
-                    }, "4n");
-                }
-                Tone.Transport.start();
-                bgmLoop.start(0);
-                isBgmPlaying = true;
-                bgmIcon.className = "fa-solid fa-volume-high text-emerald-400";
-                bgmText.innerText = "BGM ON";
-            } else {
-                Tone.Transport.stop();
-                if (bgmLoop) bgmLoop.stop();
-                isBgmPlaying = false;
-                bgmIcon.className = "fa-solid fa-volume-xmark text-rose-400";
-                bgmText.innerText = "BGM OFF";
-            }
-        }
-
-        function playSound(type) {
-            initAudio();
+        function ensureAudio() {
+            if (!soundEnabled || typeof Tone === 'undefined') return false;
             try {
-                Tone.start();
-                if (type === 'click') {
-                    synth.triggerAttackRelease("C5", "8n");
-                } else if (type === 'success') {
-                    polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n");
-                } else if (type === 'jackpot') {
-                    polySynth.triggerAttackRelease(["C4", "G4", "C5", "E5", "G5", "C6"], "4n");
-                } else if (type === 'fail') {
-                    polySynth.triggerAttackRelease(["A3", "F3"], "8n");
-                } else if (type === 'destroy') {
-                    synth.triggerAttackRelease("C2", "4n");
+                if (Tone.context && Tone.context.state !== 'running' && typeof Tone.start === 'function') {
+                    const p = Tone.start();
+                    if (p && typeof p.catch === 'function') {
+                        p.catch(() => {});
+                    }
                 }
-            } catch(e) {}
+                if (!synth) {
+                    synth = new Tone.Synth({
+                        oscillator: { type: 'square' },
+                        envelope: { attack: 0.004, decay: 0.08, sustain: 0.05, release: 0.12 },
+                        volume: -12
+                    }).toDestination();
+                }
+                if (!noiseSynth) {
+                    noiseSynth = new Tone.NoiseSynth({
+                        noise: { type: 'white' },
+                        envelope: { attack: 0.002, decay: 0.07, sustain: 0 },
+                        volume: -14
+                    }).toDestination();
+                }
+                return true;
+            } catch (err) {
+                return false;
+            }
         }
 
-        // --- 초기화 ---
-        window.addEventListener('DOMContentLoaded', () => {
-            updateUI();
+        function playShotEffectSound() {
+            if (!ensureAudio()) return;
+            try {
+                noiseSynth.triggerAttackRelease('32n');
+                synth.triggerAttackRelease('G4', '32n');
+            } catch (e) {}
+        }
+
+        function playHitSound(isKill) {
+            if (!ensureAudio()) return;
+            try {
+                if (isKill) {
+                    synth.triggerAttackRelease('A5', '32n');
+                    setTimeout(() => {
+                        if (soundEnabled && synth) synth.triggerAttackRelease('E6', '16n');
+                    }, 55);
+                } else {
+                    synth.triggerAttackRelease('C5', '32n');
+                }
+            } catch (e) {}
+        }
+
+        function playHurtSound() {
+            if (!ensureAudio()) return;
+            try {
+                synth.triggerAttackRelease('G2', '16n');
+            } catch (e) {}
+        }
+
+        function playReloadSound() {
+            if (!ensureAudio()) return;
+            try {
+                synth.triggerAttackRelease('D4', '32n');
+                setTimeout(() => {
+                    if (soundEnabled && synth) synth.triggerAttackRelease('A4', '32n');
+                }, 110);
+            } catch (e) {}
+        }
+
+        function playExplosionSound() {
+            if (!ensureAudio()) return;
+            try {
+                noiseSynth.triggerAttackRelease('8n');
+                synth.triggerAttackRelease('C2', '8n');
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // 4. 7종 픽셀 몬스터 정의 및 스폰
+        // ==========================================
+        const MONSTER_TYPES = {
+            slime: {
+                name: 'SLIME',
+                hp: 34,
+                speed: 3.3,
+                damage: 10,
+                score: 100,
+                radius: 0.65,
+                scale: 0.95,
+                mainColor: '#22c55e',
+                subColor: '#86efac',
+                eyeColor: '#fef08a'
+            },
+            scout: {
+                name: 'SCOUT',
+                hp: 24,
+                speed: 5.8,
+                damage: 8,
+                score: 140,
+                radius: 0.55,
+                scale: 0.9,
+                mainColor: '#06b6d4',
+                subColor: '#67e8f9',
+                eyeColor: '#fb7185'
+            },
+            ogre: {
+                name: 'OGRE',
+                hp: 95,
+                speed: 2.0,
+                damage: 20,
+                score: 280,
+                radius: 1.05,
+                scale: 1.35,
+                mainColor: '#e11d48',
+                subColor: '#9f1239',
+                eyeColor: '#fde047'
+            },
+            specter: {
+                name: 'SPECTER',
+                hp: 44,
+                speed: 2.9,
+                damage: 13,
+                score: 200,
+                radius: 0.68,
+                scale: 1.05,
+                mainColor: '#a855f7',
+                subColor: '#e879f9',
+                eyeColor: '#67e8f9'
+            },
+            bomber: {
+                name: 'BOMBER',
+                hp: 28,
+                speed: 4.5,
+                damage: 24,
+                score: 180,
+                radius: 0.68,
+                scale: 1.0,
+                mainColor: '#f97316',
+                subColor: '#fdba74',
+                eyeColor: '#ffffff'
+            },
+            wisp: {
+                name: 'WISP',
+                hp: 30,
+                speed: 4.8,
+                damage: 11,
+                score: 170,
+                radius: 0.58,
+                scale: 0.95,
+                mainColor: '#eab308',
+                subColor: '#fef08a',
+                eyeColor: '#0f172a'
+            },
+            crab: {
+                name: 'CRAB',
+                hp: 62,
+                speed: 3.1,
+                damage: 16,
+                score: 220,
+                radius: 0.85,
+                scale: 1.15,
+                mainColor: '#ec4899',
+                subColor: '#fbcfe8',
+                eyeColor: '#fef08a'
+            }
+        };
+
+        function chooseMonsterType() {
+            const r = Math.random();
+            if (wave === 1) {
+                if (r < 0.28) return 'slime';
+                if (r < 0.48) return 'scout';
+                if (r < 0.66) return 'wisp';
+                if (r < 0.84) return 'bomber';
+                return 'crab';
+            }
+            if (r < 0.17) return 'slime';
+            if (r < 0.33) return 'scout';
+            if (r < 0.48) return 'ogre';
+            if (r < 0.63) return 'specter';
+            if (r < 0.76) return 'bomber';
+            if (r < 0.88) return 'wisp';
+            return 'crab';
+        }
+
+        function spawnEnemy(forcedType = null) {
+            const type = forcedType || chooseMonsterType();
+            const cfg = MONSTER_TYPES[type];
+
+            let ex = 0, ez = 0;
+            for (let i = 0; i < 14; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const dist = 10 + Math.random() * 14;
+                ex = Math.max(-ARENA_RADIUS + 2.5, Math.min(ARENA_RADIUS - 2.5, Math.cos(ang) * dist));
+                ez = Math.max(-ARENA_RADIUS + 2.5, Math.min(ARENA_RADIUS - 2.5, Math.sin(ang) * dist));
+                if (Math.hypot(ex - player.x, ez - player.z) > 7.5) break;
+            }
+
+            enemies.push({
+                type,
+                name: cfg.name,
+                x: ex,
+                z: ez,
+                hp: cfg.hp + (wave - 1) * 8,
+                maxHp: cfg.hp + (wave - 1) * 8,
+                speed: cfg.speed + (wave - 1) * 0.2,
+                damage: cfg.damage,
+                score: cfg.score,
+                radius: cfg.radius,
+                scale: cfg.scale,
+                mainColor: cfg.mainColor,
+                subColor: cfg.subColor,
+                eyeColor: cfg.eyeColor,
+                phase: Math.random() * Math.PI * 2,
+                attackCd: 0,
+                warpCd: 2.6 + Math.random() * 1.4,
+                hitFlash: 0
+            });
+        }
+
+        // ==========================================
+        // 5. 픽셀 이펙트(총구 섬광, 탄환 궤적, 폭발 파편)
+        // ==========================================
+        function spawnPixelBurst(x, y, colors, count = 14, speedScale = 1) {
+            for (let i = 0; i < count; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const spd = (25 + Math.random() * 75) * speedScale;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd - 15,
+                    size: Math.random() < 0.45 ? 4 : 3,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    life: 0.25 + Math.random() * 0.28,
+                    maxLife: 0.53
+                });
+            }
+        }
+
+        function triggerBomberBlast(originX, originZ) {
+            playExplosionSound();
+            screenShake = Math.max(screenShake, 7);
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const d = Math.hypot(e.x - originX, e.z - originZ);
+                if (d <= 5.2) {
+                    e.hp -= 45;
+                    e.hitFlash = 0.14;
+                    if (e.hp <= 0) {
+                        kills++;
+                        score += e.score;
+                        enemies.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 6. 충돌, HUD, 사격, 재장전
+        // ==========================================
+        let feedbackTimer = null;
+        function showFeedback(text, colorClass = 'text-amber-300') {
+            hitFeedback.textContent = text;
+            hitFeedback.className = `font-pixel absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] sm:text-xs ${colorClass} drop-shadow-[0_2px_0_rgba(0,0,0,1)] pointer-events-none opacity-100 transition-opacity duration-150 z-15`;
+            if (feedbackTimer) clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(() => {
+                hitFeedback.classList.remove('opacity-100');
+                hitFeedback.classList.add('opacity-0');
+            }, 450);
+        }
+
+        function renderAmmo() {
+            ammoContainer.innerHTML = '';
+            for (let i = 0; i < MAX_AMMO; i++) {
+                const el = document.createElement('div');
+                el.className = i < ammo
+                    ? 'w-2 sm:w-2.5 h-full bg-amber-400 border border-amber-200'
+                    : 'w-2 sm:w-2.5 h-full bg-slate-800 border border-slate-700';
+                ammoContainer.appendChild(el);
+            }
+            reloadNotice.classList.toggle('hidden', ammo > 0 || isReloading);
+        }
+
+        function updateHUD() {
+            const clamped = Math.max(0, Math.min(100, Math.round(hp)));
+            hpText.textContent = clamped;
+            hpBar.style.width = `${clamped}%`;
+            scoreDisplay.textContent = score.toLocaleString();
+            killsDisplay.textContent = kills.toLocaleString();
+            waveDisplay.textContent = wave;
+            if (score > bestScore) {
+                bestScore = score;
+                bestScoreDisplay.textContent = bestScore.toLocaleString();
+            }
+        }
+
+        function resolveWorldCollision(pos, radius) {
+            const limit = ARENA_RADIUS - radius;
+            pos.x = Math.max(-limit, Math.min(limit, pos.x));
+            pos.z = Math.max(-limit, Math.min(limit, pos.z));
+
+            for (let i = 0; i < pillars.length; i++) {
+                const p = pillars[i];
+                const dx = pos.x - p.x;
+                const dz = pos.z - p.z;
+                const dist = Math.hypot(dx, dz);
+                const minDist = p.r + radius;
+                if (dist < minDist) {
+                    if (dist > 0.0001) {
+                        const push = (minDist - dist) / dist;
+                        pos.x += dx * push;
+                        pos.z += dz * push;
+                    } else {
+                        pos.x += minDist;
+                    }
+                }
+            }
+        }
+
+        function damagePlayer(dmg, sourceX = null, sourceZ = null) {
+            if (!isPlaying) return;
+            hp = Math.max(0, hp - dmg);
+            screenShake = Math.max(screenShake, 5);
+
+            // 공격한 적의 월드 좌표를 플레이어 시선 기준 상대 각도로 변환
+            if (sourceX !== null && sourceZ !== null) {
+                const dx = sourceX - player.x;
+                const dz = sourceZ - player.z;
+                // worldYaw: 0 = -Z(북쪽), +시계방향 (atan2(dx, -dz))
+                const worldAngleToAttacker = Math.atan2(dx, -dz);
+                const relativeAngle = worldAngleToAttacker - player.angle;
+                hitIndicators.push({
+                    angle: relativeAngle,
+                    life: 0.75,
+                    maxLife: 0.75
+                });
+            }
+
+            updateHUD();
+            playHurtSound();
+
+            damageOverlay.classList.remove('hurt-flash');
+            void damageOverlay.offsetWidth;
+            damageOverlay.classList.add('hurt-flash');
+
+            if (hp <= 0) {
+                endGame();
+            }
+        }
+
+        function reloadWeapon() {
+            if (!isPlaying || isReloading || ammo === MAX_AMMO) return;
+            isReloading = true;
+            reloadNotice.textContent = 'RELOADING...';
+            reloadNotice.classList.remove('hidden');
+            playReloadSound();
+
+            setTimeout(() => {
+                ammo = MAX_AMMO;
+                isReloading = false;
+                renderAmmo();
+            }, 600);
+        }
+
+        function shootWeapon() {
+            if (!isPlaying || isReloading) return;
+            if (ammo <= 0) {
+                reloadWeapon();
+                return;
+            }
+
+            ammo--;
+            renderAmmo();
+            playShotEffectSound();
+
+            // 강력한 사격 시각 효과: 총구 섬광, 반동, 화면 흔들림, 중앙 탄환/레이저 스파크
+            muzzleFlashTimer = 0.075;
+            recoilOffset = 10;
+            screenShake = Math.max(screenShake, 3.2);
+
+            const centerX = Math.floor(PIXEL_W / 2);
+            const centerY = Math.floor(PIXEL_H / 2);
+
+            shotTracers.push({
+                x1: Math.floor(PIXEL_W * 0.66),
+                y1: Math.floor(PIXEL_H * 0.72),
+                x2: centerX,
+                y2: centerY,
+                life: 0.08
+            });
+            spawnPixelBurst(centerX, centerY, ['#fef08a', '#38bdf8', '#fb7185'], 6, 0.55);
+
+            // 시선 방향(player.angle) 레이캐스트 판정
+            const dirX = Math.sin(player.angle);
+            const dirZ = -Math.cos(player.angle);
+
+            let bestEnemy = null;
+            let bestDist = Infinity;
+            let bestLateral = Infinity;
+
+            for (let i = 0; i < enemies.length; i++) {
+                const e = enemies[i];
+                const relX = e.x - player.x;
+                const relZ = e.z - player.z;
+                const forwardProj = relX * dirX + relZ * dirZ;
+                if (forwardProj <= 0.4) continue;
+
+                // 시선 직선으로부터의 수평 거리
+                const perpX = relX - dirX * forwardProj;
+                const perpZ = relZ - dirZ * forwardProj;
+                const lateralDist = Math.hypot(perpX, perpZ);
+
+                const hitRadius = e.radius * 0.92;
+                if (lateralDist <= hitRadius && forwardProj < bestDist) {
+                    bestDist = forwardProj;
+                    bestEnemy = e;
+                    bestLateral = lateralDist;
+                }
+            }
+
+            if (bestEnemy) {
+                const isCritical = bestLateral <= bestEnemy.radius * 0.36;
+                const dmg = isCritical ? 36 : 22;
+                bestEnemy.hp -= dmg;
+                bestEnemy.hitFlash = 0.12;
+
+                spawnPixelBurst(
+                    centerX,
+                    centerY,
+                    [bestEnemy.mainColor, bestEnemy.subColor, '#ffffff'],
+                    isCritical ? 16 : 10,
+                    0.85
+                );
+
+                if (bestEnemy.hp <= 0) {
+                    const idx = enemies.indexOf(bestEnemy);
+                    if (idx !== -1) enemies.splice(idx, 1);
+
+                    kills++;
+                    const pts = bestEnemy.score + (isCritical ? 30 : 0);
+                    score += pts;
+
+                    spawnPixelBurst(
+                        centerX,
+                        centerY,
+                        [bestEnemy.mainColor, bestEnemy.subColor, '#fde047'],
+                        22,
+                        1.25
+                    );
+
+                    if (bestEnemy.type === 'bomber') {
+                        triggerBomberBlast(bestEnemy.x, bestEnemy.z);
+                    }
+
+                    if (kills % 5 === 0) {
+                        wave++;
+                        hp = Math.min(100, hp + 15);
+                        showFeedback(`WAVE ${wave} & HP +15!`, 'text-emerald-300');
+                    } else {
+                        showFeedback(
+                            isCritical ? `CRIT KILL! +${pts}` : `${bestEnemy.name} KILL! +${pts}`,
+                            'text-amber-300'
+                        );
+                    }
+                    playHitSound(true);
+                } else {
+                    showFeedback(isCritical ? `CRIT -${dmg}` : `HIT -${dmg}`, 'text-sky-300');
+                    playHitSound(false);
+                }
+                updateHUD();
+            }
+        }
+
+        // ==========================================
+        // 7. 1인칭 픽셀 씬 렌더링
+        // ==========================================
+        function drawPixelRect(x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.floor(x), Math.floor(y), Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h)));
+        }
+
+        function drawPixelScene() {
+            ctx.save();
+
+            const shakeX = screenShake > 0 ? (Math.random() - 0.5) * screenShake * 2 : 0;
+            const shakeY = screenShake > 0 ? (Math.random() - 0.5) * screenShake * 2 : 0;
+            const bobY = Math.sin(player.bobTimer) * 2.5;
+            const horizonY = Math.floor(PIXEL_H * 0.48 + bobY);
+
+            ctx.translate(Math.floor(shakeX), Math.floor(shakeY));
+
+            // 픽셀 하늘 & 별빛/격자
+            drawPixelRect(0, 0, PIXEL_W, horizonY, '#050814');
+            drawPixelRect(0, Math.floor(horizonY * 0.35), PIXEL_W, 2, '#1e1b4b');
+            for (let s = 0; s < 14; s++) {
+                const sx = ((s * 47 + Math.floor(player.angle * 35)) % PIXEL_W + PIXEL_W) % PIXEL_W;
+                const sy = (s * 19) % Math.max(12, horizonY - 8);
+                drawPixelRect(sx, sy, 2, 2, s % 2 === 0 ? '#94a3b8' : '#38bdf8');
+            }
+
+            // 픽셀 바닥 + 구역 테마 컬러 & 타일 라인
+            let floorBase = '#0f172a';
+            let tilePrimary = '#1e293b';
+            let tileSecondary = '#162033';
+
+            if (player.x < -3 && player.z < -3) {
+                floorBase = '#091826';
+                tilePrimary = '#0ea5e9';
+                tileSecondary = '#0c2d48';
+            } else if (player.x > 3 && player.z < -3) {
+                floorBase = '#1c1309';
+                tilePrimary = '#d97706';
+                tileSecondary = '#2d1e0d';
+            } else if (player.z > 6) {
+                floorBase = '#081d18';
+                tilePrimary = '#10b981';
+                tileSecondary = '#0b2e26';
+            }
+
+            drawPixelRect(0, horizonY, PIXEL_W, PIXEL_H - horizonY + 12, floorBase);
+            for (let row = 0; row < 12; row++) {
+                const t = (row + 1) / 12;
+                const y = Math.floor(horizonY + Math.pow(t, 1.55) * (PIXEL_H - horizonY + 10));
+                const stripeColor = row % 2 === 0 ? tilePrimary : tileSecondary;
+                drawPixelRect(0, y, PIXEL_W, 2, stripeColor);
+            }
+
+            const dirX = Math.sin(player.angle);
+            const dirZ = -Math.cos(player.angle);
+            const rightX = Math.cos(player.angle);
+            const rightZ = Math.sin(player.angle);
+
+            const wallSegs = 56;
+            const renderables = [];
+
+            for (let i = 0; i < wallSegs; i++) {
+                const a1 = (i / wallSegs) * Math.PI * 2;
+                const a2 = ((i + 1) / wallSegs) * Math.PI * 2;
+                const midA = (a1 + a2) * 0.5;
+                const wx = Math.cos(midA) * ARENA_RADIUS;
+                const wz = Math.sin(midA) * ARENA_RADIUS;
+
+                const rx = wx - player.x;
+                const rz = wz - player.z;
+                const forward = rx * dirX + rz * dirZ;
+                if (forward <= 0.3) continue;
+
+                const side = rx * rightX + rz * rightZ;
+                const screenX = Math.floor(PIXEL_W * 0.5 + (side / forward) * (PIXEL_W * 0.72));
+                const segW = Math.max(4, Math.floor((4.2 / forward) * (PIXEL_W * 0.72)));
+                const wallH = Math.min(PIXEL_H * 1.4, Math.floor((6.5 / forward) * (PIXEL_H * 0.52)));
+
+                renderables.push({
+                    kind: 'wall',
+                    dist: forward,
+                    screenX,
+                    yTop: horizonY - Math.floor(wallH * 0.58) + bobY,
+                    w: segW,
+                    h: wallH,
+                    tone: i % 2 === 0 ? '#334155' : '#263349'
+                });
+            }
+
+            for (let i = 0; i < pillars.length; i++) {
+                const p = pillars[i];
+                const rx = p.x - player.x;
+                const rz = p.z - player.z;
+                const forward = rx * dirX + rz * dirZ;
+                if (forward <= 0.4) continue;
+
+                const side = rx * rightX + rz * rightZ;
+                const screenX = Math.floor(PIXEL_W * 0.5 + (side / forward) * (PIXEL_W * 0.72));
+                const pW = Math.max(6, Math.floor((p.r * 2.1 / forward) * (PIXEL_W * 0.72)));
+                const pH = Math.min(PIXEL_H * 1.3, Math.floor((5.8 / forward) * (PIXEL_H * 0.52)));
+
+                renderables.push({
+                    kind: p.kind || 'pillar',
+                    dist: forward,
+                    screenX,
+                    yTop: horizonY - Math.floor(pH * 0.56) + bobY,
+                    w: pW,
+                    h: pH
+                });
+            }
+
+            for (let i = 0; i < enemies.length; i++) {
+                const e = enemies[i];
+                const rx = e.x - player.x;
+                const rz = e.z - player.z;
+                const forward = rx * dirX + rz * dirZ;
+                if (forward <= 0.35) continue;
+
+                const side = rx * rightX + rz * rightZ;
+                const screenX = Math.floor(PIXEL_W * 0.5 + (side / forward) * (PIXEL_W * 0.72));
+                const mW = Math.max(8, Math.floor((e.radius * 2.2 * e.scale / forward) * (PIXEL_W * 0.72)));
+                const mH = Math.max(10, Math.floor((3.6 * e.scale / forward) * (PIXEL_H * 0.52)));
+                const floatOffset = e.type === 'wisp' || e.type === 'specter'
+                    ? Math.sin(e.phase * 1.5) * Math.max(1, mH * 0.08)
+                    : 0;
+
+                renderables.push({
+                    kind: 'enemy',
+                    enemy: e,
+                    dist: forward,
+                    screenX,
+                    yTop: horizonY - Math.floor(mH * 0.48) + bobY + floatOffset,
+                    w: mW,
+                    h: mH
+                });
+            }
+
+            renderables.sort((a, b) => b.dist - a.dist);
+
+            for (let i = 0; i < renderables.length; i++) {
+                const item = renderables[i];
+                if (item.kind === 'wall') {
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop, item.w, item.h, item.tone);
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop + Math.floor(item.h * 0.45), item.w, 2, '#0f172a');
+                    if (item.w >= 6) {
+                        drawPixelRect(item.screenX - item.w / 2, item.yTop - 3, Math.max(2, Math.floor(item.w * 0.55)), 3, '#475569');
+                    }
+                } else if (item.kind === 'pillar') {
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop, item.w, item.h, '#475569');
+                    drawPixelRect(item.screenX - item.w / 2 + 2, item.yTop + 2, Math.max(2, item.w - 4), item.h - 4, '#64748b');
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop, item.w, 3, '#94a3b8');
+                } else if (item.kind === 'block') {
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop, item.w, item.h, '#1e293b');
+                    drawPixelRect(item.screenX - item.w / 2 + 2, item.yTop + 2, Math.max(2, item.w - 4), item.h - 4, '#3b4d6b');
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop + Math.floor(item.h * 0.72), item.w, 3, '#f59e0b');
+                } else if (item.kind === 'core') {
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop, item.w, item.h, '#312e81');
+                    drawPixelRect(item.screenX - item.w / 2 + 2, item.yTop + 2, Math.max(2, item.w - 4), item.h - 4, '#4f46e5');
+                    drawPixelRect(item.screenX - item.w / 2, item.yTop + Math.floor(item.h * 0.45), item.w, 3, '#38bdf8');
+                } else if (item.kind === 'enemy') {
+                    const e = item.enemy;
+                    const x0 = item.screenX - item.w / 2;
+                    const y0 = item.yTop;
+                    const bodyColor = e.hitFlash > 0 ? '#ffffff' : e.mainColor;
+                    const trimColor = e.hitFlash > 0 ? '#fef08a' : e.subColor;
+
+                    // 몬스터 종별 픽셀 실루엣 & 디테일
+                    if (e.type === 'wisp') {
+                        // 부유 정령: 다이아몬드 코어 + 아우라 꼬리
+                        drawPixelRect(x0 + item.w * 0.25, y0 + item.h * 0.14, item.w * 0.5, item.h * 0.5, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.14, y0 + item.h * 0.26, item.w * 0.72, item.h * 0.26, trimColor);
+                        drawPixelRect(x0 + item.w * 0.34, y0 + item.h * 0.66, item.w * 0.32, item.h * 0.22, bodyColor);
+                    } else if (e.type === 'crab') {
+                        // 갑각류 몬스터: 좌우 집게발 + 다리
+                        drawPixelRect(x0 + item.w * 0.16, y0 + item.h * 0.26, item.w * 0.68, item.h * 0.46, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.24, y0 + item.h * 0.14, item.w * 0.52, item.h * 0.14, trimColor);
+                        // 좌우 집게
+                        drawPixelRect(x0 - item.w * 0.08, y0 + item.h * 0.12, item.w * 0.22, item.h * 0.24, trimColor);
+                        drawPixelRect(x0 + item.w * 0.86, y0 + item.h * 0.12, item.w * 0.22, item.h * 0.24, trimColor);
+                        // 다리
+                        drawPixelRect(x0 + item.w * 0.14, y0 + item.h * 0.72, item.w * 0.14, item.h * 0.18, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.72, y0 + item.h * 0.72, item.w * 0.14, item.h * 0.18, bodyColor);
+                    } else if (e.type === 'specter') {
+                        // 스펙터: 후드 + 너울거리는 하단 촉수
+                        drawPixelRect(x0 + item.w * 0.14, y0 + item.h * 0.12, item.w * 0.72, item.h * 0.62, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.24, y0 + item.h * 0.04, item.w * 0.52, item.h * 0.14, trimColor);
+                        drawPixelRect(x0 + item.w * 0.16, y0 + item.h * 0.74, item.w * 0.18, item.h * 0.16, trimColor);
+                        drawPixelRect(x0 + item.w * 0.42, y0 + item.h * 0.74, item.w * 0.16, item.h * 0.12, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.66, y0 + item.h * 0.74, item.w * 0.18, item.h * 0.16, trimColor);
+                    } else if (e.type === 'scout') {
+                        // 스카웃: 날렵한 롱이어/안테나 + 바이저
+                        drawPixelRect(x0 + item.w * 0.2, y0 + item.h * 0.22, item.w * 0.6, item.h * 0.66, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.22, y0 - item.h * 0.06, item.w * 0.12, item.h * 0.28, trimColor);
+                        drawPixelRect(x0 + item.w * 0.66, y0 - item.h * 0.06, item.w * 0.12, item.h * 0.28, trimColor);
+                    } else {
+                        // 슬라임 / 오우거 / 봄버 기본 블록
+                        drawPixelRect(x0 + item.w * 0.12, y0 + item.h * 0.18, item.w * 0.76, item.h * 0.72, bodyColor);
+                        drawPixelRect(x0 + item.w * 0.22, y0 + item.h * 0.05, item.w * 0.56, item.h * 0.16, trimColor);
+                    }
+
+                    if (e.type === 'ogre') {
+                        drawPixelRect(x0 + item.w * 0.08, y0 - item.h * 0.1, item.w * 0.18, item.h * 0.18, '#fde047');
+                        drawPixelRect(x0 + item.w * 0.74, y0 - item.h * 0.1, item.w * 0.18, item.h * 0.18, '#fde047');
+                        drawPixelRect(x0 + item.w * 0.26, y0 + item.h * 0.64, item.w * 0.48, item.h * 0.1, '#ffe4e6');
+                    } else if (e.type === 'bomber') {
+                        drawPixelRect(x0 + item.w * 0.45, y0 - item.h * 0.12, item.w * 0.1, item.h * 0.17, '#fef08a');
+                        drawPixelRect(x0 + item.w * 0.34, y0 + item.h * 0.62, item.w * 0.32, item.h * 0.1, '#fef08a');
+                    }
+
+                    // 픽셀 눈
+                    const eyeW = Math.max(2, item.w * 0.15);
+                    const eyeH = Math.max(2, item.h * 0.12);
+                    drawPixelRect(x0 + item.w * 0.25, y0 + item.h * 0.36, eyeW, eyeH, e.eyeColor);
+                    drawPixelRect(x0 + item.w * 0.60, y0 + item.h * 0.36, eyeW, eyeH, e.eyeColor);
+
+                    // 체력바(피격 시 표시)
+                    if (e.hp < e.maxHp && item.w >= 12) {
+                        const hpRatio = Math.max(0, e.hp / e.maxHp);
+                        drawPixelRect(x0, y0 - 6, item.w, 3, '#0f172a');
+                        drawPixelRect(x0, y0 - 6, item.w * hpRatio, 3, '#f43f5e');
+                    }
+                }
+            }
+
+            // 탄환 픽셀 궤적
+            for (let i = 0; i < shotTracers.length; i++) {
+                const tr = shotTracers[i];
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(tr.x1, tr.y1);
+                ctx.lineTo(tr.x2, tr.y2);
+                ctx.stroke();
+            }
+
+            // 픽셀 파편/폭발 파티클
+            for (let i = 0; i < particles.length; i++) {
+                const pt = particles[i];
+                drawPixelRect(pt.x, pt.y, pt.size, pt.size, pt.color);
+            }
+
+            // 1인칭 픽셀 블래스터 총기 & 총구 섬광
+            const gunX = Math.floor(PIXEL_W * 0.56);
+            const gunY = Math.floor(PIXEL_H * 0.66 + recoilOffset + Math.abs(bobY));
+            const gunW = Math.max(28, Math.floor(PIXEL_W * 0.16));
+            const gunH = Math.max(26, Math.floor(PIXEL_H * 0.26));
+
+            if (muzzleFlashTimer > 0) {
+                const fx = gunX + Math.floor(gunW * 0.15);
+                const fy = gunY - Math.floor(gunH * 0.45);
+                drawPixelRect(fx - 10, fy - 10, 20, 20, '#fef08a');
+                drawPixelRect(fx - 6, fy - 6, 12, 12, '#ffffff');
+                drawPixelRect(fx - 14, fy - 4, 28, 8, '#fb923c');
+            }
+
+            drawPixelRect(gunX, gunY, gunW, gunH, '#334155');
+            drawPixelRect(gunX + Math.floor(gunW * 0.12), gunY - Math.floor(gunH * 0.35), Math.floor(gunW * 0.35), Math.floor(gunH * 0.4), '#1e293b');
+            drawPixelRect(gunX + Math.floor(gunW * 0.2), gunY + Math.floor(gunH * 0.15), Math.floor(gunW * 0.6), 5, '#38bdf8');
+            drawPixelRect(gunX + Math.floor(gunW * 0.08), gunY + Math.floor(gunH * 0.55), Math.floor(gunW * 0.32), Math.floor(gunH * 0.45), '#0f172a');
+
+            // 화면 중앙 픽셀 크로스헤어 & 공격 방향 인디케이터
+            const cx = Math.floor(PIXEL_W / 2);
+            const cy = Math.floor(PIXEL_H / 2);
+
+            for (let i = 0; i < hitIndicators.length; i++) {
+                const ind = hitIndicators[i];
+                const alpha = Math.max(0, ind.life / ind.maxLife);
+                const radius = 28;
+                const ix = cx + Math.sin(ind.angle) * radius;
+                const iy = cy - Math.cos(ind.angle) * radius;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(Math.floor(ix), Math.floor(iy));
+                ctx.rotate(ind.angle);
+                drawPixelRect(-5, -3, 10, 4, '#f43f5e');
+                drawPixelRect(-3, -6, 6, 3, '#fda4af');
+                ctx.restore();
+            }
+
+            drawPixelRect(cx - 7, cy - 1, 5, 2, '#38bdf8');
+            drawPixelRect(cx + 3, cy - 1, 5, 2, '#38bdf8');
+            drawPixelRect(cx - 1, cy - 7, 2, 5, '#38bdf8');
+            drawPixelRect(cx - 1, cy + 3, 2, 5, '#38bdf8');
+            drawPixelRect(cx - 1, cy - 1, 2, 2, '#f43f5e');
+
+            ctx.restore();
+        }
+
+        // ==========================================
+        // 8. 게임 루프 및 상태 제어
+        // ==========================================
+        function updateSimulation(dt) {
+            if (muzzleFlashTimer > 0) muzzleFlashTimer = Math.max(0, muzzleFlashTimer - dt);
+            if (recoilOffset > 0) recoilOffset = Math.max(0, recoilOffset - dt * 65);
+            if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 24);
+
+            for (let i = hitIndicators.length - 1; i >= 0; i--) {
+                hitIndicators[i].life -= dt;
+                if (hitIndicators[i].life <= 0) hitIndicators.splice(i, 1);
+            }
+
+            for (let i = shotTracers.length - 1; i >= 0; i--) {
+                shotTracers[i].life -= dt;
+                if (shotTracers[i].life <= 0) shotTracers.splice(i, 1);
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i];
+                pt.x += pt.vx * dt;
+                pt.y += pt.vy * dt;
+                pt.vy += 150 * dt;
+                pt.life -= dt;
+                if (pt.life <= 0) particles.splice(i, 1);
+            }
+
+            // 1인칭 이동 처리
+            let moveFwd = 0;
+            let moveRight = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) moveFwd += 1;
+            if (keys['KeyS'] || keys['ArrowDown']) moveFwd -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveRight += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) moveRight -= 1;
+
+            moveFwd -= joyVector.y;
+            moveRight += joyVector.x;
+
+            const len = Math.hypot(moveFwd, moveRight);
+            if (len > 0) {
+                moveFwd /= Math.max(1, len);
+                moveRight /= Math.max(1, len);
+
+                const fwdX = Math.sin(player.angle);
+                const fwdZ = -Math.cos(player.angle);
+                const rgtX = Math.cos(player.angle);
+                const rgtZ = Math.sin(player.angle);
+
+                player.x += (fwdX * moveFwd + rgtX * moveRight) * player.moveSpeed * dt;
+                player.z += (fwdZ * moveFwd + rgtZ * moveRight) * player.moveSpeed * dt;
+                resolveWorldCollision(player, 0.6);
+                player.bobTimer += dt * 11;
+            } else {
+                player.bobTimer = 0;
+            }
+
+            // 몬스터 스폰 (넓어진 맵에 맞춰 최대 동시 등장 수 상향)
+            spawnTimer -= dt;
+            const maxEnemies = Math.min(16, 5 + wave * 2);
+            if (spawnTimer <= 0 && enemies.length < maxEnemies) {
+                spawnEnemy();
+                spawnTimer = Math.max(0.75, 2.0 - wave * 0.13);
+            }
+
+            // 몬스터 AI 및 공격
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                e.phase += dt * 6;
+                if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt);
+
+                const dx = player.x - e.x;
+                const dz = player.z - e.z;
+                const dist = Math.hypot(dx, dz);
+                const dirX = dist > 0.0001 ? dx / dist : 0;
+                const dirZ = dist > 0.0001 ? dz / dist : 0;
+
+                if (e.type === 'specter' && dist > 5.0) {
+                    e.warpCd -= dt;
+                    if (e.warpCd <= 0) {
+                        e.warpCd = 3.0;
+                        const step = Math.min(5.0, dist - 3.0);
+                        e.x += dirX * step;
+                        e.z += dirZ * step;
+                        resolveWorldCollision(e, e.radius);
+                        playHitSound(false);
+                    }
+                }
+
+                let vx = dirX;
+                let vz = dirZ;
+                if (e.type === 'scout' || e.type === 'wisp') {
+                    const perpX = -dirZ;
+                    const perpZ = dirX;
+                    const strafeAmp = e.type === 'wisp' ? 0.85 : 0.65;
+                    const strafe = Math.sin(e.phase * (e.type === 'wisp' ? 2.1 : 1.4)) * strafeAmp;
+                    vx += perpX * strafe;
+                    vz += perpZ * strafe;
+                }
+
+                const reach = e.type === 'bomber' ? 2.0 : 1.65;
+                if (dist > reach) {
+                    e.x += vx * e.speed * dt;
+                    e.z += vz * e.speed * dt;
+                    resolveWorldCollision(e, e.radius);
+                } else if (e.type === 'bomber') {
+                    damagePlayer(e.damage, e.x, e.z);
+                    showFeedback('BOMBER BLAST!', 'text-orange-400');
+                    spawnPixelBurst(PIXEL_W / 2, PIXEL_H / 2, ['#f97316', '#fef08a', '#ef4444'], 18, 1.1);
+                    enemies.splice(i, 1);
+                } else {
+                    e.attackCd -= dt;
+                    if (e.attackCd <= 0) {
+                        e.attackCd = e.type === 'ogre' ? 1.25 : 0.95;
+                        damagePlayer(e.damage, e.x, e.z);
+                    }
+                }
+            }
+        }
+
+        function gameLoop(now) {
+            if (!isPlaying) return;
+            const dt = Math.min(0.05, (now - lastTime) / 1000 || 0.016);
+            lastTime = now;
+
+            updateSimulation(dt);
+            drawPixelScene();
+
+            if (isPlaying) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startGame() {
+            resizePixelCanvas();
+
+            hp = 100;
+            score = 0;
+            kills = 0;
+            wave = 1;
+            ammo = MAX_AMMO;
+            isReloading = false;
+            spawnTimer = 1.1;
+            muzzleFlashTimer = 0;
+            recoilOffset = 0;
+            screenShake = 0;
+
+            player.x = 0;
+            player.z = 22;
+            player.angle = 0;
+            player.bobTimer = 0;
+
+            enemies = [];
+            particles = [];
+            shotTracers = [];
+            hitIndicators = [];
+
+            updateHUD();
+            renderAmmo();
+
+            overlayModal.classList.add('hidden');
+            resultStats.classList.add('hidden');
+            if (window.innerWidth < 640 || ('ontouchstart' in window)) {
+                touchControls.classList.remove('hidden');
+            }
+
+            isPlaying = true;
+            spawnEnemy('slime');
+            spawnEnemy('scout');
+            spawnEnemy('bomber');
+
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            isPlaying = false;
+            touchControls.classList.add('hidden');
+
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('pixel_fps_best', bestScore.toString());
+                bestScoreDisplay.textContent = bestScore.toLocaleString();
+            }
+
+            modalTitle.textContent = '전투 종료!';
+            modalDesc.textContent = '체력이 모두 소진되었습니다. 다시 도전해 보세요!';
+            finalScoreEl.textContent = score.toLocaleString();
+            finalKillsEl.textContent = kills.toLocaleString();
+            finalWaveEl.textContent = `WAVE ${wave}`;
+            resultStats.classList.remove('hidden');
+            resultStats.classList.add('grid');
+            startBtn.textContent = 'RETRY';
+            overlayModal.classList.remove('hidden');
+        }
+
+        // ==========================================
+        // 9. 입력 이벤트 바인딩
+        // ==========================================
+        startBtn.addEventListener('click', startGame);
+        reloadBtn.addEventListener('click', reloadWeapon);
+        touchReloadBtn.addEventListener('click', reloadWeapon);
+
+        touchFireBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            shootWeapon();
+        }, { passive: false });
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (!isPlaying) return;
+            if (e.code === 'KeyR') reloadWeapon();
+            if (e.code === 'Space') {
+                e.preventDefault();
+                shootWeapon();
+            }
         });
 
-        // UI 전체 동기화
-        function updateUI() {
-            const current = swordData[swordLevel];
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
 
-            const goldEl = document.getElementById('goldDisplay');
-            if (goldEl) goldEl.innerText = `${gold.toLocaleString()} G`;
+        // 마우스 드래그 시점 회전 & 좌클릭 사격
+        let isDragging = false;
+        let prevMouseX = 0;
 
-            const swordBadgeEl = document.getElementById('swordLevelBadge');
-            if (swordBadgeEl) swordBadgeEl.innerText = `+${swordLevel}`;
-
-            const swordNameEl = document.getElementById('swordName');
-            if (swordNameEl) {
-                swordNameEl.innerText = current.name;
-                swordNameEl.style.color = current.color;
+        canvas.addEventListener('mousedown', (e) => {
+            if (!isPlaying) return;
+            if (e.button === 0) {
+                isDragging = true;
+                prevMouseX = e.clientX;
+                shootWeapon();
             }
+        });
 
-            const rateDisplayEl = document.getElementById('rateDisplay');
-            if (rateDisplayEl) rateDisplayEl.innerText = `${current.rate}%`;
+        window.addEventListener('mousemove', (e) => {
+            if (!isPlaying || !isDragging) return;
+            const dx = e.clientX - prevMouseX;
+            prevMouseX = e.clientX;
+            player.angle += dx * 0.0085;
+        });
 
-            const destroyRateDisplayEl = document.getElementById('destroyRateDisplay');
-            if (destroyRateDisplayEl) destroyRateDisplayEl.innerText = `${current.destroyRate}%`;
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
 
-            const sellValueDisplayEl = document.getElementById('sellValueDisplay');
-            if (sellValueDisplayEl) sellValueDisplayEl.innerText = `${current.sellValue.toLocaleString()} G`;
+        // 모바일 터치 시점 회전
+        let lookTouchId = null;
+        let prevTouchX = 0;
 
-            const costDisplayEl = document.getElementById('costDisplay');
-            if (costDisplayEl) costDisplayEl.innerText = current.cost.toLocaleString();
-
-            const highScoreDisplayEl = document.getElementById('highScoreDisplay');
-            if (highScoreDisplayEl) highScoreDisplayEl.innerText = `+${highScore} 강`;
-
-            const statAttemptsEl = document.getElementById('statAttempts');
-            if (statAttemptsEl) statAttemptsEl.innerText = `${attempts}회`;
-
-            const statSuccessesEl = document.getElementById('statSuccesses');
-            if (statSuccessesEl) statSuccessesEl.innerText = `${successes}회`;
-
-            const luckCountEl = document.getElementById('luckCount');
-            if (luckCountEl) luckCountEl.innerText = items.luck;
-
-            const protectCountEl = document.getElementById('protectCount');
-            if (protectCountEl) protectCountEl.innerText = items.protect;
-
-            // 검 그래픽 업데이트
-            renderSwordGraphic(swordLevel);
-
-            // 배경 글로우 색상
-            const bgGlowEl = document.getElementById('bgGlow');
-            if (bgGlowEl) bgGlowEl.style.background = `radial-gradient(circle at center, ${current.color}22 0%, #020617 70%)`;
-        }
-
-        // 검 SVG 그래픽 렌더링
-        function renderSwordGraphic(level) {
-            const current = swordData[level];
-            const container = document.getElementById('swordGraphic');
-            
-            // 크기 및 세련된 검 SVG 생성
-            const scale = 1 + (level * 0.04);
-            
-            container.innerHTML = `
-                <svg width="120" height="180" viewBox="0 0 24 32" style="transform: scale(${scale}); filter: drop-shadow(0 0 12px ${current.color});" class="transition-all duration-300">
-                    <!-- 오라 라이트 -->
-                    <circle cx="12" cy="16" r="10" fill="${current.color}" opacity="0.15" />
-                    <!-- 칼날 -->
-                    ${current.svg}
-                    <!-- 손잡이 -->
-                    <rect x="11" y="22" width="2" height="7" fill="#475569" rx="1"/>
-                    <circle cx="12" cy="29" r="1.5" fill="${current.color}"/>
-                </svg>
-            `;
-            container.style.setProperty('--aura-color', current.color);
-        }
-
-        // --- 강화 메인 로직 ---
-        function enhanceSword(event) {
-            if (swordLevel >= 15) {
-                addLog("이미 최고 단계(★ 절대신 신화의 검)에 도달하셨습니다!", "text-amber-400");
-                return;
+        canvas.addEventListener('touchstart', (e) => {
+            if (!isPlaying) return;
+            const t = e.changedTouches[0];
+            if (lookTouchId === null) {
+                lookTouchId = t.identifier;
+                prevTouchX = t.clientX;
             }
+        }, { passive: true });
 
-            const current = swordData[swordLevel];
-            
-            // 골드 체크
-            if (gold < current.cost) {
-                playSound('fail');
-                addLog(`골드가 부족합니다! (필요: ${current.cost.toLocaleString()} G)`, "text-rose-400");
-                shakeElement(document.getElementById('goldDisplay').parentElement);
-                return;
-            }
-
-            // 차감
-            gold -= current.cost;
-            attempts++;
-
-            // 확률 계산 (버프 적용)
-            let successRate = current.rate;
-            if (items.luck > 0) {
-                successRate = Math.min(100, successRate + 10);
-                items.luck--;
-                addLog("[주문서 적용] 확률 증가 주문서를 사용했습니다 (+10%)", "text-emerald-300");
-            }
-
-            let protectUsed = false;
-            if (items.protect > 0 && current.destroyRate > 0) {
-                protectUsed = true;
-                items.protect--;
-            }
-
-            const roll = Math.random() * 100;
-            const clickX = event && event.clientX ? event.clientX : window.innerWidth / 2;
-            const clickY = event && event.clientY ? event.clientY : window.innerHeight / 2;
-
-            // 1. 강화 성공
-            if (roll < successRate) {
-                // 0.3% 확률 3단계 연쇄 초월 승급
-                const jackpotRoll = Math.random() * 100;
-                const isJackpot = jackpotRoll < 0.3;
-
-                if (isJackpot) {
-                    const prevLevel = swordLevel;
-                    swordLevel = Math.min(15, swordLevel + 3);
-                    successes++;
-                    playSound('jackpot');
-
-                    // 초월 연출
-                    triggerShockwave(clickX, clickY, "#facc15");
-                    createParticles(clickX, clickY, "#facc15", 50);
-                    
-                    const swordGraphic = document.getElementById('swordGraphic');
-                    swordGraphic.classList.remove('super-critical-anim');
-                    void swordGraphic.offsetWidth;
-                    swordGraphic.classList.add('super-critical-anim');
-
-                    const jackpotBadge = document.getElementById('jackpotBadge');
-                    jackpotBadge.classList.remove('hidden');
-                    setTimeout(() => jackpotBadge.classList.add('hidden'), 2500);
-
-                    addLog(`[★대기록★] 0.3% 확률의 초월 도약 발동!! +${prevLevel} ➔ +${swordLevel} ${swordData[swordLevel].name} 3단 승급!`, "text-amber-300 font-black bg-amber-500/20 p-2 rounded-lg border border-amber-400");
-                } else {
-                    swordLevel++;
-                    successes++;
-                    playSound('success');
-
-                    // 충격파 및 파티클 연출
-                    triggerShockwave(clickX, clickY, swordData[swordLevel].color);
-                    createParticles(clickX, clickY, swordData[swordLevel].color, 25);
-                    
-                    addLog(`[성공!] 강화 성공! +${swordLevel} ${swordData[swordLevel].name} 획득!`, "text-emerald-400 font-bold");
-                }
-
-                if (swordLevel > highScore) {
-                    highScore = swordLevel;
-                }
-            } 
-            // 2. 강화 실패
-            else {
-                const destroyRoll = Math.random() * 100;
-
-                // 2-1. 파괴
-                if (destroyRoll < current.destroyRate) {
-                    if (protectUsed) {
-                        playSound('fail');
-                        addLog(`[보호!] 강화 실패했으나 파괴 방지 주문서로 검을 지켰습니다! (+${swordLevel} 유지)`, "text-sky-300 font-bold");
-                    } else {
-                        playSound('destroy');
-                        addLog(`[파괴!] 강화 실패로 +${swordLevel} ${current.name} 이(가) 산산조각 났습니다...`, "text-rose-500 font-black");
-                        shakeElement(document.getElementById('mainDisplay'));
-                        swordLevel = 0; // 초기화
-                    }
-                } 
-                // 2-2. 단계 유지 또는 하락
-                else {
-                    playSound('fail');
-                    if (swordLevel > 0) {
-                        swordLevel--;
-                        addLog(`[실패] 강화 실패! 검 단계가 하락했습니다. (+${swordLevel})`, "text-amber-400");
-                    } else {
-                        addLog(`[실패] 강화 실패! (0강 유지)`, "text-slate-400");
-                    }
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isPlaying || lookTouchId === null) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === lookTouchId) {
+                    const dx = t.clientX - prevTouchX;
+                    prevTouchX = t.clientX;
+                    player.angle += dx * 0.011;
                 }
             }
+        }, { passive: true });
 
-            updateUI();
-        }
-
-        // --- 검 판매 ---
-        function sellSword() {
-            const current = swordData[swordLevel];
-            const earned = current.sellValue;
-
-            gold += earned;
-            playSound('success');
-            addLog(`[판매 완료] +${swordLevel} ${current.name} 을(를) 판매하여 ${earned.toLocaleString()} G를 획득했습니다!`, "text-amber-300 font-bold");
-
-            swordLevel = 0;
-            updateUI();
-        }
-
-        // --- 상점 아이템 구매 ---
-        function buyItem(type) {
-            if (type === 'luck') {
-                if (gold >= 500) {
-                    gold -= 500;
-                    items.luck++;
-                    playSound('click');
-                    addLog("확률 증가 주문서를 구매했습니다.", "text-emerald-300");
-                } else {
-                    playSound('fail');
-                    addLog("골드가 부족합니다!", "text-rose-400");
-                }
-            } else if (type === 'protect') {
-                if (gold >= 1500) {
-                    gold -= 1500;
-                    items.protect++;
-                    playSound('click');
-                    addLog("파괴 방지 주문서를 구매했습니다.", "text-sky-300");
-                } else {
-                    playSound('fail');
-                    addLog("골드가 부족합니다!", "text-rose-400");
+        canvas.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === lookTouchId) {
+                    lookTouchId = null;
                 }
             }
-            updateUI();
-        }
+        });
 
-        // --- 광산 알바 ---
-        function workForGold() {
-            gold += 200;
-            playSound('click');
-            addLog("광산에서 열심히 일하여 200 G를 벌었습니다!", "text-slate-300");
-            updateUI();
-        }
+        // 가상 조이스틱
+        let joyActive = false;
+        const maxJoy = 32;
 
-        // --- 이펙트 및 유틸리티 ---
-        function shakeElement(el) {
-            el.classList.remove('shake');
-            void el.offsetWidth;
-            el.classList.add('shake');
-        }
+        joystickPad.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            joyActive = true;
+        }, { passive: false });
 
-        function triggerSwordSparkles(e) {
-            playSound('click');
-            const color = swordData[swordLevel].color;
-            triggerShockwave(e.clientX, e.clientY, color);
-            createParticles(e.clientX, e.clientY, color, 15);
-        }
+        joystickPad.addEventListener('touchmove', (e) => {
+            if (!joyActive) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = joystickPad.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const t = e.touches[0];
 
-        function triggerShockwave(x, y, color) {
-            const shock = document.createElement('div');
-            shock.className = 'shockwave';
-            shock.style.left = `${x - 50}px`;
-            shock.style.top = `${y - 50}px`;
-            shock.style.width = '100px';
-            shock.style.height = '100px';
-            shock.style.setProperty('--sw-color', color);
-            document.body.appendChild(shock);
-
-            setTimeout(() => shock.remove(), 600);
-        }
-
-        function createParticles(x, y, color, count = 20) {
-            for (let i = 0; i < count; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                document.body.appendChild(particle);
-
-                const size = Math.random() * 10 + 4;
-                particle.style.width = `${size}px`;
-                particle.style.height = `${size}px`;
-                particle.style.background = color;
-                particle.style.boxShadow = `0 0 12px ${color}`;
-
-                particle.style.left = `${x}px`;
-                particle.style.top = `${y}px`;
-
-                const angle = Math.random() * Math.PI * 2;
-                const distance = Math.random() * 160 + 30;
-                const destinationX = Math.cos(angle) * distance;
-                const destinationY = Math.sin(angle) * distance;
-
-                particle.style.setProperty('--tx', `${destinationX}px`);
-                particle.style.setProperty('--ty', `${destinationY}px`);
-
-                setTimeout(() => particle.remove(), 800);
+            let dx = t.clientX - cx;
+            let dy = t.clientY - cy;
+            const d = Math.hypot(dx, dy);
+            if (d > maxJoy) {
+                dx = (dx / d) * maxJoy;
+                dy = (dy / d) * maxJoy;
             }
-        }
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joyVector.x = dx / maxJoy;
+            joyVector.y = dy / maxJoy;
+        }, { passive: false });
 
-        function addLog(msg, colorClass = "text-slate-300") {
-            const logBox = document.getElementById('logBox');
-            const item = document.createElement('div');
-            
-            // 터미널 프롬프트 기호 추가
-            const time = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            item.className = `${colorClass} leading-tight text-[10.5px] font-mono break-all`;
-            item.innerHTML = `<span class="text-slate-600 font-normal">[${time}]</span> <span class="text-emerald-500 font-bold">&gt;</span> ${msg}`;
-            
-            logBox.appendChild(item);
-            logBox.scrollTop = logBox.scrollHeight;
+        function resetJoy() {
+            joyActive = false;
+            joystickKnob.style.transform = 'translate(0px, 0px)';
+            joyVector.x = 0;
+            joyVector.y = 0;
         }
+        joystickPad.addEventListener('touchend', resetJoy);
+        joystickPad.addEventListener('touchcancel', resetJoy);
 
-        function clearLogs() {
-            document.getElementById('logBox').innerHTML = `<div class="text-emerald-400">$ clear</div><div class="text-slate-500">&gt; 화면이 초기화 되었습니다.</div>`;
-        }
+        soundToggleBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundOnIcon.classList.toggle('hidden', !soundEnabled);
+            soundOffIcon.classList.toggle('hidden', soundEnabled);
+        });
+
+        window.onload = function () {
+            resizePixelCanvas();
+            renderAmmo();
+            updateHUD();
+            drawPixelScene();
+        };
     </script>
 </body>
 </html>

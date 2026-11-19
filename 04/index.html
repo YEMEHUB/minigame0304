@@ -1,584 +1,1239 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CraftCraft 3D - 1인칭 마인크래프트 게임</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>라바 소시지 헌터 3D</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js -->
+    <!-- Three.js (3D 엔진) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
-
+    <!-- Tone.js (효과음 합성) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Pretendard', sans-serif;
-            user-select: none;
-            -webkit-user-select: none;
+            font-family: 'Jua', sans-serif;
+            margin: 0;
             overflow: hidden;
-            background-color: #000;
+            background-color: #1c1914;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-        .pixel-font {
-            font-family: 'Press Start 2P', monospace;
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
         }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translate(-50%, -50%);
+        /* 나뭇잎 생명 아이콘 애니메이션 */
+        @keyframes leaf-pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.25) rotate(10deg); }
+            100% { transform: scale(1); }
+        }
+        .leaf-active {
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .leaf-lost {
+            filter: grayscale(100%) brightness(40%);
+            transform: scale(0.8) rotate(-15deg);
+            opacity: 0.4;
+        }
+        /* 피격 시 화면 붉은 점멸 효과 */
+        #damage-overlay {
             pointer-events: none;
-            z-index: 20;
+            transition: opacity 0.2s ease-out;
         }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.85);
-            box-shadow: 0 0 2px rgba(0,0,0,0.8);
-        }
-        #crosshair::before {
-            top: 9px;
-            left: 0;
-            width: 20px;
-            height: 2px;
-        }
-        #crosshair::after {
-            top: 0;
-            left: 9px;
-            width: 2px;
-            height: 20px;
-        }
-        .hotbar-slot {
-            background: rgba(0, 0, 0, 0.6);
-            border: 4px solid #8b8b8b;
-            box-shadow: inset -2px -2px 0px #373737, inset 2px 2px 0px #ffffff;
-            transition: all 0.1s ease;
-        }
-        .hotbar-slot.active {
-            border-color: #ffffff;
-            box-shadow: inset -2px -2px 0px #555555, inset 2px 2px 0px #ffffff, 0 0 10px rgba(255, 255, 255, 0.8);
-            transform: scale(1.1);
+        /* 가상 조이스틱 영역 */
+        #joystick-zone {
+            touch-action: none;
         }
     </style>
 </head>
-<body class="w-screen h-screen relative overflow-hidden text-white" oncontextmenu="return false;">
+<body class="relative w-screen h-screen overflow-hidden">
 
-    <!-- Crosshair -->
-    <div id="crosshair"></div>
+    <!-- 3D 캔버스 -->
+    <canvas id="game-canvas"></canvas>
 
-    <!-- UI Overlay: Instructions & Start Menu -->
-    <div id="startOverlay" class="absolute inset-0 bg-black/80 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center">
-        <div class="max-w-md w-full bg-slate-900 border-4 border-amber-600 rounded-3xl p-8 shadow-2xl">
-            <h1 class="pixel-font text-3xl text-amber-400 mb-2 leading-relaxed">CRAFT CRAFT</h1>
-            <p class="text-slate-300 text-xs mb-6">3D 마인크래프트 스타일 샌드박스 웹게임</p>
+    <!-- 피격 경고 오버레이 -->
+    <div id="damage-overlay" class="fixed inset-0 bg-red-600/40 opacity-0 z-10"></div>
 
-            <div class="bg-slate-800/90 p-4 rounded-xl text-left space-y-2 mb-6 border border-slate-700 text-sm">
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">W, A, S, D</span>
-                    <span class="text-slate-300">이동</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">마우스 이동</span>
-                    <span class="text-slate-300">시점 회전</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">마우스 좌클릭</span>
-                    <span class="text-slate-300">블록 파괴</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">마우스 우클릭</span>
-                    <span class="text-slate-300">블록 설치</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">Space</span>
-                    <span class="text-slate-300">점프</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">Shift</span>
-                    <span class="text-slate-300">달리기</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-amber-300 font-bold">숫자키 1 ~ 5</span>
-                    <span class="text-slate-300">블록 종류 선택</span>
+    <!-- 상단 HUD (왼쪽: 소시지 카운터 & 카메라 힌트 / 오른쪽: 나뭇잎 5개 생명) -->
+    <div class="fixed top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-start z-20 pointer-events-none">
+        
+        <!-- 왼쪽: 소시지 수집 현황 -->
+        <div class="flex flex-col gap-2 pointer-events-auto">
+            <div class="bg-amber-950/85 border-2 border-amber-500/70 rounded-2xl px-4 py-2.5 shadow-xl backdrop-blur-sm flex items-center gap-3">
+                <!-- 칼집 소시지 SVG 아이콘 -->
+                <svg class="w-9 h-9 flex-shrink-0 drop-shadow" viewBox="0 0 64 64">
+                    <rect x="8" y="20" width="48" height="24" rx="12" fill="#d96b38" stroke="#7c2d12" stroke-width="3"/>
+                    <path d="M22 20 Q24 28 22 33" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+                    <path d="M32 20 Q34 28 32 33" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+                    <path d="M42 20 Q44 28 42 33" stroke="#7c2d12" stroke-width="3" stroke-linecap="round" fill="none"/>
+                    <ellipse cx="26" cy="25" rx="10" ry="2.5" fill="#f59e0b" opacity="0.5"/>
+                </svg>
+                <div>
+                    <div class="text-xs text-amber-300 tracking-wide">숨겨진 소시지</div>
+                    <div class="text-2xl sm:text-3xl text-white font-bold leading-none">
+                        <span id="sausage-count" class="text-yellow-400">0</span> <span class="text-lg text-amber-200">/ 8</span>
+                    </div>
                 </div>
             </div>
 
-            <button id="playBtn" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 font-black text-white rounded-xl shadow-lg active:scale-95 transition-all text-lg border-b-4 border-emerald-800">
-                게임 시작하기 (화면 클릭)
+            <!-- 조작 안내 뱃지 -->
+            <div class="hidden sm:flex items-center gap-2 bg-black/50 text-amber-100/90 text-xs px-3 py-1.5 rounded-xl border border-white/10">
+                <span>이동: WASD / 방향키</span>
+                <span>•</span>
+                <span>점프: Space</span>
+                <span>•</span>
+                <span>시점회전: 마우스 드래그</span>
+            </div>
+        </div>
+
+        <!-- 오른쪽 상단: 나뭇잎 모양 5개 생명 UI -->
+        <div class="flex flex-col items-end gap-2 pointer-events-auto">
+            <div class="bg-stone-900/80 border-2 border-lime-500/60 rounded-2xl px-3.5 py-2 shadow-xl backdrop-blur-sm">
+                <div class="text-[11px] text-lime-300 text-right mb-1 pr-1">남은 생명</div>
+                <div id="leaves-container" class="flex items-center gap-1.5 sm:gap-2">
+                    <!-- JS로 5개의 나뭇잎 SVG 생성 -->
+                </div>
+            </div>
+
+            <!-- 사운드 버튼 -->
+            <button id="sound-btn" class="bg-stone-800/85 hover:bg-stone-700 text-white text-xs px-3 py-1.5 rounded-xl border border-stone-600 shadow cursor-pointer transition">
+                🔊 효과음 켜짐
             </button>
         </div>
     </div>
 
-    <!-- HUD Overlay -->
-    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
-        <!-- Top Stats Info -->
-        <div class="flex justify-between items-start">
-            <div class="bg-black/60 backdrop-blur border border-white/20 p-3 rounded-xl">
-                <p class="text-xs text-amber-400 font-bold">좌표 (X, Y, Z)</p>
-                <p id="posDisplay" class="pixel-font text-xs text-white mt-1">0, 0, 0</p>
-            </div>
-            <div class="bg-black/60 backdrop-blur border border-white/20 px-4 py-2 rounded-xl text-right">
-                <p class="text-xs text-slate-300">조작 팁: <span class="text-amber-300 font-bold">ESC</span>를 누르면 마우스 커서가 해제됩니다.</p>
-            </div>
+    <!-- 보라색 친구 경보 배너 -->
+    <div id="danger-banner" class="fixed top-24 left-1/2 -translate-x-1/2 bg-purple-950/90 border-2 border-purple-400 text-purple-100 px-4 py-1.5 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 z-20 pointer-events-none flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping"></span>
+        <span id="danger-text">보라색 괴물이 나타났습니다! 조심하세요!</span>
+    </div>
+
+    <!-- 모바일 & 터치 컨트롤 (조이스틱 + 점프 버튼) -->
+    <div id="mobile-controls" class="fixed bottom-5 left-5 right-5 flex justify-between items-end z-20 pointer-events-none sm:opacity-80">
+        <!-- 가상 조이스틱 -->
+        <div id="joystick-zone" class="w-28 h-28 rounded-full bg-white/15 border-2 border-white/30 backdrop-blur-xs relative pointer-events-auto flex items-center justify-center shadow-lg">
+            <div id="joystick-knob" class="w-11 h-11 rounded-full bg-yellow-400/90 border-2 border-amber-700 shadow-md transform translate-x-0 translate-y-0"></div>
         </div>
 
-        <!-- Bottom Hotbar -->
-        <div class="self-center flex space-x-2 bg-black/50 p-2 rounded-2xl border border-white/20 backdrop-blur">
-            <div id="slot-1" class="hotbar-slot active w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
-                <div class="w-6 h-6 rounded bg-emerald-600 border border-emerald-300"></div>
-                <span class="text-[10px] text-white font-bold mt-1">잔디 (1)</span>
+        <!-- 점프 버튼 -->
+        <button id="jump-btn" class="w-20 h-20 rounded-full bg-amber-500/85 active:bg-amber-400 border-4 border-amber-200 text-amber-950 font-bold text-lg shadow-xl pointer-events-auto flex flex-col items-center justify-center">
+            <span>JUMP</span>
+            <span class="text-[10px]">점프</span>
+        </button>
+    </div>
+
+    <!-- 시작 / 게임오버 / 클리어 모달 -->
+    <div id="overlay-modal" class="fixed inset-0 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 z-30">
+        <div class="bg-gradient-to-b from-amber-900 to-stone-900 border-4 border-amber-500 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl">
+            <div id="modal-badge" class="inline-block bg-yellow-400 text-amber-950 text-xs font-bold px-3 py-1 rounded-full mb-3">
+                3D 하수구 어드벤처
             </div>
-            <div id="slot-2" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
-                <div class="w-6 h-6 rounded bg-amber-800 border border-amber-600"></div>
-                <span class="text-[10px] text-white font-bold mt-1">흙 (2)</span>
-            </div>
-            <div id="slot-3" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
-                <div class="w-6 h-6 rounded bg-stone-500 border border-stone-300"></div>
-                <span class="text-[10px] text-white font-bold mt-1">돌 (3)</span>
-            </div>
-            <div id="slot-4" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
-                <div class="w-6 h-6 rounded bg-amber-900 border border-amber-700"></div>
-                <span class="text-[10px] text-white font-bold mt-1">나무 (4)</span>
-            </div>
-            <div id="slot-5" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
-                <div class="w-6 h-6 rounded bg-emerald-800 border border-emerald-500"></div>
-                <span class="text-[10px] text-white font-bold mt-1">나뭇잎 (5)</span>
-            </div>
+            <h1 id="modal-title" class="text-3xl sm:text-4xl text-yellow-300 font-bold mb-3 drop-shadow">
+                노랑이의 소시지 대모험
+            </h1>
+            <p id="modal-desc" class="text-amber-100/90 text-sm sm:text-base leading-relaxed mb-6">
+                하수구 곳곳에 숨겨진 <span class="text-orange-400 font-bold">칼집 소시지 8개</span>를 모두 찾으세요!<br>
+                중간에 나타나는 <span class="text-purple-400 font-bold">보라색 친구</span>의 돌진과 독침 공격을 피해야 합니다. (생명: 나뭇잎 5개)
+            </p>
+            <button id="start-btn" class="w-full py-4 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-amber-950 font-bold text-xl rounded-2xl shadow-lg transform active:scale-95 transition cursor-pointer">
+                게임 시작하기 ▶
+            </button>
         </div>
     </div>
 
-    <!-- 3D Canvas Container -->
-    <div id="canvas-container" class="w-full h-full"></div>
-
     <script>
-        // --- GAME CONSTANTS & BLOCK TYPES ---
-        const BLOCK_SIZE = 1;
-        const WORLD_SIZE = 24; // 24x24 Ground Area
+        /**
+         * 라바 소시지 헌터 3D (Three.js 기반)
+         * 1. 배경: 사진 속 하수구 벽면, 녹슨 배수관, 노란 나뭇잎, 병뚜껑, 전구 케이블을 3D 공간으로 재현
+         * 2. 캐릭터: 더듬이와 땀방울, 줄무늬 꼬리를 가진 노란색 애벌레(플레이어)
+         * 3. 적 캐릭터: 긴 목과 거대한 톱니 이빨 입을 가진 보라색 괴물 (돌진 및 보라색 독구슬 공격)
+         * 4. 목표: 숨겨진 칼집 소시지 8개 수집 & 나뭇잎 5개 생명 관리
+         */
 
-        const BLOCK_TYPES = {
-            1: { name: 'Grass', color: 0x4aa02c, topColor: 0x55ba33 },
-            2: { name: 'Dirt', color: 0x8b5a2b },
-            3: { name: 'Stone', color: 0x7d8491 },
-            4: { name: 'Wood', color: 0x5c4033 },
-            5: { name: 'Leaves', color: 0x2d6a4f, transparent: true, opacity: 0.85 }
-        };
+        // --- 사운드 매니저 (Tone.js) ---
+        let soundOn = true;
+        let synth = null;
+        function playSfx(type) {
+            if (!soundOn || typeof Tone === 'undefined') return;
+            try {
+                if (Tone.context.state !== 'running') Tone.start();
+                if (!synth) {
+                    synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.volume.value = -10;
+                }
+                const now = Tone.now();
+                if (type === 'sausage') {
+                    synth.triggerAttackRelease('C5', '16n', now);
+                    synth.triggerAttackRelease('E5', '16n', now + 0.07);
+                    synth.triggerAttackRelease('G5', '8n', now + 0.14);
+                } else if (type === 'jump') {
+                    synth.triggerAttackRelease('A4', '16n', now);
+                    synth.triggerAttackRelease('D5', '16n', now + 0.05);
+                } else if (type === 'hurt') {
+                    synth.triggerAttackRelease('G3', '8n', now);
+                    synth.triggerAttackRelease('C#3', '4n', now + 0.08);
+                } else if (type === 'roar') {
+                    synth.triggerAttackRelease('D2', '4n', now);
+                    synth.triggerAttackRelease('Eb2', '4n', now + 0.1);
+                } else if (type === 'win') {
+                    ['C5', 'E5', 'G5', 'C6'].forEach((note, idx) => {
+                        synth.triggerAttackRelease(note, '8n', now + idx * 0.1);
+                    });
+                }
+            } catch (e) {}
+        }
 
-        let selectedBlockType = 1;
+        // --- UI 요소 및 생명(나뭇잎 5개) 초기화 ---
+        const MAX_LIVES = 5;
+        const TOTAL_SAUSAGES = 8;
+        let lives = MAX_LIVES;
+        let collectedSausages = 0;
+        let gameActive = false;
 
-        // --- THREE.JS SCENE SETUP ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Sky blue
-        scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+        const leavesContainer = document.getElementById('leaves-container');
+        const sausageCountEl = document.getElementById('sausage-count');
+        const damageOverlay = document.getElementById('damage-overlay');
+        const dangerBanner = document.getElementById('danger-banner');
+        const dangerText = document.getElementById('danger-text');
+        const overlayModal = document.getElementById('overlay-modal');
+        const modalBadge = document.getElementById('modal-badge');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const startBtn = document.getElementById('start-btn');
+        const soundBtn = document.getElementById('sound-btn');
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 8, 12);
+        // 사진 바닥에 놓인 노란/연두 나뭇잎 모양의 SVG 생성
+        function renderLeaves() {
+            leavesContainer.innerHTML = '';
+            for (let i = 0; i < MAX_LIVES; i++) {
+                const isAlive = i < lives;
+                const leafWrapper = document.createElement('div');
+                leafWrapper.className = `w-7 h-7 sm:w-8 sm:h-8 ${isAlive ? 'leaf-active' : 'leaf-lost'}`;
+                leafWrapper.innerHTML = `
+                    <svg viewBox="0 0 64 64" class="w-full h-full">
+                        <!-- 나뭇잎 몸통 -->
+                        <path d="M10 50 C12 22, 34 10, 56 10 C54 34, 42 52, 16 52 Z" 
+                              fill="${isAlive ? '#a3e635' : '#6b7280'}" 
+                              stroke="${isAlive ? '#3f6212' : '#374151'}" 
+                              stroke-width="3" stroke-linejoin="round"/>
+                        <!-- 나뭇잎 중앙 잎맥 및 줄기 -->
+                        <path d="M8 54 Q28 36 52 14" stroke="${isAlive ? '#4d7c0f' : '#374151'}" stroke-width="3" stroke-linecap="round" fill="none"/>
+                        <path d="M26 38 L22 28 M36 29 L33 20 M31 35 L40 38" stroke="${isAlive ? '#4d7c0f' : '#374151'}" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                `;
+                leavesContainer.appendChild(leafWrapper);
+            }
+        }
+        renderLeaves();
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        soundBtn.addEventListener('click', () => {
+            soundOn = !soundOn;
+            soundBtn.textContent = soundOn ? '🔊 효과음 켜짐' : '🔇 효과음 꺼짐';
+        });
+
+        // --- Three.js 씬 설정 ---
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        container.appendChild(renderer.domElement);
 
-        // --- LIGHTING ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x4a4335);
+        scene.fog = new THREE.FogExp2(0x4a4335, 0.018);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 150);
+
+        // 조명 설정 (하수구 틈새로 들어오는 따뜻한 햇빛 + 전구 빛)
+        const ambientLight = new THREE.AmbientLight(0xd9cdb8, 0.75);
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        sunLight.position.set(30, 50, 20);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
-        sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 150;
-        const d = 30;
-        sunLight.shadow.camera.left = -d;
-        sunLight.shadow.camera.right = d;
-        sunLight.shadow.camera.top = d;
-        sunLight.shadow.camera.bottom = -d;
-        scene.add(sunLight);
+        const dirLight = new THREE.DirectionalLight(0xfff2cc, 1.1);
+        dirLight.position.set(12, 28, 15);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 70;
+        const d = 28;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
 
-        // --- WORLD GENERATION & BLOCK MAP ---
-        const blocks = new Map(); // Key: "x,y,z", Value: Mesh
+        // --- 절차적 텍스처 생성기 (첫 번째 사진 배경 재현) ---
+        function createSewerWallTexture() {
+            const c = document.createElement('canvas');
+            c.width = 1024;
+            c.height = 512;
+            const ctx = c.getContext('2d');
 
-        const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            // 콘크리트/진흙 벽 그라데이션
+            const grad = ctx.createLinearGradient(0, 0, 0, 512);
+            grad.addColorStop(0, '#9e9582');
+            grad.addColorStop(0.5, '#7c7462');
+            grad.addColorStop(1, '#4b4738');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 1024, 512);
 
-        function getBlockKey(x, y, z) {
-            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+            // 상단 배수구 창살/주름 느낌
+            ctx.fillStyle = 'rgba(45, 40, 30, 0.35)';
+            for (let x = 0; x < 1024; x += 28) {
+                ctx.fillRect(x, 0, 14, 75);
+            }
+
+            // 벽면 금 간 자국 & 물때
+            ctx.strokeStyle = 'rgba(40, 35, 25, 0.45)';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 18; i++) {
+                ctx.beginPath();
+                let sx = Math.random() * 1024;
+                let sy = 60 + Math.random() * 150;
+                ctx.moveTo(sx, sy);
+                for (let j = 0; j < 5; j++) {
+                    sx += (Math.random() - 0.5) * 60;
+                    sy += 30 + Math.random() * 40;
+                    ctx.lineTo(sx, sy);
+                }
+                ctx.stroke();
+            }
+
+            // 하단 이끼 덤불 (사진 속 초록 이끼 표현)
+            for (let i = 0; i < 45; i++) {
+                const bx = Math.random() * 1024;
+                const by = 360 + Math.random() * 140;
+                const r = 25 + Math.random() * 45;
+                const mossGrad = ctx.createRadialGradient(bx, by, 5, bx, by, r);
+                mossGrad.addColorStop(0, 'rgba(92, 125, 36, 0.85)');
+                mossGrad.addColorStop(1, 'rgba(65, 88, 25, 0)');
+                ctx.fillStyle = mossGrad;
+                ctx.beginPath();
+                ctx.arc(bx, by, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.ClampToEdgeWrapping;
+            tex.repeat.set(3, 1);
+            return tex;
         }
 
-        function createBlockMaterial(typeId) {
-            const config = BLOCK_TYPES[typeId];
-            return new THREE.MeshStandardMaterial({
-                color: config.color,
-                roughness: 0.8,
-                metalness: 0.1,
-                transparent: config.transparent || false,
-                opacity: config.opacity || 1.0
+        function createSewerGroundTexture() {
+            const c = document.createElement('canvas');
+            c.width = 512;
+            c.height = 512;
+            const ctx = c.getContext('2d');
+
+            // 황토빛 하수구 바닥
+            ctx.fillStyle = '#8b6928';
+            ctx.fillRect(0, 0, 512, 512);
+
+            for (let i = 0; i < 1200; i++) {
+                const x = Math.random() * 512;
+                const y = Math.random() * 512;
+                const r = 1 + Math.random() * 5;
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(115, 82, 26, 0.4)' : 'rgba(166, 130, 56, 0.35)';
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(6, 6);
+            return tex;
+        }
+
+        // --- 3D 하수구 월드 구축 (첫 번째 사진의 디테일 반영) ---
+        const ARENA_RADIUS = 24;
+        const obstacles = []; // 충돌 및 소시지 은신처 오브젝트
+
+        // 바닥
+        const groundGeo = new THREE.CircleGeometry(ARENA_RADIUS, 48);
+        const groundMat = new THREE.MeshStandardMaterial({ 
+            map: createSewerGroundTexture(),
+            roughness: 0.9 
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 원형 하수구 벽면
+        const wallGeo = new THREE.CylinderGeometry(ARENA_RADIUS, ARENA_RADIUS, 16, 48, 1, true);
+        const wallMat = new THREE.MeshStandardMaterial({ 
+            map: createSewerWallTexture(), 
+            side: THREE.BackSide,
+            roughness: 0.85
+        });
+        const wall = new THREE.Mesh(wallGeo, wallMat);
+        wall.position.y = 8;
+        scene.add(wall);
+
+        // 1) 사진 왼쪽의 커다란 낡은 금속 파이프/통 (소시지가 안에 숨겨질 수 있음!)
+        const pipeGroup = new THREE.Group();
+        const pipeGeo = new THREE.CylinderGeometry(3.2, 3.5, 6.5, 24, 1, true);
+        const pipeMat = new THREE.MeshStandardMaterial({ 
+            color: 0x4b534e, 
+            side: THREE.DoubleSide, 
+            roughness: 0.7, 
+            metalness: 0.4 
+        });
+        const pipeMesh = new THREE.Mesh(pipeGeo, pipeMat);
+        pipeMesh.rotation.z = Math.PI / 2;
+        pipeMesh.rotation.y = 0.4;
+        pipeMesh.castShadow = true;
+        pipeMesh.receiveShadow = true;
+        pipeGroup.add(pipeMesh);
+
+        // 파이프 테두리 링
+        const rimGeo = new THREE.TorusGeometry(3.2, 0.25, 10, 24);
+        const rimMesh = new THREE.Mesh(rimGeo, pipeMat);
+        rimMesh.position.set(3.0, 0, -1.25);
+        rimMesh.rotation.y = Math.PI / 2 + 0.4;
+        pipeGroup.add(rimMesh);
+
+        pipeGroup.position.set(-14, 3.0, -6);
+        scene.add(pipeGroup);
+        obstacles.push({ x: -14, z: -6, r: 3.6 });
+
+        // 2) 사진 속 매달린 전선과 보라색/초록색 발광 전구
+        const cableGeo = new THREE.CylinderGeometry(0.12, 0.12, 13, 8);
+        const cableMat = new THREE.MeshStandardMaterial({ color: 0x2b2620 });
+        const cable = new THREE.Mesh(cableGeo, cableMat);
+        cable.position.set(-8, 9.5, -8);
+        scene.add(cable);
+
+        // 보라색 전구
+        const purpleBulb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.55, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xd8b4fe })
+        );
+        purpleBulb.position.set(-7.5, 9.8, -8);
+        scene.add(purpleBulb);
+        const purpleLight = new THREE.PointLight(0xc084fc, 1.5, 14);
+        purpleLight.position.copy(purpleBulb.position);
+        scene.add(purpleLight);
+
+        // 초록색 전구
+        const greenBulb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.55, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0x6ee7b7 })
+        );
+        greenBulb.position.set(-8.5, 6.2, -8);
+        scene.add(greenBulb);
+        const greenLight = new THREE.PointLight(0x34d399, 1.5, 14);
+        greenLight.position.copy(greenBulb.position);
+        scene.add(greenLight);
+
+        // 3) 사진 속 병뚜껑 & 바위/이끼 덤불 & 쓰러진 캔/뚜껑 등 은신처 소품들
+        // 은색 병뚜껑
+        const capGeo = new THREE.CylinderGeometry(1.1, 0.9, 0.45, 20);
+        const capMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, metalness: 0.7, roughness: 0.3 });
+        const bottleCap = new THREE.Mesh(capGeo, capMat);
+        bottleCap.position.set(-5, 0.22, -4);
+        bottleCap.castShadow = true;
+        scene.add(bottleCap);
+
+        // 둥근 철제 뚜껑 방패 (사진 왼쪽 파이프 옆)
+        const lidGeo = new THREE.CylinderGeometry(2.4, 2.4, 0.3, 24);
+        const lidMat = new THREE.MeshStandardMaterial({ color: 0x373a36, metalness: 0.5, roughness: 0.6 });
+        const roundLid = new THREE.Mesh(lidGeo, lidMat);
+        roundLid.position.set(-10.5, 2.2, -9.5);
+        roundLid.rotation.x = Math.PI / 2 - 0.2;
+        roundLid.rotation.z = 0.3;
+        roundLid.castShadow = true;
+        scene.add(roundLid);
+        obstacles.push({ x: -10.5, z: -9.5, r: 2.2 });
+
+        // 이끼 덤불 & 조약돌 군집 (소시지를 가려주는 은신처 역할)
+        const bushPositions = [
+            { x: 0, z: -14, s: 2.6 },
+            { x: 11, z: -10, s: 2.3 },
+            { x: 15, z: 4, s: 2.5 },
+            { x: 7, z: 14, s: 2.2 },
+            { x: -8, z: 13, s: 2.4 },
+            { x: -15, z: 5, s: 2.0 },
+            { x: 4, z: -2, s: 1.8 }
+        ];
+
+        bushPositions.forEach(pos => {
+            const bushGroup = new THREE.Group();
+            const mossMat = new THREE.MeshStandardMaterial({ color: 0x5c7d24, roughness: 0.9 });
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x786855, roughness: 0.85 });
+
+            for (let i = 0; i < 4; i++) {
+                const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(pos.s * (0.55 + Math.random() * 0.3), 1), mossMat);
+                puff.position.set((Math.random() - 0.5) * pos.s, pos.s * 0.35, (Math.random() - 0.5) * pos.s);
+                puff.castShadow = true;
+                puff.receiveShadow = true;
+                bushGroup.add(puff);
+            }
+            for (let i = 0; i < 3; i++) {
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.6 + Math.random() * 0.5, 0), rockMat);
+                rock.position.set((Math.random() - 0.5) * pos.s * 1.4, 0.35, (Math.random() - 0.5) * pos.s * 1.4);
+                rock.scale.y = 0.6;
+                rock.castShadow = true;
+                bushGroup.add(rock);
+            }
+            bushGroup.position.set(pos.x, 0, pos.z);
+            scene.add(bushGroup);
+        });
+
+        // 바닥에 떨어진 노란 나뭇잎 장식
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0xd9c826, side: THREE.DoubleSide, roughness: 0.7 });
+        [[-9, -2, 0.4], [2, -5, -0.8], [10, 7, 1.2], [-4, 9, 2.1]].forEach(([lx, lz, rot]) => {
+            const leaf = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.1), leafMat);
+            leaf.rotation.x = -Math.PI / 2;
+            leaf.rotation.z = rot;
+            leaf.position.set(lx, 0.03, lz);
+            scene.add(leaf);
+        });
+
+        // --- 3D 모델 1: 노랑색 친구 (플레이어: 옐로우 애벌레) ---
+        function createYellowLarva() {
+            const group = new THREE.Group();
+
+            const yellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35 });
+            const orangeStripeMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.4 });
+            const whiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const cheekMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.65 });
+
+            // 세워진 상체 몸통
+            const bodyGeo = new THREE.CylinderGeometry(0.65, 0.85, 2.1, 20);
+            const body = new THREE.Mesh(bodyGeo, yellowMat);
+            body.position.y = 1.35;
+            body.castShadow = true;
+            group.add(body);
+
+            // 둥근 머리 윗부분
+            const headTop = new THREE.Mesh(new THREE.SphereGeometry(0.65, 20, 16), yellowMat);
+            headTop.position.y = 2.4;
+            headTop.castShadow = true;
+            group.add(headTop);
+
+            // 뒤쪽으로 구부러진 줄무늬 꼬리 마디
+            for (let i = 0; i < 3; i++) {
+                const segMat = i % 2 === 0 ? orangeStripeMat : yellowMat;
+                const seg = new THREE.Mesh(new THREE.SphereGeometry(0.82 - i * 0.1, 16, 16), segMat);
+                seg.position.set(0, 0.68 - i * 0.06, -0.45 - i * 0.55);
+                seg.castShadow = true;
+                group.add(seg);
+            }
+
+            // 큰 흰 눈 2개 + 작은 눈동자
+            [-0.22, 0.22].forEach(ex => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 14), whiteMat);
+                eye.scale.set(0.85, 1.25, 0.7);
+                eye.position.set(ex, 2.25, 0.54);
+                group.add(eye);
+
+                const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), blackMat);
+                pupil.position.set(ex * 0.9, 2.25, 0.71);
+                group.add(pupil);
+            });
+
+            // 콧구멍 2개
+            [-0.12, 0.12].forEach(nx => {
+                const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), blackMat);
+                nostril.position.set(nx, 1.85, 0.68);
+                group.add(nostril);
+            });
+
+            // 발그레한 볼터치
+            [-0.45, 0.45].forEach(cx => {
+                const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), cheekMat);
+                cheek.scale.set(1, 0.8, 0.4);
+                cheek.position.set(cx, 1.72, 0.62);
+                group.add(cheek);
+            });
+
+            // 입 (놀란 표정)
+            const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 8, 16, Math.PI), blackMat);
+            mouth.position.set(0, 1.38, 0.72);
+            group.add(mouth);
+
+            // 머리 위 더듬이 1개 (사진 속 둥근 갈색 끝부분 포함)
+            const antennaStem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.55, 8), yellowMat);
+            antennaStem.position.set(0.15, 3.15, 0);
+            antennaStem.rotation.z = -0.25;
+            group.add(antennaStem);
+
+            const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), orangeStripeMat);
+            antennaTip.position.set(0.22, 3.42, 0);
+            group.add(antennaTip);
+
+            return group;
+        }
+
+        const player = createYellowLarva();
+        scene.add(player);
+
+        // --- 3D 모델 2: 보라색 친구 (적 캐릭터: 긴 목 & 거대한 이빨 입) ---
+        function createPurpleMonster() {
+            const group = new THREE.Group();
+
+            const purpleMat = new THREE.MeshStandardMaterial({ color: 0x7e22ce, roughness: 0.35 });
+            const darkMouthMat = new THREE.MeshStandardMaterial({ color: 0x1e092b, roughness: 0.9 });
+            const toothMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.3 });
+            const tongueMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x09090b });
+
+            // 하단 거대한 배/입 몸통
+            const lowerBody = new THREE.Mesh(new THREE.SphereGeometry(1.45, 20, 20), purpleMat);
+            lowerBody.scale.set(1.0, 1.15, 1.2);
+            lowerBody.position.set(0, 1.45, 0);
+            lowerBody.castShadow = true;
+            group.add(lowerBody);
+
+            // 뒤쪽 꼬리 받침
+            const tailBase = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 14), purpleMat);
+            tailBase.scale.set(1.1, 0.5, 1.5);
+            tailBase.position.set(0, 0.45, -1.2);
+            group.add(tailBase);
+
+            // 입 안쪽 어두운 공간
+            const mouthCavity = new THREE.Mesh(new THREE.SphereGeometry(1.18, 18, 18), darkMouthMat);
+            mouthCavity.scale.set(0.92, 1.15, 0.8);
+            mouthCavity.position.set(0, 1.45, 0.55);
+            group.add(mouthCavity);
+
+            // 입 안 빨간 혀
+            const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.2, 1.1), tongueMat);
+            tongue.position.set(0, 0.85, 0.85);
+            tongue.rotation.x = 0.25;
+            group.add(tongue);
+
+            // 촘촘하고 날카로운 톱니 이빨들 (위/아래 아치형 배치)
+            const teethCount = 14;
+            for (let i = 0; i < teethCount; i++) {
+                const angle = (i / teethCount) * Math.PI * 2;
+                const tx = Math.cos(angle) * 0.95;
+                const ty = 1.45 + Math.sin(angle) * 1.18;
+
+                const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.48, 6), toothMat);
+                tooth.position.set(tx, ty, 1.12);
+                // 이빨이 입 중앙을 향하도록 회전
+                tooth.rotation.z = angle + Math.PI / 2;
+                tooth.rotation.x = 0.2;
+                group.add(tooth);
+            }
+
+            // 길고 가느다란 보라색 목
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.65, 2.6, 16), purpleMat);
+            neck.position.set(0, 3.5, -0.15);
+            neck.rotation.x = 0.12;
+            neck.castShadow = true;
+            group.add(neck);
+
+            // 작은 머리
+            const smallHead = new THREE.Mesh(new THREE.SphereGeometry(0.36, 14, 14), purpleMat);
+            smallHead.position.set(0, 4.85, 0.05);
+            smallHead.castShadow = true;
+            group.add(smallHead);
+
+            // 작은 까만 눈 2개 & 더듬이 2개
+            [-0.14, 0.14].forEach(ex => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), blackMat);
+                eye.position.set(ex, 4.9, 0.36);
+                group.add(eye);
+
+                const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 6), toothMat);
+                ant.position.set(ex * 0.8, 5.3, 0.05);
+                group.add(ant);
+            });
+
+            return group;
+        }
+
+        const monster = createPurpleMonster();
+        monster.visible = false; // 소시지를 1개 이상 먹으면 땅에서 솟아나며 등장!
+        scene.add(monster);
+
+        // 보라색 괴물이 땅을 뚫고 솟아날 때 바닥에 생기는 흙 구덩이 & 파편 고리
+        const burrowHoleGroup = new THREE.Group();
+        const holeCenter = new THREE.Mesh(
+            new THREE.CircleGeometry(1.75, 24),
+            new THREE.MeshBasicMaterial({ color: 0x1c140d })
+        );
+        holeCenter.rotation.x = -Math.PI / 2;
+        holeCenter.position.y = 0.04;
+        burrowHoleGroup.add(holeCenter);
+
+        const dirtClodMat = new THREE.MeshStandardMaterial({ color: 0x5c4018, roughness: 0.95 });
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const clod = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35 + (i % 3) * 0.1, 0), dirtClodMat);
+            clod.position.set(Math.cos(angle) * 1.75, 0.2, Math.sin(angle) * 1.75);
+            clod.scale.y = 0.65;
+            burrowHoleGroup.add(clod);
+        }
+        burrowHoleGroup.visible = false;
+        scene.add(burrowHoleGroup);
+
+        // --- 3D 모델 3: 숨겨진 칼집 소시지 8개 (마지막 사진 디테일 재현) ---
+        function createSausageMesh() {
+            const group = new THREE.Group();
+
+            const sausageMat = new THREE.MeshStandardMaterial({ 
+                color: 0xd96b38, 
+                roughness: 0.45,
+                metalness: 0.05
+            });
+            const cutMat = new THREE.MeshStandardMaterial({ color: 0x6b240c, roughness: 0.9 });
+
+            // 통통한 소시지 몸통 (캡슐 형태)
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.95, 16), sausageMat);
+            body.rotation.z = Math.PI / 2;
+            body.castShadow = true;
+            group.add(body);
+
+            [-0.47, 0.47].forEach(capX => {
+                const cap = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12), sausageMat);
+                cap.position.x = capX;
+                group.add(cap);
+            });
+
+            // 사진 속 3개의 칼집 표현
+            [-0.22, 0, 0.22].forEach(cutX => {
+                const cut = new THREE.Mesh(new THREE.TorusGeometry(0.365, 0.035, 6, 14, Math.PI * 0.75), cutMat);
+                cut.position.set(cutX, 0.02, 0);
+                cut.rotation.y = Math.PI / 2;
+                cut.rotation.z = 0.4;
+                group.add(cut);
+            });
+
+            // 숨겨져 있어도 살짝 찾을 수 있도록 은은한 황금빛 링/파티클
+            const glowRing = new THREE.Mesh(
+                new THREE.RingGeometry(0.55, 0.72, 20),
+                new THREE.MeshBasicMaterial({ color: 0xfde047, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+            );
+            glowRing.rotation.x = -Math.PI / 2;
+            glowRing.position.y = -0.35;
+            group.add(glowRing);
+
+            return group;
+        }
+
+        // 소시지 8개 숨김 좌표 (파이프 안, 이끼 덤불 뒤, 벽 구석 등)
+        const sausageCoords = [
+            { x: -14.0, z: -6.0 },  // 1. 왼쪽 커다란 녹슨 파이프 내부
+            { x: 0.0,   z: -15.2 }, // 2. 정면 중앙 이끼 덤불 뒤
+            { x: 11.8,  z: -10.8 }, // 3. 우측 상단 이끼 바위 사이
+            { x: 16.5,  z: 4.5 },   // 4. 우측 이끼 덤불 뒤
+            { x: 7.5,   z: 15.2 },  // 5. 우측 하단 덤불 뒤
+            { x: -8.5,  z: 14.5 },  // 6. 좌측 하단 덤불 뒤
+            { x: -17.5, z: 3.0 },   // 7. 좌측 외곽 벽면 근처
+            { x: 4.2,   z: -2.5 }   // 8. 중앙 작은 이끼 무더기 속
+        ];
+
+        let sausages = [];
+        function spawnSausages() {
+            sausages.forEach(s => scene.remove(s.mesh));
+            sausages = [];
+
+            sausageCoords.forEach((coord, idx) => {
+                const mesh = createSausageMesh();
+                mesh.position.set(coord.x, 0.55, coord.z);
+                scene.add(mesh);
+                sausages.push({ mesh, collected: false, phase: idx * 0.8 });
             });
         }
 
-        function addBlock(x, y, z, typeId) {
-            const key = getBlockKey(x, y, z);
-            if (blocks.has(key)) return;
+        // --- 보라색 괴물의 원거리 독침/보라구슬 투사체 ---
+        let projectiles = [];
+        function shootMonsterProjectile(origin, targetPos) {
+            const projGeo = new THREE.SphereGeometry(0.38, 12, 12);
+            const projMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+            const mesh = new THREE.Mesh(projGeo, projMat);
+            mesh.position.copy(origin);
+            mesh.position.y = 1.4;
 
-            const mat = createBlockMaterial(typeId);
-            const mesh = new THREE.Mesh(blockGeometry, mat);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            mesh.userData = { typeId, key };
+            const dir = new THREE.Vector3().subVectors(targetPos, mesh.position);
+            dir.y = 0;
+            dir.normalize();
 
             scene.add(mesh);
-            blocks.set(key, mesh);
+            projectiles.push({ mesh, vel: dir.multiplyScalar(13.5), life: 3.0 });
         }
 
-        function removeBlock(x, y, z) {
-            const key = getBlockKey(x, y, z);
-            const mesh = blocks.get(key);
-            if (mesh) {
-                scene.remove(mesh);
-                mesh.geometry.dispose();
-                if (Array.isArray(mesh.material)) {
-                    mesh.material.forEach(m => m.dispose());
-                } else {
-                    mesh.material.dispose();
-                }
-                blocks.delete(key);
+        // --- 플레이어 & 몬스터 물리/상태 변수 ---
+        const playerState = {
+            pos: new THREE.Vector3(0, 0, 6),
+            velY: 0,
+            isGrounded: true,
+            invulnerableTimer: 0,
+            facingAngle: Math.PI
+        };
+
+        const monsterState = {
+            active: false,
+            pos: new THREE.Vector3(0, -6.0, -18),
+            emergeY: -6.0,        // 땅속(-6.0) -> 지상(0.0) 솟아오르기 높이
+            phase: 'HIDDEN',      // 'HIDDEN' | 'EMERGING' | 'CHASING' | 'BURROWING'
+            attackCooldown: 2.5,
+            burrowTimer: 7.0,     // 주기적으로 땅속으로 숨었다가 다른 곳에서 솟아남
+            lungeTimer: 0,
+            lungeDir: new THREE.Vector3()
+        };
+
+        // 플레이어 주변(반경 6~10m) 바닥 위치 계산 헬퍼
+        function getEmergeSpotNearPlayer() {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 6.5 + Math.random() * 3.5;
+            let nx = playerState.pos.x + Math.cos(angle) * dist;
+            let nz = playerState.pos.z + Math.sin(angle) * dist;
+            const maxR = ARENA_RADIUS - 2.2;
+            const r = Math.hypot(nx, nz);
+            if (r > maxR) {
+                nx = (nx / r) * maxR;
+                nz = (nz / r) * maxR;
             }
+            return new THREE.Vector3(nx, 0, nz);
         }
 
-        // Generate Procedural Terrain (Mountains, Trees, Grass)
-        function generateTerrain() {
-            const half = Math.floor(WORLD_SIZE / 2);
-            for (let x = -half; x < half; x++) {
-                for (let z = -half; z < half; z++) {
-                    // Simple Perlin-like height formula
-                    const height = Math.floor(Math.sin(x * 0.3) * Math.cos(z * 0.3) * 2) + 2;
+        // --- 카메라 회전 및 추적 컨트롤 ---
+        let cameraYaw = 0;
+        let isDragging = false;
+        let prevPointerX = 0;
 
-                    // Bedrock & Stone
-                    for (let y = 0; y < height - 1; y++) {
-                        addBlock(x, y, z, 3); // Stone
-                    }
-                    // Dirt
-                    if (height > 0) {
-                        addBlock(x, height - 1, z, 2); // Dirt
-                    }
-                    // Grass Top
-                    addBlock(x, height, z, 1); // Grass
-
-                    // Random Tree Spawning
-                    if (x > -half + 3 && x < half - 3 && z > -half + 3 && z < half - 3) {
-                        if (Math.random() < 0.02 && height >= 1) {
-                            spawnTree(x, height + 1, z);
-                        }
-                    }
-                }
-            }
-        }
-
-        function spawnTree(trunkX, startY, trunkZ) {
-            const trunkHeight = 4 + Math.floor(Math.random() * 2);
-            // Trunk
-            for (let y = 0; y < trunkHeight; y++) {
-                addBlock(trunkX, startY + y, trunkZ, 4);
-            }
-            // Leaves
-            const leafTop = startY + trunkHeight;
-            for (let lx = -2; lx <= 2; lx++) {
-                for (let lz = -2; lz <= 2; lz++) {
-                    for (let ly = -1; ly <= 1; ly++) {
-                        if (Math.abs(lx) === 2 && Math.abs(lz) === 2) continue;
-                        const bx = trunkX + lx;
-                        const by = leafTop + ly;
-                        const bz = trunkZ + lz;
-                        if (!blocks.has(getBlockKey(bx, by, bz))) {
-                            addBlock(bx, by, bz, 5);
-                        }
-                    }
-                }
-            }
-        }
-
-        generateTerrain();
-
-        // Target Outline Mesh for Raycasting
-        const outlineGeo = new THREE.BoxGeometry(1.02, 1.02, 1.02);
-        const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true });
-        const targetOutline = new THREE.Mesh(outlineGeo, outlineMat);
-        targetOutline.visible = false;
-        scene.add(targetOutline);
-
-        // --- PLAYER PHYSICS & COLLISION CONSTANTS ---
-        const GRAVITY = 32.0;           // 중력 가속도
-        const JUMP_FORCE = 10.5;         // 점프 힘
-        const PLAYER_HEIGHT = 1.6;      // 플레이어 키 (눈높이 기준)
-        const PLAYER_RADIUS = 0.3;      // 플레이어 충돌 반경
-
-        let isLocked = false;
-        let isGrounded = false;          // 땅에 닿아있는지 여부
-        let isSprinting = false;
-
-        const moveState = { forward: false, backward: false, left: false, right: false, jump: false };
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-
-        // Pointer Lock Setup
-        const startOverlay = document.getElementById('startOverlay');
-        const playBtn = document.getElementById('playBtn');
-
-        playBtn.addEventListener('click', () => {
-            document.body.requestPointerLock();
+        canvas.addEventListener('pointerdown', (e) => {
+            isDragging = true;
+            prevPointerX = e.clientX;
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - prevPointerX;
+            prevPointerX = e.clientX;
+            cameraYaw -= dx * 0.007;
+        });
+        window.addEventListener('pointerup', () => {
+            isDragging = false;
         });
 
-        document.addEventListener('pointerlockchange', () => {
-            if (document.pointerLockElement === document.body) {
-                isLocked = true;
-                startOverlay.classList.add('hidden');
-            } else {
-                isLocked = false;
-                startOverlay.classList.remove('hidden');
-            }
-        });
-
-        // Camera Look Rotation Logic
-        let pitch = 0; // Vertical angle
-        let yaw = 0;   // Horizontal angle
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isLocked) return;
-
-            const sensitivity = 0.0025;
-            yaw -= e.movementX * sensitivity;
-            pitch -= e.movementY * sensitivity;
-
-            // Clamp pitch to avoid flipping
-            pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
-
-            // Update camera orientation
-            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-            euler.x = pitch;
-            euler.y = yaw;
-            camera.quaternion.setFromEuler(euler);
-        });
-
-        // Keyboard Controls
+        // --- 키보드 & 터치 조이스틱 입력 ---
+        const keys = { w: false, a: false, s: false, d: false };
         window.addEventListener('keydown', (e) => {
-            switch (e.code) {
-                case 'KeyW': moveState.forward = true; break;
-                case 'KeyS': moveState.backward = true; break;
-                case 'KeyA': moveState.left = true; break;
-                case 'KeyD': moveState.right = true; break;
-                case 'Space': 
-                    if (isGrounded) {
-                        velocity.y = JUMP_FORCE;
-                        isGrounded = false;
-                    }
-                    moveState.jump = true;
-                    break;
-                case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
-                case 'Digit1': selectHotbarSlot(1); break;
-                case 'Digit2': selectHotbarSlot(2); break;
-                case 'Digit3': selectHotbarSlot(3); break;
-                case 'Digit4': selectHotbarSlot(4); break;
-                case 'Digit5': selectHotbarSlot(5); break;
-            }
+            const k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
+            if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+            if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
+            if (e.code === 'Space') triggerJump();
         });
-
         window.addEventListener('keyup', (e) => {
-            switch (e.code) {
-                case 'KeyW': moveState.forward = false; break;
-                case 'KeyS': moveState.backward = false; break;
-                case 'KeyA': moveState.left = false; break;
-                case 'KeyD': moveState.right = false; break;
-                case 'Space': moveState.jump = false; break;
-                case 'ShiftLeft': case 'ShiftRight': isSprinting = false; break;
+            const k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
+            if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+            if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
+        });
+
+        function triggerJump() {
+            if (!gameActive) return;
+            if (playerState.isGrounded) {
+                playerState.velY = 10.5;
+                playerState.isGrounded = false;
+                playSfx('jump');
+            }
+        }
+        document.getElementById('jump-btn').addEventListener('click', triggerJump);
+
+        // 가상 조이스틱
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let joyVec = { x: 0, y: 0 };
+        let joyActive = false;
+
+        function handleJoystickMove(clientX, clientY) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxDist = rect.width / 2 - 20;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joyVec.x = dx / maxDist;
+            joyVec.y = dy / maxDist;
+        }
+
+        joystickZone.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            joyActive = true;
+            handleJoystickMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (joyActive) handleJoystickMove(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointerup', () => {
+            if (joyActive) {
+                joyActive = false;
+                joyVec = { x: 0, y: 0 };
+                joystickKnob.style.transform = `translate(0px, 0px)`;
             }
         });
 
-        function selectHotbarSlot(slotNum) {
-            selectedBlockType = slotNum;
-            document.querySelectorAll('.hotbar-slot').forEach(el => el.classList.remove('active'));
-            document.getElementById(`slot-${slotNum}`).classList.add('active');
+        // --- 데미지 처리 (나뭇잎 생명 감소) ---
+        function damagePlayer() {
+            if (playerState.invulnerableTimer > 0 || !gameActive) return;
+
+            lives = Math.max(0, lives - 1);
+            renderLeaves();
+            playSfx('hurt');
+            playerState.invulnerableTimer = 1.6;
+
+            // 화면 붉은 플래시
+            damageOverlay.style.opacity = '1';
+            setTimeout(() => { damageOverlay.style.opacity = '0'; }, 220);
+
+            if (lives <= 0) {
+                endGame(false);
+            }
         }
 
-        // --- AABB COLLISION DETECTION & RESOLUTION ---
-        function checkCollisionAt(pos) {
-            // 플레이어 bounding box 검사
-            const minX = Math.floor(pos.x - PLAYER_RADIUS);
-            const maxX = Math.ceil(pos.x + PLAYER_RADIUS);
-            const minY = Math.floor(pos.y - PLAYER_HEIGHT);
-            const maxY = Math.ceil(pos.y);
-            const minZ = Math.floor(pos.z - PLAYER_RADIUS);
-            const maxZ = Math.ceil(pos.z + PLAYER_RADIUS);
-
-            for (let x = minX; x < maxX; x++) {
-                for (let y = minY; y < maxY; y++) {
-                    for (let z = minZ; z < maxZ; z++) {
-                        const key = getBlockKey(x, y, z);
-                        if (blocks.has(key)) {
-                            // 단순 박스 충돌 연산
-                            const bx = x, by = y, bz = z;
-                            if (pos.x + PLAYER_RADIUS > bx - 0.5 && pos.x - PLAYER_RADIUS < bx + 0.5 &&
-                                pos.y > by - 0.5 && pos.y - PLAYER_HEIGHT < by + 0.5 &&
-                                pos.z + PLAYER_RADIUS > bz - 0.5 && pos.z - PLAYER_RADIUS < bz + 0.5) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            return false;
+        // --- 경보 배너 표시 ---
+        function showBanner(msg) {
+            dangerText.textContent = msg;
+            dangerBanner.style.opacity = '1';
+            setTimeout(() => {
+                dangerBanner.style.opacity = '0';
+            }, 3200);
         }
 
-        // --- RAYCASTING FOR BLOCK BREAK / PLACE ---
-        const raycaster = new THREE.Raycaster();
-        let currentTarget = null; // Stores target block and face normal
+        // --- 게임 시작 & 종료 ---
+        function startGame() {
+            lives = MAX_LIVES;
+            collectedSausages = 0;
+            sausageCountEl.textContent = '0';
+            renderLeaves();
 
-        function updateRaycast() {
-            if (!isLocked) {
-                targetOutline.visible = false;
-                return;
-            }
+            playerState.pos.set(0, 0, 7);
+            playerState.velY = 0;
+            playerState.isGrounded = true;
+            playerState.invulnerableTimer = 0;
+            cameraYaw = 0;
 
-            raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-            const blockMeshes = Array.from(blocks.values());
-            const intersects = raycaster.intersectObjects(blockMeshes);
+            monsterState.active = false;
+            monsterState.phase = 'HIDDEN';
+            monsterState.emergeY = -6.0;
+            monsterState.pos.set(-2, -6.0, -18);
+            monsterState.attackCooldown = 2.0;
+            monsterState.burrowTimer = 7.0;
+            monsterState.lungeTimer = 0;
+            monster.visible = false;
+            burrowHoleGroup.visible = false;
 
-            if (intersects.length > 0 && intersects[0].distance <= 6) {
-                const hit = intersects[0];
-                targetOutline.position.copy(hit.object.position);
-                targetOutline.visible = true;
+            projectiles.forEach(p => scene.remove(p.mesh));
+            projectiles = [];
 
-                currentTarget = {
-                    mesh: hit.object,
-                    point: hit.point,
-                    normal: hit.face.normal,
-                    pos: hit.object.position.clone()
-                };
+            spawnSausages();
+
+            overlayModal.classList.add('hidden');
+            gameActive = true;
+            playSfx('jump');
+        }
+
+        function endGame(isWin) {
+            gameActive = false;
+            overlayModal.classList.remove('hidden');
+
+            if (isWin) {
+                playSfx('win');
+                modalBadge.textContent = '미션 클리어!';
+                modalBadge.className = 'inline-block bg-lime-400 text-lime-950 text-xs font-bold px-3 py-1 rounded-full mb-3';
+                modalTitle.textContent = '소시지 8개 모두 획득!';
+                modalDesc.innerHTML = `축하합니다! 보라색 괴물의 공격을 이겨내고<br>맛있는 칼집 소시지 8개를 모두 모았습니다! (남은 나뭇잎: <span class="text-lime-400 font-bold">${lives}개</span>)`;
+                startBtn.textContent = '다시 플레이하기 ↻';
             } else {
-                targetOutline.visible = false;
-                currentTarget = null;
+                modalBadge.textContent = '게임 오버';
+                modalBadge.className = 'inline-block bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full mb-3';
+                modalTitle.textContent = '나뭇잎 생명을 모두 잃었어요!';
+                modalDesc.innerHTML = `보라색 친구의 매서운 공격에 당했습니다.<br>현재까지 찾은 소시지: <span class="text-yellow-400 font-bold">${collectedSausages} / 8개</span>`;
+                startBtn.textContent = '다시 도전하기 ↻';
             }
         }
 
-        // Mouse Click Block Actions
-        window.addEventListener('mousedown', (e) => {
-            if (!isLocked || !currentTarget) return;
+        startBtn.addEventListener('click', startGame);
 
-            if (e.button === 0) { // Left Click: Break Block
-                removeBlock(currentTarget.pos.x, currentTarget.pos.y, currentTarget.pos.z);
-            } else if (e.button === 2) { // Right Click: Place Block
-                const placePos = currentTarget.pos.clone().add(currentTarget.normal);
-                
-                // 플레이어 신체와 겹치는지 체크 후 설치
-                const playerFeetY = camera.position.y - PLAYER_HEIGHT;
-                const distXZ = Math.hypot(camera.position.x - placePos.x, camera.position.z - placePos.z);
-                const overlapY = (placePos.y + 0.5 > playerFeetY) && (placePos.y - 0.5 < camera.position.y);
-
-                if (!(distXZ < 0.7 && overlapY)) {
-                    addBlock(placePos.x, placePos.y, placePos.z, selectedBlockType);
-                }
-            }
-        });
-
-        // --- GAME LOOP WITH PHYSICS ---
+        // --- 메인 애니메이션 & 게임 루프 ---
         const clock = new THREE.Clock();
 
         function animate() {
             requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+            const elapsed = clock.getElapsedTime();
 
-            const delta = Math.min(clock.getDelta(), 0.1);
+            // 1. 소시지 부유 회전 애니메이션
+            sausages.forEach(s => {
+                if (!s.collected) {
+                    s.mesh.rotation.y = elapsed * 2.2 + s.phase;
+                    s.mesh.position.y = 0.55 + Math.sin(elapsed * 3.5 + s.phase) * 0.12;
+                }
+            });
 
-            if (isLocked) {
-                // 1. 중력 적용
-                velocity.y -= GRAVITY * delta;
+            if (gameActive) {
+                // 2. 플레이어(노랑이) 이동 처리
+                let moveForward = 0;
+                let moveRight = 0;
+                if (keys.w) moveForward += 1;
+                if (keys.s) moveForward -= 1;
+                if (keys.d) moveRight += 1;
+                if (keys.a) moveRight -= 1;
 
-                // 2. 수평 수직 이동 속도 계산
-                const moveSpeed = isSprinting ? 8.0 : 5.0;
-
-                // 입력 방향 벡터 구하기
-                direction.z = Number(moveState.forward) - Number(moveState.backward);
-                direction.x = Number(moveState.right) - Number(moveState.left);
-                direction.normalize();
-
-                // 카메라 회전 기준 이동 방향 계산
-                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                forward.y = 0;
-                forward.normalize();
-
-                const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-                right.y = 0;
-                right.normalize();
-
-                const moveVector = new THREE.Vector3();
-                if (moveState.forward || moveState.backward) moveVector.addScaledVector(forward, direction.z);
-                if (moveState.left || moveState.right) moveVector.addScaledVector(right, direction.x);
-                if (moveVector.lengthSq() > 0) moveVector.normalize();
-
-                // 3. 축별 축분리 충돌 처리 (X -> Z -> Y 순서)
-                
-                // X 축 이동 및 충돌
-                camera.position.x += moveVector.x * moveSpeed * delta;
-                if (checkCollisionAt(camera.position)) {
-                    camera.position.x -= moveVector.x * moveSpeed * delta;
+                if (joyActive) {
+                    moveForward -= joyVec.y;
+                    moveRight += joyVec.x;
                 }
 
-                // Z 축 이동 및 충돌
-                camera.position.z += moveVector.z * moveSpeed * delta;
-                if (checkCollisionAt(camera.position)) {
-                    camera.position.z -= moveVector.z * moveSpeed * delta;
-                }
+                const inputLen = Math.hypot(moveForward, moveRight);
+                if (inputLen > 0.05) {
+                    const normF = moveForward / Math.max(1, inputLen);
+                    const normR = moveRight / Math.max(1, inputLen);
 
-                // Y 축(높이) 이동 및 충돌 (중력/점프 적용)
-                camera.position.y += velocity.y * delta;
-                if (checkCollisionAt(camera.position)) {
-                    // 아래로 떨어지는 중 바닥과 충돌한 경우
-                    if (velocity.y < 0) {
-                        camera.position.y -= velocity.y * delta;
-                        velocity.y = 0;
-                        isGrounded = true;
-                    } 
-                    // 위로 점프 중 천장과 충돌한 경우
-                    else if (velocity.y > 0) {
-                        camera.position.y -= velocity.y * delta;
-                        velocity.y = 0;
-                    }
+                    const sinY = Math.sin(cameraYaw);
+                    const cosY = Math.cos(cameraYaw);
+
+                    const vx = (-sinY * normF + cosY * normR) * 9.2;
+                    const vz = (-cosY * normF - sinY * normR) * 9.2;
+
+                    playerState.pos.x += vx * dt;
+                    playerState.pos.z += vz * dt;
+
+                    // 진행 방향으로 부드럽게 회전
+                    const targetAngle = Math.atan2(vx, vz);
+                    playerState.facingAngle = targetAngle;
+
+                    // 꿈틀거리는 이동 애니메이션
+                    player.scale.y = 1 + Math.sin(elapsed * 18) * 0.08;
+                    player.scale.x = 1 - Math.sin(elapsed * 18) * 0.05;
                 } else {
-                    isGrounded = false;
+                    player.scale.set(1, 1 + Math.sin(elapsed * 4) * 0.03, 1);
                 }
 
-                // 공허(낙사) 방지 처리
-                if (camera.position.y < -30) {
-                    camera.position.set(0, 10, 0);
-                    velocity.set(0, 0, 0);
+                // 점프 & 중력
+                if (!playerState.isGrounded) {
+                    playerState.velY -= 26 * dt;
+                    playerState.pos.y += playerState.velY * dt;
+                    if (playerState.pos.y <= 0) {
+                        playerState.pos.y = 0;
+                        playerState.velY = 0;
+                        playerState.isGrounded = true;
+                    }
                 }
 
-                // HUD Position Update
-                const p = camera.position;
-                document.getElementById('posDisplay').textContent = `${Math.round(p.x)}, ${Math.round(p.y - PLAYER_HEIGHT)}, ${Math.round(p.z)}`;
+                // 원형 하수구 벽 경계 제한
+                const distFromCenter = Math.hypot(playerState.pos.x, playerState.pos.z);
+                const maxR = ARENA_RADIUS - 1.5;
+                if (distFromCenter > maxR) {
+                    playerState.pos.x = (playerState.pos.x / distFromCenter) * maxR;
+                    playerState.pos.z = (playerState.pos.z / distFromCenter) * maxR;
+                }
 
-                updateRaycast();
+                // 무적 점멸 처리
+                if (playerState.invulnerableTimer > 0) {
+                    playerState.invulnerableTimer -= dt;
+                    player.visible = Math.floor(playerState.invulnerableTimer * 15) % 2 === 0;
+                } else {
+                    player.visible = true;
+                }
+
+                // 3. 소시지 수집 판정
+                sausages.forEach(s => {
+                    if (!s.collected) {
+                        const d = Math.hypot(playerState.pos.x - s.mesh.position.x, playerState.pos.z - s.mesh.position.z);
+                        if (d < 1.65) {
+                            s.collected = true;
+                            s.mesh.visible = false;
+                            collectedSausages++;
+                            sausageCountEl.textContent = collectedSausages;
+                            playSfx('sausage');
+
+                            // 첫 번째 소시지를 찾으면 보라색 괴물이 땅을 뚫고 솟아오름!
+                            if (!monsterState.active && collectedSausages >= 1) {
+                                const spot = getEmergeSpotNearPlayer();
+                                monsterState.active = true;
+                                monsterState.phase = 'EMERGING';
+                                monsterState.emergeY = -5.8;
+                                monsterState.pos.set(spot.x, -5.8, spot.z);
+                                monsterState.burrowTimer = 7.5;
+                                monster.visible = true;
+                                burrowHoleGroup.position.set(spot.x, 0, spot.z);
+                                burrowHoleGroup.visible = true;
+                                playSfx('roar');
+                                showBanner('⚠️ 땅이 흔들리며 보라색 친구가 솟아납니다!');
+                            } else if (collectedSausages === 4) {
+                                playSfx('roar');
+                                showBanner('🔥 보라색 친구가 더 자주 땅속에서 기습합니다!');
+                            }
+
+                            if (collectedSausages >= TOTAL_SAUSAGES) {
+                                endGame(true);
+                            }
+                        }
+                    }
+                });
+
+                // 4. 보라색 친구(몬스터) 땅에서 솟아나기 & 추격/공격 로직
+                if (monsterState.active) {
+                    const toPlayer = new THREE.Vector3().subVectors(playerState.pos, monsterState.pos);
+                    toPlayer.y = 0;
+                    const distToPlayer = toPlayer.length();
+                    const baseSpeed = 4.6 + collectedSausages * 0.38;
+
+                    if (monsterState.phase === 'EMERGING') {
+                        // 땅속에서 지상으로 쑥 솟아오르는 연출
+                        monsterState.emergeY += 11.5 * dt;
+                        if (distToPlayer > 0.1) {
+                            monster.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+                        }
+                        // 흙 구덩이 진동 효과
+                        burrowHoleGroup.scale.setScalar(1 + Math.sin(elapsed * 35) * 0.08);
+
+                        if (monsterState.emergeY >= 0) {
+                            monsterState.emergeY = 0;
+                            monsterState.phase = 'CHASING';
+                            monsterState.attackCooldown = 1.4;
+                            // 솟아난 직후 흙 구덩이는 서서히 사라짐
+                            setTimeout(() => {
+                                if (monsterState.phase === 'CHASING') burrowHoleGroup.visible = false;
+                            }, 900);
+                        }
+                        monster.position.set(monsterState.pos.x, monsterState.emergeY, monsterState.pos.z);
+
+                    } else if (monsterState.phase === 'BURROWING') {
+                        // 땅속으로 다시 파고들어 숨는 연출
+                        monsterState.emergeY -= 12.0 * dt;
+                        burrowHoleGroup.visible = true;
+                        burrowHoleGroup.position.set(monsterState.pos.x, 0, monsterState.pos.z);
+
+                        if (monsterState.emergeY <= -5.8) {
+                            // 플레이어 근처 새로운 위치에서 다시 솟아남!
+                            const nextSpot = getEmergeSpotNearPlayer();
+                            monsterState.pos.set(nextSpot.x, -5.8, nextSpot.z);
+                            monsterState.emergeY = -5.8;
+                            monsterState.phase = 'EMERGING';
+                            burrowHoleGroup.position.set(nextSpot.x, 0, nextSpot.z);
+                            playSfx('roar');
+                        }
+                        monster.position.set(monsterState.pos.x, monsterState.emergeY, monsterState.pos.z);
+
+                    } else if (monsterState.phase === 'CHASING') {
+                        // 일정 시간 추격 후 다시 땅속으로 잠수해 기습 준비
+                        monsterState.burrowTimer -= dt;
+                        if (monsterState.burrowTimer <= 0 && monsterState.lungeTimer <= 0) {
+                            monsterState.phase = 'BURROWING';
+                            monsterState.burrowTimer = Math.max(4.5, 7.5 - collectedSausages * 0.35);
+                        }
+
+                        if (monsterState.lungeTimer > 0) {
+                            // 돌진 공격 중!
+                            monsterState.lungeTimer -= dt;
+                            monsterState.pos.addScaledVector(monsterState.lungeDir, (baseSpeed * 2.1) * dt);
+                            monster.rotation.x = 0.25;
+                        } else {
+                            monster.rotation.x = 0;
+                            if (distToPlayer > 0.1) {
+                                toPlayer.normalize();
+                                monsterState.pos.addScaledVector(toPlayer, baseSpeed * dt);
+                                monster.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+                            }
+
+                            // 공격 쿨타임 체크 (근거리 돌진 또는 원거리 독구슬 발사)
+                            monsterState.attackCooldown -= dt;
+                            if (monsterState.attackCooldown <= 0) {
+                                if (distToPlayer < 8.5) {
+                                    monsterState.lungeTimer = 0.65;
+                                    monsterState.lungeDir.copy(toPlayer).normalize();
+                                    monsterState.attackCooldown = 2.6;
+                                    playSfx('roar');
+                                } else {
+                                    shootMonsterProjectile(monsterState.pos, playerState.pos);
+                                    monsterState.attackCooldown = Math.max(1.6, 3.0 - collectedSausages * 0.15);
+                                }
+                            }
+                        }
+
+                        // 몬스터 벽 경계 제한
+                        const mDist = Math.hypot(monsterState.pos.x, monsterState.pos.z);
+                        if (mDist > maxR) {
+                            monsterState.pos.x = (monsterState.pos.x / mDist) * maxR;
+                            monsterState.pos.z = (monsterState.pos.z / mDist) * maxR;
+                        }
+
+                        monster.position.copy(monsterState.pos);
+                        monster.position.y = Math.abs(Math.sin(elapsed * 8)) * 0.18;
+                    }
+
+                    // 몬스터가 지상에 나와 있을 때만 몸통/이빨 충돌 피격 판정
+                    if (monsterState.emergeY > -1.2 && distToPlayer < 1.85 && playerState.pos.y < 1.5) {
+                        damagePlayer();
+                    }
+                }
+
+                // 5. 보라색 투사체 업데이트 및 피격 판정
+                for (let i = projectiles.length - 1; i >= 0; i--) {
+                    const p = projectiles[i];
+                    p.life -= dt;
+                    p.mesh.position.addScaledVector(p.vel, dt);
+
+                    const pDist = Math.hypot(p.mesh.position.x - playerState.pos.x, p.mesh.position.z - playerState.pos.z);
+                    if (pDist < 1.1 && playerState.pos.y < 1.4) {
+                        damagePlayer();
+                        scene.remove(p.mesh);
+                        projectiles.splice(i, 1);
+                        continue;
+                    }
+
+                    if (p.life <= 0 || Math.hypot(p.mesh.position.x, p.mesh.position.z) > ARENA_RADIUS) {
+                        scene.remove(p.mesh);
+                        projectiles.splice(i, 1);
+                    }
+                }
             }
+
+            // 플레이어 메쉬 위치/회전 동기화
+            player.position.copy(playerState.pos);
+            player.rotation.y = playerState.facingAngle;
+
+            // 3인칭 추적 카메라 위치 업데이트
+            const camDist = 11.5;
+            const camHeight = 6.2;
+            const targetCamX = playerState.pos.x + Math.sin(cameraYaw) * camDist;
+            const targetCamZ = playerState.pos.z + Math.cos(cameraYaw) * camDist;
+
+            camera.position.lerp(new THREE.Vector3(targetCamX, playerState.pos.y + camHeight, targetCamZ), 0.12);
+            camera.lookAt(playerState.pos.x, playerState.pos.y + 1.6, playerState.pos.z);
 
             renderer.render(scene, camera);
         }
 
-        // Responsive Window Resize
+        // 화면 리사이즈 대응
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Start Loop
-        animate();
+        window.onload = function () {
+            animate();
+        };
     </script>
 </body>
 </html>

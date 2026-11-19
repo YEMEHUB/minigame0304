@@ -1,1249 +1,2250 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프리미엄 체스 미니게임</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans KR', sans-serif;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>카트라이더 아케이드 레이싱</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-display: 'Black Han Sans', 'Noto Sans KR', sans-serif;
+      --font-body: 'Noto Sans KR', sans-serif;
+    }
 
-        /* Chessboard Aspect Ratio & Grid */
-        .board-container {
-            width: 100%;
-            max-width: 560px;
-            aspect-ratio: 1 / 1;
-        }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-        .board-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            width: 100%;
-            height: 100%;
-        }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #090d16;
+      font-family: var(--font-body);
+      color: #f8fafc;
+    }
 
-        /* Square Colors */
-        .sq-light {
-            background-color: #f0d9b5;
-            color: #b58863;
-        }
-        .sq-dark {
-            background-color: #b58863;
-            color: #f0d9b5;
-        }
+    .font-display {
+      font-family: var(--font-display);
+      letter-spacing: 0.03em;
+    }
 
-        /* Highlights */
-        .sq-selected {
-            background-color: #baca44 !important;
-        }
-        .sq-last-move {
-            background-color: rgba(205, 210, 106, 0.8) !important;
-        }
-        .sq-check {
-            background-color: #e74c3c !important;
-            animation: pulse 1s infinite alternate;
-        }
+    .arcade-btn {
+      position: relative;
+      border-radius: 1rem;
+      font-weight: 900;
+      transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
+      cursor: pointer;
+    }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(0.98); }
-        }
+    .arcade-btn:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
 
-        /* Move Hints */
-        .move-hint {
-            position: relative;
-        }
-        .move-hint::after {
-            content: '';
-            position: absolute;
-            width: 28%;
-            height: 28%;
-            background-color: rgba(20, 85, 30, 0.4);
-            border-radius: 50%;
-        }
-        .capture-hint::after {
-            content: '';
-            position: absolute;
-            width: 85%;
-            height: 85%;
-            border: 4px solid rgba(20, 85, 30, 0.4);
-            border-radius: 50%;
-            background-color: transparent;
-        }
+    .arcade-btn:active {
+      transform: translateY(3px) scale(0.98);
+    }
 
-        /* Piece Graphics Styling */
-        .piece {
-            font-size: min(8vw, 52px);
-            cursor: pointer;
-            transition: transform 0.15s ease-in-out;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-        }
-        .piece:hover {
-            transform: scale(1.1);
-        }
-        .piece.white {
-            color: #ffffff;
-            text-shadow: 0 0 2px #000, 0 0 1px #000;
-        }
-        .piece.black {
-            color: #1a1a1a;
-            text-shadow: 0 0 1px #fff;
-        }
+    .btn-cyan {
+      background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+      box-shadow: 0 5px 0 #0369a1, 0 10px 24px rgba(14, 165, 233, 0.45);
+      border: 1px solid rgba(224, 242, 254, 0.5);
+      color: #ffffff;
+    }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #1f2937;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 3px;
-        }
-    </style>
+    .btn-cyan:active {
+      box-shadow: 0 1px 0 #0369a1, 0 4px 12px rgba(14, 165, 233, 0.35);
+    }
+
+    .btn-amber {
+      background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+      box-shadow: 0 5px 0 #92400e, 0 10px 24px rgba(245, 158, 11, 0.4);
+      border: 1px solid rgba(254, 243, 199, 0.55);
+      color: #111827;
+    }
+
+    .btn-amber:active {
+      box-shadow: 0 1px 0 #92400e, 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .btn-slate {
+      background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+      box-shadow: 0 4px 0 #0f172a, 0 8px 18px rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #f8fafc;
+    }
+
+    .btn-slate:active {
+      box-shadow: 0 1px 0 #0f172a;
+    }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .touch-pad-btn {
+      background: rgba(15, 23, 42, 0.68);
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      transition: transform 0.08s ease, background-color 0.08s ease, border-color 0.08s ease;
+    }
+
+    .touch-pad-btn.active-touch {
+      transform: scale(0.93);
+      background: rgba(56, 189, 248, 0.35);
+      border-color: #38bdf8;
+    }
+
+    .touch-pad-btn.drift-touch.active-touch {
+      background: rgba(251, 191, 36, 0.38);
+      border-color: #fbbf24;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.06); opacity: 0.9; }
+    }
+
+    .countdown-pop {
+      animation: pulseGlow 0.55s ease-out;
+    }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4">
+<body class="select-none overflow-hidden">
+  <!-- 전체 화면 레이싱 캔버스 컨테이너 -->
+  <div id="appContainer" class="relative w-screen h-screen overflow-hidden bg-slate-950">
+    <!-- 메인 2.5D 탑다운 레이싱 캔버스 (텍스트 오버레이 없음, 순수 레이싱 연출용) -->
+    <canvas id="gameCanvas"></canvas>
 
-    <!-- Header -->
-    <header class="w-full max-w-4xl flex justify-between items-center py-2 px-4 bg-slate-800 rounded-xl shadow-lg border border-slate-700 mb-2">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-chess-king text-2xl text-amber-500"></i>
-            <h1 class="text-xl font-bold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
-                미니 체스
-            </h1>
+    <!-- 상단 HUD 바: 순위 / 랩 / 타이머 / 트랙명 / 오디오 및 메뉴 버튼 -->
+    <header id="topHud" class="pointer-events-none absolute top-0 left-0 right-0 z-20 p-2.5 sm:p-4 flex items-start justify-between gap-2">
+      <!-- 좌측: 순위, 랩 카운터, 경과 시간 -->
+      <div class="pointer-events-auto flex flex-wrap items-center gap-2 sm:gap-3">
+        <!-- 순위 카드 -->
+        <div class="glass-panel rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 flex items-baseline gap-1.5">
+          <span class="text-[11px] sm:text-xs font-bold text-sky-300 uppercase">순위</span>
+          <span id="hudRank" class="font-display text-2xl sm:text-4xl text-amber-300 leading-none">1</span>
+          <span class="text-xs sm:text-sm font-bold text-slate-400">/ 4</span>
         </div>
-        <div class="flex items-center gap-2">
-            <button id="btn-sound" class="p-2 px-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">
-                <i class="fa-solid fa-volume-high"></i>
-            </button>
-            <button id="btn-restart" class="p-2 px-3 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg text-sm transition flex items-center gap-1">
-                <i class="fa-solid fa-rotate-right"></i> 새 게임
-            </button>
+
+        <!-- 랩 카운터 -->
+        <div class="glass-panel rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 flex items-baseline gap-1.5">
+          <span class="text-[11px] sm:text-xs font-bold text-emerald-300">랩</span>
+          <span id="hudLap" class="font-display text-xl sm:text-3xl text-white leading-none">1/3</span>
         </div>
+
+        <!-- 레이스 타이머 -->
+        <div class="glass-panel rounded-2xl px-3 sm:px-4 py-1.5 sm:py-2 flex flex-col justify-center">
+          <span class="text-[10px] font-bold text-slate-400 leading-none mb-0.5">기록</span>
+          <span id="hudTimer" class="font-mono text-sm sm:text-lg font-extrabold text-white tracking-wider leading-none">00:00.00</span>
+        </div>
+
+        <!-- 현재 트랙 배지 (데스크톱/태블릿) -->
+        <div class="hidden md:flex glass-panel rounded-2xl px-3.5 py-2 items-center gap-2">
+          <span id="hudTrackDot" class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+          <span id="hudTrackName" class="text-xs font-bold text-slate-200">빌리지 손가락</span>
+        </div>
+      </div>
+
+      <!-- 우측: 미니맵 + 사운드/터치/재시작 버튼 -->
+      <div class="pointer-events-auto flex items-start gap-2 sm:gap-3">
+        <!-- 미니맵 캔버스 -->
+        <div class="glass-panel rounded-2xl p-1.5 sm:p-2 flex flex-col items-center">
+          <canvas id="minimapCanvas" width="112" height="84" class="w-[88px] h-[66px] sm:w-[120px] sm:h-[90px] rounded-xl bg-slate-950/80"></canvas>
+        </div>
+
+        <!-- 컨트롤 버튼 그룹 -->
+        <div class="flex flex-col sm:flex-row gap-1.5 sm:gap-2">
+          <button id="muteBtn" type="button" aria-label="사운드 토글" class="arcade-btn btn-slate w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-base sm:text-lg" title="사운드 켜기/끄기">
+            <span id="muteIcon">🔊</span>
+          </button>
+          <button id="touchToggleBtn" type="button" aria-label="터치 패드 토글" class="arcade-btn btn-slate w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-xs sm:text-sm font-black" title="화면 터치 컨트롤 표시/숨김">
+            PAD
+          </button>
+          <button id="quickRestartBtn" type="button" aria-label="즉시 재시작" class="arcade-btn btn-slate w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center text-base sm:text-lg" title="다시 시작">
+            ↻
+          </button>
+        </div>
+      </div>
     </header>
 
-    <!-- Main Game Container -->
-    <main class="w-full max-w-4xl flex flex-col lg:flex-row gap-4 items-center lg:items-start justify-center flex-grow">
-        
-        <!-- Chessboard Column -->
-        <div class="flex flex-col items-center w-full max-w-[560px]">
-            
-            <!-- Black Player Info Bar -->
-            <div id="player-black-card" class="w-full flex justify-between items-center p-3 bg-slate-800 rounded-t-xl border-t border-x border-slate-700">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl text-slate-200 border border-slate-600">
-                        <i id="black-avatar-icon" class="fa-solid fa-robot"></i>
-                    </div>
-                    <div>
-                        <div class="font-bold text-sm sm:text-base flex items-center gap-2">
-                            <span id="black-name">AI 컴퓨터</span>
-                            <span id="black-turn-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 hidden animate-ping"></span>
-                        </div>
-                        <div id="black-captured" class="flex gap-1 h-5 text-sm text-slate-400 items-center"></div>
-                    </div>
-                </div>
-                <div id="black-timer" class="font-mono text-lg font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700 text-slate-300">
-                    10:00
-                </div>
-            </div>
+    <!-- 카운트다운 / 상태 알림 배지 (레이스 시작 카운트다운 및 부스터 준비 안내) -->
+    <div id="centerBanner" class="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center hidden">
+      <div id="countdownText" class="font-display text-6xl sm:text-8xl text-amber-300 drop-shadow-[0_6px_24px_rgba(0,0,0,0.85)] countdown-pop">3</div>
+      <div id="subBannerText" class="mt-2 px-4 py-1.5 rounded-full bg-slate-950/75 border border-sky-400/40 text-xs sm:text-sm font-bold text-sky-200 hidden"></div>
+    </div>
 
-            <!-- Chessboard -->
-            <div class="board-container relative border-2 border-slate-700 shadow-2xl overflow-hidden">
-                <div id="chessboard" class="board-grid"></div>
-                
-                <!-- Game Over Overlay -->
-                <div id="game-over-modal" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex-col items-center justify-center text-center p-6 z-20">
-                    <i id="game-over-icon" class="fa-solid fa-trophy text-5xl text-amber-400 mb-3 animate-bounce"></i>
-                    <h2 id="game-over-title" class="text-3xl font-extrabold text-white mb-2">체크메이트!</h2>
-                    <p id="game-over-desc" class="text-slate-300 mb-6">백색 플레이어 승리</p>
-                    <button id="btn-modal-restart" class="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold rounded-xl shadow-lg hover:from-amber-400 hover:to-amber-500 transition transform active:scale-95">
-                        다시 시작하기
-                    </button>
-                </div>
-            </div>
-
-            <!-- White Player Info Bar -->
-            <div id="player-white-card" class="w-full flex justify-between items-center p-3 bg-slate-800 rounded-b-xl border-b border-x border-slate-700">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-xl text-slate-900 border border-amber-300">
-                        <i class="fa-solid fa-user"></i>
-                    </div>
-                    <div>
-                        <div class="font-bold text-sm sm:text-base flex items-center gap-2">
-                            <span>플레이어 (백)</span>
-                            <span id="white-turn-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                        </div>
-                        <div id="white-captured" class="flex gap-1 h-5 text-sm text-slate-400 items-center"></div>
-                    </div>
-                </div>
-                <div id="white-timer" class="font-mono text-lg font-bold bg-slate-900 px-3 py-1 rounded border border-slate-700 text-slate-300">
-                    10:00
-                </div>
-            </div>
+    <!-- 하단 대시보드: 부스터 게이지, 아이템 슬롯, 속도계 -->
+    <footer id="bottomHud" class="pointer-events-none absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 z-20 w-[94%] max-w-2xl flex items-end justify-between gap-2 sm:gap-4">
+      <!-- 드리프트 부스터 게이지 -->
+      <div class="pointer-events-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 flex-1 max-w-[230px]">
+        <div class="flex items-center justify-between text-[11px] sm:text-xs font-extrabold mb-1">
+          <span class="text-amber-300 flex items-center gap-1">
+            <span>⚡</span>
+            <span>부스터 게이지</span>
+          </span>
+          <span id="boostPercentText" class="text-slate-200 font-mono">0%</span>
         </div>
-
-        <!-- Right Side Control & History Panel -->
-        <div class="w-full lg:w-72 flex flex-col gap-3">
-            
-            <!-- Game Options Panel -->
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md">
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">게임 설정</h3>
-                
-                <div class="flex flex-col gap-3">
-                    <div>
-                        <label class="text-xs text-slate-300 mb-1 block">대국 모드</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="mode-ai" class="py-2 px-3 text-xs font-bold rounded-lg border border-amber-500 bg-amber-500/20 text-amber-300 flex items-center justify-center gap-1.5 transition">
-                                <i class="fa-solid fa-robot"></i> VS 컴퓨터
-                            </button>
-                            <button id="mode-pvp" class="py-2 px-3 text-xs font-bold rounded-lg border border-slate-600 bg-slate-700 text-slate-300 flex items-center justify-center gap-1.5 hover:bg-slate-650 transition">
-                                <i class="fa-solid fa-users"></i> 2인용
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="ai-difficulty-container">
-                        <label class="text-xs text-slate-300 mb-1 block">AI 난이도</label>
-                        <select id="ai-difficulty" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500">
-                            <option value="easy">초급 (무작위)</option>
-                            <option value="medium">중급 (위치 평가)</option>
-                            <option value="hard" selected>고급 (알파-베타 수읽기)</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Move History Log -->
-            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md flex-grow flex flex-col h-48 lg:h-64">
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 flex justify-between items-center">
-                    <span>수순 기록</span>
-                    <span id="move-count" class="text-amber-400 text-xs font-mono">0 수</span>
-                </h3>
-                <div id="move-log" class="flex-grow overflow-y-auto bg-slate-900 rounded-lg p-2.5 font-mono text-xs space-y-1">
-                    <div class="text-slate-500 italic text-center py-4">게임을 시작하세요</div>
-                </div>
-            </div>
-
-            <!-- Status Indicator -->
-            <div id="status-bar" class="bg-amber-500/10 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-xl text-center text-xs font-medium">
-                백색(플레이어)의 차례입니다.
-            </div>
+        <div class="w-full h-3 sm:h-3.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700/80 p-0.5">
+          <div id="boostGaugeFill" class="h-full w-0 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-cyan-300 transition-all duration-75"></div>
         </div>
-    </main>
+      </div>
 
-    <!-- Footer -->
-    <footer class="mt-4 text-center text-slate-500 text-xs">
-        웹 표준 HTML5 & JS 기반 미니 체스 앱
+      <!-- 보유 아이템 / 순간 부스터 슬롯 (스페이스 또는 아이템 버튼으로 사용) -->
+      <button id="useItemBtn" type="button" class="pointer-events-auto arcade-btn glass-panel rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-2.5 border-2 border-sky-400/35 hover:border-sky-300" title="아이템 사용 (E 또는 Enter)">
+        <div id="itemIconBox" class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-slate-900/90 border border-slate-700 flex items-center justify-center text-xl sm:text-2xl shadow-inner">
+          —
+        </div>
+        <div class="text-left">
+          <div class="text-[10px] font-bold text-sky-300 leading-tight">아이템 [E]</div>
+          <div id="itemNameLabel" class="text-xs sm:text-sm font-black text-white leading-tight mt-0.5">비어있음</div>
+        </div>
+      </button>
+
+      <!-- 속도계 -->
+      <div class="pointer-events-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 text-right min-w-[96px] sm:min-w-[116px]">
+        <div class="text-[10px] font-bold text-slate-400 leading-none">속도</div>
+        <div class="flex items-baseline justify-end gap-1 mt-0.5">
+          <span id="speedValue" class="font-display text-2xl sm:text-3xl text-cyan-300 leading-none">0</span>
+          <span class="text-[11px] font-bold text-slate-300">KM/H</span>
+        </div>
+      </div>
     </footer>
 
-    <!-- JavaScript Logic -->
-    <script>
-        /**
-         * Chess Mini Game Script
-         * Standard rules (including Castling), UI animations, Audio Synthesis, Minimax AI engine with Piece-Square Tables.
-         */
+    <!-- 온스크린 터치 컨트롤 (모바일/태블릿 자동 활성화 또는 PAD 버튼으로 토글 가능) -->
+    <div id="touchControls" class="pointer-events-none absolute inset-x-0 bottom-20 sm:bottom-24 z-20 px-3 sm:px-6 flex items-end justify-between hidden">
+      <!-- 좌측: 좌/우 조향 -->
+      <div class="pointer-events-auto flex items-center gap-2.5 sm:gap-3">
+        <button id="touchLeftBtn" type="button" aria-label="좌회전" class="touch-pad-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white">
+          ◀
+        </button>
+        <button id="touchRightBtn" type="button" aria-label="우회전" class="touch-pad-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white">
+          ▶
+        </button>
+      </div>
 
-        // FontAwesome icons map for chess pieces
-        const PIECE_ICONS = {
-            'p': 'fa-chess-pawn',
-            'r': 'fa-chess-rook',
-            'n': 'fa-chess-knight',
-            'b': 'fa-chess-bishop',
-            'q': 'fa-chess-queen',
-            'k': 'fa-chess-king'
+      <!-- 우측: 드리프트, 브레이크/후진, 가속 -->
+      <div class="pointer-events-auto flex items-center gap-2 sm:gap-3">
+        <button id="touchDriftBtn" type="button" aria-label="드리프트" class="touch-pad-btn drift-touch px-3.5 h-14 sm:h-16 rounded-2xl flex flex-col items-center justify-center text-amber-300 font-black">
+          <span class="text-xs sm:text-sm leading-none">DRIFT</span>
+          <span class="text-[10px] text-amber-100/80 mt-1">드리프트</span>
+        </button>
+        <button id="touchBrakeBtn" type="button" aria-label="브레이크/후진" class="touch-pad-btn w-13 h-14 sm:w-14 sm:h-16 px-2.5 rounded-2xl flex flex-col items-center justify-center text-rose-300 font-black">
+          <span class="text-xs sm:text-sm leading-none">▼</span>
+          <span class="text-[10px] text-rose-100/80 mt-1">제동</span>
+        </button>
+        <button id="touchAccelBtn" type="button" aria-label="가속" class="touch-pad-btn w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center text-sky-300 font-black">
+          <span class="text-lg sm:text-xl leading-none">▲</span>
+          <span class="text-[11px] text-sky-100 mt-1">가속</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 시작 화면 / 트랙 선택 모달 -->
+    <div id="startOverlay" class="absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+      <div class="glass-panel w-full max-w-xl rounded-3xl p-5 sm:p-7 border border-sky-400/30 shadow-2xl">
+        <div class="text-center mb-5">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 text-xs font-extrabold mb-2">
+            <span>🏎️</span>
+            <span>드리프트 &amp; 부스터 아케이드 레이싱</span>
+          </div>
+          <h1 class="font-display text-4xl sm:text-6xl text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-sky-300 to-cyan-200 drop-shadow">
+            카트라이더 레이싱
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-300 mt-2">
+            코너에서 드리프트로 게이지를 채우고 짜릿한 부스터로 1위를 차지하세요!
+          </p>
+        </div>
+
+        <!-- 트랙 선택 카드 -->
+        <div class="mb-5">
+          <div class="text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-2">트랙 선택</div>
+          <div id="trackSelectorGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <!-- JS로 트랙 옵션 카드 생성 -->
+          </div>
+        </div>
+
+        <!-- 조작법 안내 -->
+        <div class="bg-slate-900/75 border border-slate-800 rounded-2xl p-3.5 mb-5 text-xs text-slate-300 space-y-1.5">
+          <div class="font-extrabold text-sky-300 mb-1">조작 안내</div>
+          <div class="flex flex-wrap justify-between gap-2">
+            <span><strong class="text-white">이동/제동:</strong> 방향키(←↑↓→) 또는 WASD</span>
+            <span><strong class="text-amber-300">드리프트:</strong> Shift 또는 Space</span>
+          </div>
+          <div class="flex flex-wrap justify-between gap-2">
+            <span><strong class="text-cyan-300">아이템 사용:</strong> E 또는 Enter</span>
+            <span><strong class="text-emerald-300">모바일/태블릿:</strong> 화면 터치 패드 지원</span>
+          </div>
+        </div>
+
+        <button id="startRaceBtn" type="button" class="arcade-btn btn-cyan w-full py-3.5 sm:py-4 text-xl sm:text-2xl font-display rounded-2xl">
+          레이스 출발!
+        </button>
+      </div>
+    </div>
+
+    <!-- 완주 / 결과 모달 -->
+    <div id="finishOverlay" class="pointer-events-auto absolute inset-0 z-30 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 hidden">
+      <div class="glass-panel w-full max-w-md rounded-3xl p-5 sm:p-7 border border-amber-400/35 text-center shadow-2xl">
+        <div id="finishBadge" class="inline-block px-3.5 py-1 rounded-full bg-amber-400/20 border border-amber-300/40 text-amber-300 text-xs font-extrabold mb-2">
+          레이스 완주!
+        </div>
+        <h2 id="finishTitle" class="font-display text-4xl sm:text-5xl text-white mb-1">1위 달성!</h2>
+        <p id="finishSubtitle" class="text-xs sm:text-sm text-slate-300 mb-4">완벽한 드리프트 라인이었습니다!</p>
+
+        <!-- 순위표 -->
+        <div id="standingsList" class="space-y-2 mb-5 text-left">
+          <!-- JS로 최종 순위 렌더링 -->
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button id="playAgainBtn" type="button" class="arcade-btn btn-amber py-3 px-4 text-base sm:text-lg font-display rounded-2xl">
+            다시 달리기
+          </button>
+          <button id="changeTrackBtn" type="button" class="arcade-btn btn-slate py-3 px-4 text-base sm:text-lg font-bold rounded-2xl">
+            트랙 선택
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 비차단 알림 토스트 (alert 대체용) -->
+    <div id="toastNotice" class="pointer-events-none absolute top-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-slate-900/90 border border-sky-400/40 text-xs sm:text-sm font-bold text-sky-200 shadow-lg opacity-0 transition-opacity duration-200">
+    </div>
+  </div>
+
+  <script>
+    /**
+     * =========================================================================
+     * 카트라이더 아케이드 레이싱 (KartRider Arcade Racing)
+     * 단일 파일 완결형 게임 엔진:
+     * - Catmull-Rom 스플라인 기반 폐곡선 서킷 & 도로 폭/경계/부스터 패드/아이템 박스
+     * - 2.5D 탑다운 시점 렌더링 (트랙 엣지 입체감, 카트 차체/바퀴/드리프트 스파크/부스터 화염)
+     * - 드리프트 물리 & 부스터 게이지 충전 + 순간 부스터 발동
+     * - 3대의 AI 라이벌 카트 (라인 추종, 코너 감속/드리프트, 부스터 사용)
+     * - Web Audio API 합성 사운드 (엔진음, 드리프트 마찰음, 부스터 폭발음, 카운트다운, 완주 팡파레)
+     * - 키보드(방향키/WASD/Shift/Space/E) + 온스크린 터치 컨트롤 + 미니맵
+     * =========================================================================
+     */
+
+    // -------------------------------------------------------------------------
+    // 1. 트랙 데이터 정의 (폐곡선 제어점 및 테마 컬러)
+    // -------------------------------------------------------------------------
+    const TRACK_CONFIGS = [
+      {
+        id: 'village',
+        name: '빌리지 손가락',
+        badge: '초급 · 밸런스',
+        laps: 3,
+        roadWidth: 215,
+        theme: {
+          grassBase: '#132a1e',
+          grassStripe: '#173425',
+          shoulderOuter: '#ef4444',
+          shoulderInner: '#f8fafc',
+          roadFill: '#263042',
+          roadInner: '#1e2736',
+          centerLine: 'rgba(248, 250, 252, 0.24)',
+          accent: '#38bdf8'
+        },
+        // 시계방향 폐곡선 제어점 (월드 좌표 0 ~ 3600 x 0 ~ 2600)
+        controlPoints: [
+          { x: 1800, y: 2100 },
+          { x: 2650, y: 2100 },
+          { x: 3150, y: 1750 },
+          { x: 3050, y: 1120 },
+          { x: 2450, y: 950 },
+          { x: 2050, y: 1220 },
+          { x: 1620, y: 1180 },
+          { x: 1320, y: 680 },
+          { x: 760, y: 640 },
+          { x: 520, y: 1150 },
+          { x: 880, y: 1620 },
+          { x: 640, y: 2050 },
+          { x: 1080, y: 2180 }
+        ]
+      },
+      {
+        id: 'ice',
+        name: '아이스 설산 질주',
+        badge: '중급 · 연속 코너',
+        laps: 3,
+        roadWidth: 205,
+        theme: {
+          grassBase: '#0f2537',
+          grassStripe: '#143047',
+          shoulderOuter: '#06b6d4',
+          shoulderInner: '#e0f2fe',
+          roadFill: '#243b53',
+          roadInner: '#1b2d40',
+          centerLine: 'rgba(186, 230, 253, 0.26)',
+          accent: '#22d3ee'
+        },
+        controlPoints: [
+          { x: 1750, y: 2150 },
+          { x: 2780, y: 2120 },
+          { x: 3220, y: 1580 },
+          { x: 2820, y: 1150 },
+          { x: 2220, y: 1350 },
+          { x: 2120, y: 780 },
+          { x: 1450, y: 560 },
+          { x: 820, y: 760 },
+          { x: 1080, y: 1300 },
+          { x: 540, y: 1560 },
+          { x: 680, y: 2120 }
+        ]
+      },
+      {
+        id: 'factory',
+        name: '팩토리 하이웨이',
+        badge: '고급 · 초고속 직선',
+        laps: 3,
+        roadWidth: 210,
+        theme: {
+          grassBase: '#231b2e',
+          grassStripe: '#2c223a',
+          shoulderOuter: '#f59e0b',
+          shoulderInner: '#fef3c7',
+          roadFill: '#2b2d3b',
+          roadInner: '#20222e',
+          centerLine: 'rgba(253, 224, 71, 0.25)',
+          accent: '#fbbf24'
+        },
+        controlPoints: [
+          { x: 1850, y: 2200 },
+          { x: 2980, y: 2160 },
+          { x: 3280, y: 1420 },
+          { x: 2680, y: 920 },
+          { x: 2020, y: 1020 },
+          { x: 1760, y: 580 },
+          { x: 960, y: 560 },
+          { x: 520, y: 1020 },
+          { x: 940, y: 1480 },
+          { x: 560, y: 1980 },
+          { x: 1120, y: 2220 }
+        ]
+      }
+    ];
+
+    const KART_ROSTER = [
+      { id: 'player', name: '다오 (나)', isPlayer: true, bodyColor: '#38bdf8', accentColor: '#f8fafc', wheelColor: '#0f172a', baseMaxSpeed: 690, accel: 540, turnRate: 2.75 },
+      { id: 'ai1', name: '배찌', isPlayer: false, bodyColor: '#fbbf24', accentColor: '#fffbeb', wheelColor: '#0f172a', baseMaxSpeed: 652, accel: 495, turnRate: 2.6 },
+      { id: 'ai2', name: '디지니', isPlayer: false, bodyColor: '#f43f5e', accentColor: '#ffe4e6', wheelColor: '#0f172a', baseMaxSpeed: 638, accel: 480, turnRate: 2.55 },
+      { id: 'ai3', name: '에띠', isPlayer: false, bodyColor: '#34d399', accentColor: '#ecfdf5', wheelColor: '#0f172a', baseMaxSpeed: 624, accel: 468, turnRate: 2.5 }
+    ];
+
+    // -------------------------------------------------------------------------
+    // 2. Web Audio API 합성 사운드 매니저 (외부 오디오 파일 없음)
+    // -------------------------------------------------------------------------
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.engineOsc = null;
+        this.engineGain = null;
+        this.driftNoise = null;
+        this.driftFilter = null;
+        this.driftGain = null;
+        this.initialized = false;
+      }
+
+      init() {
+        if (this.initialized) {
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+          return;
+        }
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+          this.ctx = new AudioCtx();
+
+          // 엔진 험 사운드 (톱니파 + 로우패스 필터)
+          this.engineOsc = this.ctx.createOscillator();
+          this.engineOsc.type = 'sawtooth';
+          this.engineOsc.frequency.value = 55;
+
+          const engineFilter = this.ctx.createBiquadFilter();
+          engineFilter.type = 'lowpass';
+          engineFilter.frequency.value = 240;
+
+          this.engineGain = this.ctx.createGain();
+          this.engineGain.gain.value = 0.0001;
+
+          this.engineOsc.connect(engineFilter);
+          engineFilter.connect(this.engineGain);
+          this.engineGain.connect(this.ctx.destination);
+          this.engineOsc.start();
+
+          // 드리프트 마찰 사운드 (화이트 노이즈 버퍼 + 밴드패스 필터)
+          const bufferSize = this.ctx.sampleRate * 1.5;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          this.driftNoise = this.ctx.createBufferSource();
+          this.driftNoise.buffer = noiseBuffer;
+          this.driftNoise.loop = true;
+
+          this.driftFilter = this.ctx.createBiquadFilter();
+          this.driftFilter.type = 'bandpass';
+          this.driftFilter.frequency.value = 1350;
+          this.driftFilter.Q.value = 3.2;
+
+          this.driftGain = this.ctx.createGain();
+          this.driftGain.gain.value = 0.0001;
+
+          this.driftNoise.connect(this.driftFilter);
+          this.driftFilter.connect(this.driftGain);
+          this.driftGain.connect(this.ctx.destination);
+          this.driftNoise.start();
+
+          this.initialized = true;
+        } catch (err) {
+          console.warn('Web Audio 초기화 실패:', err);
+        }
+      }
+
+      setMuted(mute) {
+        this.muted = mute;
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        if (this.muted) {
+          this.engineGain.gain.setTargetAtTime(0.0001, now, 0.05);
+          this.driftGain.gain.setTargetAtTime(0.0001, now, 0.05);
+        }
+      }
+
+      updateContinuous(speedRatio, isDrifting, isBoosting, activeRace) {
+        if (!this.initialized || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        if (this.muted || !activeRace) {
+          this.engineGain.gain.setTargetAtTime(0.0001, now, 0.08);
+          this.driftGain.gain.setTargetAtTime(0.0001, now, 0.08);
+          return;
+        }
+
+        const clampedSpeed = Math.max(0, Math.min(1.4, speedRatio));
+        const targetFreq = 52 + clampedSpeed * 115 + (isBoosting ? 36 : 0);
+        const targetEngineVol = 0.025 + clampedSpeed * 0.045;
+        this.engineOsc.frequency.setTargetAtTime(targetFreq, now, 0.06);
+        this.engineGain.gain.setTargetAtTime(targetEngineVol, now, 0.06);
+
+        const targetDriftVol = isDrifting && clampedSpeed > 0.25 ? 0.045 : 0.0001;
+        this.driftFilter.frequency.setTargetAtTime(isBoosting ? 1750 : 1280, now, 0.06);
+        this.driftGain.gain.setTargetAtTime(targetDriftVol, now, 0.05);
+      }
+
+      playBeep(isGo = false) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = isGo ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(isGo ? 880 : 520, now);
+          if (isGo) {
+            osc.frequency.exponentialRampToValueAtTime(1174.66, now + 0.22);
+          }
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + (isGo ? 0.35 : 0.16));
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + (isGo ? 0.36 : 0.18));
+        } catch (err) {}
+      }
+
+      playBoostWhoosh() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(680, now + 0.18);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.55);
+
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.58);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.6);
+        } catch (err) {}
+      }
+
+      playPickup() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const notes = [587.33, 880, 1174.66];
+          notes.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            const t = now + idx * 0.055;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.11, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.15);
+          });
+        } catch (err) {}
+      }
+
+      playLapChime(isFinal = false) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const seq = isFinal ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 783.99];
+          seq.forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            const t = now + idx * 0.09;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.13, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.26);
+          });
+        } catch (err) {}
+      }
+
+      playFinishFanfare() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const melody = [
+            { f: 523.25, d: 0.12 },
+            { f: 659.25, d: 0.12 },
+            { f: 783.99, d: 0.12 },
+            { f: 1046.5, d: 0.34 },
+            { f: 783.99, d: 0.14 },
+            { f: 1046.5, d: 0.5 }
+          ];
+          let cursor = now;
+          melody.forEach((note) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(note.f, cursor);
+            gain.gain.setValueAtTime(0.15, cursor);
+            gain.gain.exponentialRampToValueAtTime(0.001, cursor + note.d);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(cursor);
+            osc.stop(cursor + note.d + 0.02);
+            cursor += note.d * 0.92;
+          });
+        } catch (err) {}
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. 폐곡선 Catmull-Rom 스플라인 트랙 빌더
+    // -------------------------------------------------------------------------
+    function catmullRom(p0, p1, p2, p3, t) {
+      const t2 = t * t;
+      const t3 = t2 * t;
+      return {
+        x:
+          0.5 *
+          (2 * p1.x +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y:
+          0.5 *
+          (2 * p1.y +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+      };
+    }
+
+    function buildTrackData(config) {
+      const pts = config.controlPoints;
+      const n = pts.length;
+      const samplesPerSegment = 45;
+      const rawPoints = [];
+
+      for (let i = 0; i < n; i++) {
+        const p0 = pts[(i - 1 + n) % n];
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % n];
+        const p3 = pts[(i + 2) % n];
+        for (let s = 0; s < samplesPerSegment; s++) {
+          const t = s / samplesPerSegment;
+          rawPoints.push(catmullRom(p0, p1, p2, p3, t));
+        }
+      }
+
+      // 균일한 아크 길이(arc-length) 샘플링으로 트랙 진행도(0~1) 정확도 향상
+      const cumLengths = [0];
+      let totalLength = 0;
+      for (let i = 1; i <= rawPoints.length; i++) {
+        const a = rawPoints[i - 1];
+        const b = rawPoints[i % rawPoints.length];
+        const dist = Math.hypot(b.x - a.x, b.y - a.y);
+        totalLength += dist;
+        cumLengths.push(totalLength);
+      }
+
+      const uniformCount = 360;
+      const spine = [];
+      let rawIdx = 0;
+
+      for (let u = 0; u < uniformCount; u++) {
+        const targetDist = (u / uniformCount) * totalLength;
+        while (rawIdx < rawPoints.length - 1 && cumLengths[rawIdx + 1] < targetDist) {
+          rawIdx++;
+        }
+        const segStart = cumLengths[rawIdx];
+        const segEnd = cumLengths[rawIdx + 1];
+        const alpha = segEnd > segStart ? (targetDist - segStart) / (segEnd - segStart) : 0;
+        const a = rawPoints[rawIdx];
+        const b = rawPoints[(rawIdx + 1) % rawPoints.length];
+        spine.push({
+          x: a.x + (b.x - a.x) * alpha,
+          y: a.y + (b.y - a.y) * alpha,
+          progress: u / uniformCount
+        });
+      }
+
+      // 접선 벡터 & 곡률 계산
+      for (let i = 0; i < uniformCount; i++) {
+        const prev = spine[(i - 1 + uniformCount) % uniformCount];
+        const curr = spine[i];
+        const next = spine[(i + 1) % uniformCount];
+        const tx = next.x - prev.x;
+        const ty = next.y - prev.y;
+        const len = Math.hypot(tx, ty) || 1;
+        curr.tx = tx / len;
+        curr.ty = ty / len;
+        curr.nx = -curr.ty;
+        curr.ny = curr.tx;
+        curr.angle = Math.atan2(curr.ty, curr.tx);
+      }
+
+      for (let i = 0; i < uniformCount; i++) {
+        const prev = spine[(i - 4 + uniformCount) % uniformCount];
+        const next = spine[(i + 4) % uniformCount];
+        let diff = next.angle - prev.angle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        spine[i].curvature = diff; // 양수: 우회전 코너, 음수: 좌회전 코너
+      }
+
+      // 부스터 패드 배치 (트랙 진행 비율 기준)
+      const boostRatios = [0.14, 0.39, 0.64, 0.88];
+      const boostPads = boostRatios.map((r, idx) => {
+        const pt = getSpineAtProgress(spine, r);
+        const lateral = idx % 2 === 0 ? -config.roadWidth * 0.14 : config.roadWidth * 0.14;
+        return {
+          x: pt.x + pt.nx * lateral,
+          y: pt.y + pt.ny * lateral,
+          angle: pt.angle,
+          radius: 44
         };
+      });
 
-        // Base Piece Values
-        const PIECE_VALUES = {
-            'p': 100,
-            'n': 320,
-            'b': 330,
-            'r': 500,
-            'q': 900,
-            'k': 20000
-        };
+      // 아이템 박스 배치 (트랙 진행 비율 기준, 좌/우/중앙 교차)
+      const itemRatios = [0.08, 0.22, 0.31, 0.47, 0.56, 0.72, 0.81, 0.93];
+      const itemBoxes = [];
+      itemRatios.forEach((r, idx) => {
+        const pt = getSpineAtProgress(spine, r);
+        const offsets = [-config.roadWidth * 0.26, 0, config.roadWidth * 0.26];
+        offsets.forEach((lat, subIdx) => {
+          itemBoxes.push({
+            id: `${idx}-${subIdx}`,
+            x: pt.x + pt.nx * lat,
+            y: pt.y + pt.ny * lat,
+            angle: pt.angle,
+            radius: 24,
+            respawnTimer: 0,
+            bobPhase: (idx + subIdx) * 0.9
+          });
+        });
+      });
 
-        // Piece-Square Tables for positional evaluation
-        const PST = {
-            p: [
-                [ 0,  0,  0,  0,  0,  0,  0,  0],
-                [50, 50, 50, 50, 50, 50, 50, 50],
-                [10, 10, 20, 30, 30, 20, 10, 10],
-                [ 5,  5, 10, 27, 27, 10,  5,  5],
-                [ 0,  0,  0, 25, 25,  0,  0,  0],
-                [ 5, -5,-10,  0,  0,-10, -5,  5],
-                [ 5, 10, 10,-25,-25, 10, 10,  5],
-                [ 0,  0,  0,  0,  0,  0,  0,  0]
-            ],
-            n: [
-                [-50,-40,-30,-30,-30,-30,-40,-50],
-                [-40,-20,  0,  0,  0,  0,-20,-40],
-                [-30,  0, 10, 15, 15, 10,  0,-30],
-                [-30,  5, 15, 20, 20, 15,  5,-30],
-                [-30,  0, 15, 20, 20, 15,  0,-30],
-                [-30,  5, 10, 15, 15, 10,  5,-30],
-                [-40,-20,  0,  5,  5,  0,-20,-40],
-                [-50,-40,-30,-30,-30,-30,-40,-50]
-            ],
-            b: [
-                [-20,-10,-10,-10,-10,-10,-10,-20],
-                [-10,  0,  0,  0,  0,  0,  0,-10],
-                [-10,  0,  5, 10, 10,  5,  0,-10],
-                [-10,  5,  5, 10, 10,  5,  5,-10],
-                [-10,  0, 10, 10, 10, 10,  0,-10],
-                [-10, 10, 10, 10, 10, 10, 10,-10],
-                [-10,  5,  0,  0,  0,  0,  5,-10],
-                [-20,-10,-10,-10,-10,-10,-10,-20]
-            ],
-            r: [
-                [ 0,  0,  0,  0,  0,  0,  0,  0],
-                [ 5, 10, 10, 10, 10, 10, 10,  5],
-                [-5,  0,  0,  0,  0,  0,  0, -5],
-                [-5,  0,  0,  0,  0,  0,  0, -5],
-                [-5,  0,  0,  0,  0,  0,  0, -5],
-                [-5,  0,  0,  0,  0,  0,  0, -5],
-                [-5,  0,  0,  0,  0,  0,  0, -5],
-                [ 0,  0,  0,  5,  5,  0,  0,  0]
-            ],
-            q: [
-                [-20,-10,-10, -5, -5,-10,-10,-20],
-                [-10,  0,  0,  0,  0,  0,  0,-10],
-                [-10,  0,  5,  5,  5,  5,  0,-10],
-                [ -5,  0,  5,  5,  5,  5,  0, -5],
-                [  0,  0,  5,  5,  5,  5,  0, -5],
-                [-10,  5,  5,  5,  5,  5,  0,-10],
-                [-10,  0,  5,  0,  0,  0,  0,-10],
-                [-20,-10,-10, -5, -5,-10,-10,-20]
-            ],
-            k: [
-                [-30,-40,-40,-50,-50,-40,-40,-30],
-                [-30,-40,-40,-50,-50,-40,-40,-30],
-                [-30,-40,-40,-50,-50,-40,-40,-30],
-                [-30,-40,-40,-50,-50,-40,-40,-30],
-                [-20,-30,-30,-40,-40,-30,-30,-20],
-                [-10,-20,-20,-20,-20,-20,-20,-10],
-                [ 20, 20,  0,  0,  0,  0, 20, 20],
-                [ 20, 30, 10,  0,  0, 10, 30, 20]
-            ]
-        };
+      // 월드 경계 계산
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of spine) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
 
-        // Chess Opening Book Sequences for Black
-        const OPENING_BOOK = [
-            // Sicilian Defense style response against e4 (1... c5)
-            [
-                { moveNum: 1, whiteFrom: 'e2', whiteTo: 'e4', replyFrom: {r: 1, c: 2}, replyTo: {r: 3, c: 2} }, // c7-c5
-                { moveNum: 2, whiteFrom: 'g1', whiteTo: 'f3', replyFrom: {r: 1, c: 3}, replyTo: {r: 2, c: 3} }  // d7-d6
-            ],
-            // Open Game / Italian / Ruy Lopez style response against e4 (1... e5)
-            [
-                { moveNum: 1, whiteFrom: 'e2', whiteTo: 'e4', replyFrom: {r: 1, c: 4}, replyTo: {r: 3, c: 4} }, // e7-e5
-                { moveNum: 2, whiteFrom: 'g1', whiteTo: 'f3', replyFrom: {r: 0, c: 1}, replyTo: {r: 2, c: 2} }  // Nb8-c6
-            ],
-            // French Defense style response against e4 (1... e6)
-            [
-                { moveNum: 1, whiteFrom: 'e2', whiteTo: 'e4', replyFrom: {r: 1, c: 4}, replyTo: {r: 2, c: 4} }, // e7-e6
-                { moveNum: 2, whiteFrom: 'd2', whiteTo: 'd4', replyFrom: {r: 1, c: 3}, replyTo: {r: 3, c: 3} }  // d7-d5
-            ],
-            // King's Indian / Indian Defense response against d4 (1... Nf6)
-            [
-                { moveNum: 1, whiteFrom: 'd2', whiteTo: 'd4', replyFrom: {r: 0, c: 6}, replyTo: {r: 2, c: 5} }, // Ng8-f6
-                { moveNum: 2, whiteFrom: 'c2', whiteTo: 'c4', replyFrom: {r: 1, c: 6}, replyTo: {r: 2, c: 6} }  // g7-g6
-            ],
-            // Queen's Gambit Declined response against d4 (1... d5)
-            [
-                { moveNum: 1, whiteFrom: 'd2', whiteTo: 'd4', replyFrom: {r: 1, c: 3}, replyTo: {r: 3, c: 3} }, // d7-d5
-                { moveNum: 2, whiteFrom: 'c2', whiteTo: 'c4', replyFrom: {r: 1, c: 4}, replyTo: {r: 2, c: 4} }  // e7-e6
-            ]
-        ];
+      return {
+        config,
+        spine,
+        totalLength,
+        roadWidth: config.roadWidth,
+        boostPads,
+        itemBoxes,
+        bounds: {
+          minX: minX - 650,
+          maxX: maxX + 650,
+          minY: minY - 650,
+          maxY: maxY + 650
+        }
+      };
+    }
 
-        // State variables
-        let board = [];
-        let turn = 'w'; // 'w' or 'b'
-        let selectedSq = null;
-        let validMoves = [];
-        let history = [];
-        let capturedPieces = { w: [], b: [] };
-        let isGameOver = false;
-        let gameMode = 'ai'; // 'ai' or 'pvp'
-        let aiDifficulty = 'hard';
-        let soundEnabled = true;
-        let selectedOpeningIndex = 0;
+    function getSpineAtProgress(spine, progress) {
+      const wrapped = ((progress % 1) + 1) % 1;
+      const exactIdx = wrapped * spine.length;
+      const i0 = Math.floor(exactIdx) % spine.length;
+      const i1 = (i0 + 1) % spine.length;
+      const frac = exactIdx - Math.floor(exactIdx);
+      const a = spine[i0];
+      const b = spine[i1];
+      return {
+        x: a.x + (b.x - a.x) * frac,
+        y: a.y + (b.y - a.y) * frac,
+        tx: a.tx,
+        ty: a.ty,
+        nx: a.nx,
+        ny: a.ny,
+        angle: a.angle,
+        curvature: a.curvature,
+        progress: wrapped
+      };
+    }
 
-        // Castling Rights Tracking
-        let movedRights = {
-            wKingMoved: false,
-            wRookA: false,
-            wRookH: false,
-            bKingMoved: false,
-            bRookA: false,
-            bRookH: false
-        };
+    function findNearestSpinePoint(spine, x, y, hintIndex = null, windowSize = 36) {
+      let bestIdx = 0;
+      let bestDistSq = Infinity;
+      const n = spine.length;
 
-        // Timers
-        let timers = { w: 600, b: 600 };
-        let timerInterval = null;
-
-        // Web Audio API Context
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        let audioCtx = null;
-
-        function playSound(type) {
-            if (!soundEnabled) return;
-            try {
-                if (!audioCtx) audioCtx = new AudioContext();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                const now = audioCtx.currentTime;
-
-                if (type === 'move') {
-                    osc.frequency.setValueAtTime(300, now);
-                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
-                    osc.start(now);
-                    osc.stop(now + 0.08);
-                } else if (type === 'capture') {
-                    osc.frequency.setValueAtTime(600, now);
-                    osc.frequency.exponentialRampToValueAtTime(200, now + 0.12);
-                    gain.gain.setValueAtTime(0.4, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-                    osc.start(now);
-                    osc.stop(now + 0.12);
-                } else if (type === 'check') {
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(440, now);
-                    osc.frequency.setValueAtTime(880, now + 0.1);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
-                    osc.start(now);
-                    osc.stop(now + 0.25);
-                } else if (type === 'castle') {
-                    osc.frequency.setValueAtTime(250, now);
-                    osc.frequency.setValueAtTime(400, now + 0.06);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-                    osc.start(now);
-                    osc.stop(now + 0.15);
-                }
-            } catch (e) {
-                console.log("Audio play error:", e);
+      if (hintIndex !== null && hintIndex >= 0) {
+        for (let offset = -windowSize; offset <= windowSize; offset++) {
+          const idx = (hintIndex + offset + n) % n;
+          const dx = x - spine[idx].x;
+          const dy = y - spine[idx].y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestDistSq) {
+            bestDistSq = d2;
+            bestIdx = idx;
+          }
+        }
+        // 힌트 주변에서 너무 멀어졌을 경우 전체 탐색 fallback
+        if (bestDistSq > 480 * 480) {
+          for (let i = 0; i < n; i++) {
+            const dx = x - spine[i].x;
+            const dy = y - spine[i].y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestDistSq) {
+              bestDistSq = d2;
+              bestIdx = i;
             }
+          }
+        }
+      } else {
+        for (let i = 0; i < n; i++) {
+          const dx = x - spine[i].x;
+          const dy = y - spine[i].y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestDistSq) {
+            bestDistSq = d2;
+            bestIdx = i;
+          }
+        }
+      }
+
+      const pt = spine[bestIdx];
+      const dist = Math.sqrt(bestDistSq);
+      return { index: bestIdx, point: pt, dist };
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. 파티클 시스템 (드리프트 스파크, 부스터 화염, 충돌/아이템 이펙트)
+    // -------------------------------------------------------------------------
+    class ParticlePool {
+      constructor() {
+        this.particles = [];
+      }
+
+      clear() {
+        this.particles.length = 0;
+      }
+
+      spawn(opts) {
+        if (this.particles.length > 420) {
+          this.particles.shift();
+        }
+        this.particles.push({
+          x: opts.x,
+          y: opts.y,
+          vx: opts.vx || 0,
+          vy: opts.vy || 0,
+          size: opts.size || 5,
+          color: opts.color || '#fbbf24',
+          alpha: opts.alpha ?? 1,
+          life: 0,
+          maxLife: opts.maxLife || 0.4,
+          glow: opts.glow || false
+        });
+      }
+
+      update(dt) {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          const p = this.particles[i];
+          p.life += dt;
+          if (p.life >= p.maxLife) {
+            this.particles.splice(i, 1);
+            continue;
+          }
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.vx *= 0.94;
+          p.vy *= 0.94;
+          p.alpha = Math.max(0, 1 - p.life / p.maxLife);
+        }
+      }
+
+      draw(ctx) {
+        for (const p of this.particles) {
+          ctx.save();
+          ctx.globalAlpha = p.alpha;
+          if (p.glow) {
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 10;
+          }
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (0.45 + 0.55 * p.alpha), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. 카트 엔티티 (플레이어 및 AI 라이벌)
+    // -------------------------------------------------------------------------
+    class Kart {
+      constructor(rosterSpec, index, track) {
+        this.id = rosterSpec.id;
+        this.name = rosterSpec.name;
+        this.isPlayer = rosterSpec.isPlayer;
+        this.bodyColor = rosterSpec.bodyColor;
+        this.accentColor = rosterSpec.accentColor;
+        this.wheelColor = rosterSpec.wheelColor;
+        this.baseMaxSpeed = rosterSpec.baseMaxSpeed;
+        this.accel = rosterSpec.accel;
+        this.turnRate = rosterSpec.turnRate;
+        this.gridIndex = index;
+
+        this.radius = 22;
+        this.resetOnGrid(track);
+      }
+
+      resetOnGrid(track) {
+        // 출발선 뒤쪽 2x2 그리드 배치
+        const row = Math.floor(this.gridIndex / 2);
+        const col = this.gridIndex % 2 === 0 ? -1 : 1;
+        const startProgress = ((1 - 0.024 - row * 0.022) % 1 + 1) % 1;
+        const sp = getSpineAtProgress(track.spine, startProgress);
+        const lateralOffset = col * (track.roadWidth * 0.22);
+
+        this.x = sp.x + sp.nx * lateralOffset;
+        this.y = sp.y + sp.ny * lateralOffset;
+        this.angle = sp.angle;
+        this.visualAngle = sp.angle;
+        this.vx = 0;
+        this.vy = 0;
+        this.speed = 0;
+
+        // 드리프트 및 부스터 상태
+        this.isDrifting = false;
+        this.driftDir = 0; // -1 좌측, +1 우측
+        this.driftCharge = 0; // 0 ~ 100
+        this.boostTimer = 0; // 남은 부스터 시간(초)
+        this.spinOutTimer = 0; // 아이템 피격 스핀 시간
+
+        // 아이템 슬롯 ('boost' | 'shield' | 'turbo' | null)
+        this.item = null;
+        this.shieldTimer = 0;
+
+        // 진행도 및 랩 추적
+        const nearest = findNearestSpinePoint(track.spine, this.x, this.y);
+        this.spineIndex = nearest.index;
+        this.progress = nearest.point.progress;
+        this.prevProgress = this.progress;
+        this.lap = 1;
+        this.totalProgress = this.progress;
+        this.finished = false;
+        this.finishTime = null;
+        this.rank = this.gridIndex + 1;
+
+        // AI 전용 변수
+        this.aiLaneOffset = col * (track.roadWidth * 0.24);
+        this.aiLaneTimer = 1.2 + this.gridIndex * 0.6;
+        this.aiLookahead = 0.055 + this.gridIndex * 0.006;
+      }
+
+      giveBoost(duration = 1.25) {
+        this.boostTimer = Math.max(this.boostTimer, duration);
+      }
+
+      grantRandomItem() {
+        if (this.item) return false;
+        const pool = ['boost', 'turbo', 'shield'];
+        this.item = pool[Math.floor(Math.random() * pool.length)];
+        return true;
+      }
+
+      useItem(sound, onNotice) {
+        if (!this.item || this.finished) return;
+        const used = this.item;
+        this.item = null;
+
+        if (used === 'boost') {
+          this.giveBoost(1.45);
+          sound.playBoostWhoosh();
+          if (this.isPlayer && onNotice) onNotice('⚡ 부스터 아이템 발동!');
+        } else if (used === 'turbo') {
+          this.giveBoost(2.0);
+          this.driftCharge = Math.min(100, this.driftCharge + 35);
+          sound.playBoostWhoosh();
+          if (this.isPlayer && onNotice) onNotice('🚀 메가 터보 분사!');
+        } else if (used === 'shield') {
+          this.shieldTimer = 5.5;
+          sound.playPickup();
+          if (this.isPlayer && onNotice) onNotice('🛡️ 보호막 활성화!');
+        }
+      }
+
+      update(dt, input, track, particles, sound, raceActive, onLapChange, onNotice) {
+        if (this.shieldTimer > 0) {
+          this.shieldTimer = Math.max(0, this.shieldTimer - dt);
         }
 
-        // Initialize Board Standard Setup
-        function initBoard() {
-            board = [
-                [{t:'r',c:'b'}, {t:'n',c:'b'}, {t:'b',c:'b'}, {t:'q',c:'b'}, {t:'k',c:'b'}, {t:'b',c:'b'}, {t:'n',c:'b'}, {t:'r',c:'b'}],
-                [{t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}, {t:'p',c:'b'}],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                [null, null, null, null, null, null, null, null],
-                [{t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}, {t:'p',c:'w'}],
-                [{t:'r',c:'w'}, {t:'n',c:'w'}, {t:'b',c:'w'}, {t:'q',c:'w'}, {t:'k',c:'w'}, {t:'b',c:'w'}, {t:'n',c:'w'}, {t:'r',c:'w'}]
-            ];
-            
-            turn = 'w';
-            selectedSq = null;
-            validMoves = [];
-            history = [];
-            capturedPieces = { w: [], b: [] };
-            isGameOver = false;
-            timers = { w: 600, b: 600 };
-            selectedOpeningIndex = Math.floor(Math.random() * OPENING_BOOK.length);
-
-            movedRights = {
-                wKingMoved: false,
-                wRookA: false,
-                wRookH: false,
-                bKingMoved: false,
-                bRookA: false,
-                bRookH: false
-            };
-
-            clearInterval(timerInterval);
-            startTimer();
-
-            renderBoard();
-            updateUI();
+        if (this.spinOutTimer > 0) {
+          this.spinOutTimer = Math.max(0, this.spinOutTimer - dt);
+          this.angle += 11.5 * dt;
+          this.visualAngle = this.angle;
+          this.vx *= Math.pow(0.25, dt);
+          this.vy *= Math.pow(0.25, dt);
+          this.x += this.vx * dt;
+          this.y += this.vy * dt;
+          this.speed = Math.hypot(this.vx, this.vy);
+          this.updateProgress(track, onLapChange);
+          return;
         }
 
-        // Timer Function
-        function startTimer() {
-            timerInterval = setInterval(() => {
-                if (isGameOver) return;
-                
-                timers[turn]--;
-                updateTimerDisplay();
+        // 조작 입력 결정 (플레이어 vs AI)
+        let throttle = 0;
+        let brake = 0;
+        let steer = 0;
+        let wantDrift = false;
 
-                if (timers[turn] <= 0) {
-                    endGame(turn === 'w' ? 'b' : 'w', '시간 초과 승리!');
-                }
-            }, 1000);
+        if (!raceActive) {
+          throttle = 0;
+        } else if (this.isPlayer && !this.finished) {
+          throttle = (input.up ? 1 : 0);
+          brake = (input.down ? 1 : 0);
+          steer = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+          wantDrift = Boolean(input.drift);
+        } else {
+          // AI 운전 로직 (완주 후에도 트랙을 따라 부드럽게 주행)
+          const aiCtrl = this.computeAiControl(dt, track);
+          throttle = aiCtrl.throttle;
+          brake = aiCtrl.brake;
+          steer = aiCtrl.steer;
+          wantDrift = aiCtrl.wantDrift;
         }
 
-        function updateTimerDisplay() {
-            const formatTime = (s) => {
-                const m = Math.floor(s / 60);
-                const sec = s % 60;
-                return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-            };
-            document.getElementById('white-timer').textContent = formatTime(timers.w);
-            document.getElementById('black-timer').textContent = formatTime(timers.b);
+        // 부스터 타이머 감소
+        if (this.boostTimer > 0) {
+          this.boostTimer = Math.max(0, this.boostTimer - dt);
         }
 
-        // Render Chessboard
-        function renderBoard() {
-            const boardEl = document.getElementById('chessboard');
-            boardEl.innerHTML = '';
+        // 현재 노면이 도로 안인지 오프로드(잔디/설원/외곽)인지 판별
+        const nearest = findNearestSpinePoint(track.spine, this.x, this.y, this.spineIndex, 34);
+        this.spineIndex = nearest.index;
+        const onRoad = nearest.dist <= track.roadWidth * 0.56;
 
-            const kingInCheck = isKingInCheck(turn, board) ? findKing(turn, board) : null;
-            const lastMove = history.length > 0 ? history[history.length - 1] : null;
+        // 속도 벡터를 전진(forward)과 측면(lateral) 성분으로 분해
+        const fx = Math.cos(this.angle);
+        const fy = Math.sin(this.angle);
+        const rx = -fy;
+        const ry = fx;
 
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const square = document.createElement('div');
-                    const isLight = (r + c) % 2 === 0;
-                    square.className = `flex items-center justify-center relative cursor-pointer ${isLight ? 'sq-light' : 'sq-dark'}`;
-                    square.dataset.r = r;
-                    square.dataset.c = c;
+        let forwardSpeed = this.vx * fx + this.vy * fy;
+        let lateralSpeed = this.vx * rx + this.vy * ry;
 
-                    // Last move highlight
-                    if (lastMove && ((lastMove.from.r === r && lastMove.from.c === c) || (lastMove.to.r === r && lastMove.to.c === c))) {
-                        square.classList.add('sq-last-move');
-                    }
+        const isBoosting = this.boostTimer > 0;
+        const maxSpeed =
+          this.baseMaxSpeed *
+          (onRoad ? 1.0 : 0.72) *
+          (isBoosting ? 1.36 : 1.0);
 
-                    // Selected highlight
-                    if (selectedSq && selectedSq.r === r && selectedSq.c === c) {
-                        square.classList.add('sq-selected');
-                    }
-
-                    // Check highlight
-                    if (kingInCheck && kingInCheck.r === r && kingInCheck.c === c) {
-                        square.classList.add('sq-check');
-                    }
-
-                    // Valid Move Hint
-                    const moveHint = validMoves.find(m => m.r === r && m.c === c);
-                    if (moveHint) {
-                        if (board[r][c]) {
-                            square.classList.add('capture-hint');
-                        } else {
-                            square.classList.add('move-hint');
-                        }
-                    }
-
-                    // Render Piece
-                    const piece = board[r][c];
-                    if (piece) {
-                        const pieceEl = document.createElement('i');
-                        pieceEl.className = `fa-solid ${PIECE_ICONS[piece.t]} piece ${piece.c === 'w' ? 'white' : 'black'}`;
-                        square.appendChild(pieceEl);
-                    }
-
-                    // File & Rank notation labels
-                    if (c === 0) {
-                        const rankLabel = document.createElement('span');
-                        rankLabel.className = 'absolute top-0.5 left-1 text-[9px] font-bold opacity-60 pointer-events-none';
-                        rankLabel.textContent = 8 - r;
-                        square.appendChild(rankLabel);
-                    }
-                    if (r === 7) {
-                        const fileLabel = document.createElement('span');
-                        fileLabel.className = 'absolute bottom-0.5 right-1 text-[9px] font-bold opacity-60 pointer-events-none';
-                        fileLabel.textContent = String.fromCharCode(97 + c);
-                        square.appendChild(fileLabel);
-                    }
-
-                    square.addEventListener('click', () => handleSquareClick(r, c));
-                    boardEl.appendChild(square);
-                }
-            }
+        // 가속 및 제동/후진
+        if (throttle > 0) {
+          const boostAccelBonus = isBoosting ? 360 : 0;
+          forwardSpeed += (this.accel + boostAccelBonus) * throttle * dt;
+        }
+        if (brake > 0) {
+          if (forwardSpeed > 40) {
+            forwardSpeed -= 680 * brake * dt;
+          } else {
+            forwardSpeed -= 260 * brake * dt;
+          }
         }
 
-        // Handle Cell Clicks
-        function handleSquareClick(r, c) {
-            if (isGameOver) return;
-            if (gameMode === 'ai' && turn === 'b') return; // Block human input on AI turn
+        // 자연 구름 저항
+        const drag = onRoad ? 1.35 : 2.6;
+        forwardSpeed *= Math.max(0, 1 - drag * dt);
+        forwardSpeed = Math.max(-180, Math.min(maxSpeed, forwardSpeed));
 
-            const clickedPiece = board[r][c];
+        // 드리프트 시작 / 유지 / 종료 판정
+        const speedAbs = Math.abs(forwardSpeed);
+        if (!this.isDrifting) {
+          if (wantDrift && Math.abs(steer) > 0 && forwardSpeed > 250) {
+            this.isDrifting = true;
+            this.driftDir = Math.sign(steer);
+          }
+        } else {
+          // 드리프트 유지 중 게이지 충전 및 코너 조향 강화
+          const steerAssist = steer === this.driftDir ? 1.28 : steer === 0 ? 0.85 : 0.58;
+          this.angle += this.driftDir * this.turnRate * 1.18 * steerAssist * dt;
 
-            // If clicked on valid destination move square
-            if (selectedSq) {
-                const move = validMoves.find(m => m.r === r && m.c === c);
-                if (move) {
-                    makeMove(selectedSq, { r, c, isCastle: move.isCastle, castleType: move.castleType });
-                    selectedSq = null;
-                    validMoves = [];
-                    return;
-                }
-            }
+          // 드리프트 게이지 충전 속도
+          const chargeRate = 34 + (steer === this.driftDir ? 16 : 4);
+          this.driftCharge = Math.min(100, this.driftCharge + chargeRate * dt);
 
-            // Select Own Piece
-            if (clickedPiece && clickedPiece.c === turn) {
-                selectedSq = { r, c };
-                validMoves = getLegalMoves(r, c, board, movedRights);
-                renderBoard();
-            } else {
-                selectedSq = null;
-                validMoves = [];
-                renderBoard();
-            }
-        }
-
-        // Execute Move
-        function makeMove(from, toMove) {
-            const fromR = from.r, fromC = from.c;
-            const toR = toMove.r, toC = toMove.c;
-            const piece = board[fromR][fromC];
-            const target = board[toR][toC];
-
-            let isCastle = toMove.isCastle || false;
-            let castleType = toMove.castleType || null;
-
-            // Update Castling Tracking
-            if (piece.t === 'k') {
-                if (piece.c === 'w') movedRights.wKingMoved = true;
-                else movedRights.bKingMoved = true;
-            }
-            if (piece.t === 'r') {
-                if (piece.c === 'w') {
-                    if (fromR === 7 && fromC === 0) movedRights.wRookA = true;
-                    if (fromR === 7 && fromC === 7) movedRights.wRookH = true;
-                } else {
-                    if (fromR === 0 && fromC === 0) movedRights.bRookA = true;
-                    if (fromR === 0 && fromC === 7) movedRights.bRookH = true;
-                }
-            }
-
-            // Move Piece
-            board[toR][toC] = piece;
-            board[fromR][fromC] = null;
-
-            // Handle Castling Rook Move
-            if (isCastle) {
-                if (castleType === 'K') {
-                    board[toR][5] = board[toR][7];
-                    board[toR][7] = null;
-                } else if (castleType === 'Q') {
-                    board[toR][3] = board[toR][0];
-                    board[toR][0] = null;
-                }
-                playSound('castle');
-            } else if (target) {
-                capturedPieces[turn].push(target.t);
-                playSound('capture');
-            } else {
-                playSound('move');
-            }
-
-            // Pawn Promotion (Default to Queen)
-            if (piece.t === 'p' && (toR === 0 || toR === 7)) {
-                board[toR][toC].t = 'q';
-            }
-
-            // Push History Log
-            const moveNotation = isCastle 
-                ? (castleType === 'K' ? 'O-O' : 'O-O-O')
-                : getNotation(piece, from, {r: toR, c: toC}, target);
-            
-            history.push({ from, to: {r: toR, c: toC}, piece, target, notation: moveNotation });
-
-            // Switch Turn
-            turn = turn === 'w' ? 'b' : 'w';
-
-            // Check / Checkmate status
-            const inCheck = isKingInCheck(turn, board);
-            const hasLegalMoves = checkAnyLegalMoves(turn, board, movedRights);
-
-            if (inCheck) {
-                if (!hasLegalMoves) {
-                    renderBoard();
-                    updateUI();
-                    endGame(turn === 'w' ? 'b' : 'w', '체크메이트 승리!');
-                    return;
-                } else {
-                    playSound('check');
-                }
-            } else if (!hasLegalMoves) {
-                renderBoard();
-                updateUI();
-                endGame('draw', '스테일메이트 (무승부)');
-                return;
-            }
-
-            renderBoard();
-            updateUI();
-
-            // Trigger AI Turn if applicable
-            if (gameMode === 'ai' && turn === 'b' && !isGameOver) {
-                setTimeout(triggerAIMove, 250);
-            }
-        }
-
-        // Notation Generator
-        function getNotation(piece, from, to, target) {
-            const files = ['a','b','c','d','e','f','g','h'];
-            const pName = piece.t.toUpperCase() === 'P' ? '' : piece.t.toUpperCase();
-            const captureSymbol = target ? 'x' : '';
-            return `${pName}${files[from.c]}${8-from.r}${captureSymbol}${files[to.c]}${8-to.r}`;
-        }
-
-        // Check if player has any legal moves left
-        function checkAnyLegalMoves(playerColor, currentBoard, cRights) {
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (currentBoard[r][c] && currentBoard[r][c].c === playerColor) {
-                        const moves = getLegalMoves(r, c, currentBoard, cRights);
-                        if (moves.length > 0) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        // Get Strict Legal Moves (Filtering Check-causing moves + adding Castling)
-        function getLegalMoves(r, c, currentBoard, cRights) {
-            const rawMoves = getRawMoves(r, c, currentBoard);
-            const legalMoves = [];
-            const piece = currentBoard[r][c];
-            if (!piece) return [];
-
-            for (let move of rawMoves) {
-                // Simulate Move
-                const tempBoard = currentBoard.map(row => [...row]);
-                tempBoard[move.r][move.c] = tempBoard[r][c];
-                tempBoard[r][c] = null;
-
-                // If Move doesn't leave/put King in Check, it's valid
-                if (!isKingInCheck(piece.c, tempBoard)) {
-                    legalMoves.push(move);
-                }
-            }
-
-            // Castling Logic
-            if (piece.t === 'k' && !isKingInCheck(piece.c, currentBoard)) {
-                const row = piece.c === 'w' ? 7 : 0;
-                const isKingMoved = piece.c === 'w' ? cRights.wKingMoved : cRights.bKingMoved;
-                const isRookAMoved = piece.c === 'w' ? cRights.wRookA : cRights.bRookA;
-                const isRookHMoved = piece.c === 'w' ? cRights.wRookH : cRights.bRookH;
-
-                if (r === row && c === 4 && !isKingMoved) {
-                    // King side (O-O)
-                    if (!isRookHMoved && currentBoard[row][7] && currentBoard[row][7].t === 'r' && currentBoard[row][7].c === piece.c) {
-                        if (!currentBoard[row][5] && !currentBoard[row][6]) {
-                            if (!isSquareAttacked(row, 5, piece.c, currentBoard) && !isSquareAttacked(row, 6, piece.c, currentBoard)) {
-                                legalMoves.push({ r: row, c: 6, isCastle: true, castleType: 'K' });
-                            }
-                        }
-                    }
-                    // Queen side (O-O-O)
-                    if (!isRookAMoved && currentBoard[row][0] && currentBoard[row][0].t === 'r' && currentBoard[row][0].c === piece.c) {
-                        if (!currentBoard[row][1] && !currentBoard[row][2] && !currentBoard[row][3]) {
-                            if (!isSquareAttacked(row, 2, piece.c, currentBoard) && !isSquareAttacked(row, 3, piece.c, currentBoard)) {
-                                legalMoves.push({ r: row, c: 2, isCastle: true, castleType: 'Q' });
-                            }
-                        }
-                    }
-                }
-            }
-
-            return legalMoves;
-        }
-
-        // Calculate Pseudo Legal Moves based on Movement Rules
-        function getRawMoves(r, c, currentBoard) {
-            const piece = currentBoard[r][c];
-            if (!piece) return [];
-
-            const moves = [];
-            const dir = piece.c === 'w' ? -1 : 1;
-
-            switch (piece.t) {
-                case 'p':
-                    // Forward 1
-                    if (r + dir >= 0 && r + dir < 8 && !currentBoard[r + dir][c]) {
-                        moves.push({ r: r + dir, c });
-                        // Initial Forward 2
-                        const startRow = piece.c === 'w' ? 6 : 1;
-                        if (r === startRow && !currentBoard[r + 2 * dir][c]) {
-                            moves.push({ r: r + 2 * dir, c });
-                        }
-                    }
-                    // Diagonal Captures
-                    [-1, 1].forEach(dc => {
-                        if (c + dc >= 0 && c + dc < 8 && r + dir >= 0 && r + dir < 8) {
-                            const target = currentBoard[r + dir][c + dc];
-                            if (target && target.c !== piece.c) {
-                                moves.push({ r: r + dir, c: c + dc });
-                            }
-                        }
-                    });
-                    break;
-
-                case 'r':
-                    addRayMoves(r, c, [[1,0],[-1,0],[0,1],[0,-1]], currentBoard, moves, piece.c);
-                    break;
-
-                case 'b':
-                    addRayMoves(r, c, [[1,1],[1,-1],[-1,1],[-1,-1]], currentBoard, moves, piece.c);
-                    break;
-
-                case 'q':
-                    addRayMoves(r, c, [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]], currentBoard, moves, piece.c);
-                    break;
-
-                case 'n':
-                    const knightOffsets = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-                    knightOffsets.forEach(([dr, dc]) => {
-                        const nr = r + dr, nc = c + dc;
-                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-                            const target = currentBoard[nr][nc];
-                            if (!target || target.c !== piece.c) moves.push({ r: nr, c: nc });
-                        }
-                    });
-                    break;
-
-                case 'k':
-                    const kingOffsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-                    kingOffsets.forEach(([dr, dc]) => {
-                        const nr = r + dr, nc = c + dc;
-                        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-                            const target = currentBoard[nr][nc];
-                            if (!target || target.c !== piece.c) moves.push({ r: nr, c: nc });
-                        }
-                    });
-                    break;
-            }
-
-            return moves;
-        }
-
-        // Raycast moves helper (Rook, Bishop, Queen)
-        function addRayMoves(r, c, directions, currentBoard, moves, color) {
-            directions.forEach(([dr, dc]) => {
-                let nr = r + dr;
-                let nc = c + dc;
-                while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
-                    const target = currentBoard[nr][nc];
-                    if (!target) {
-                        moves.push({ r: nr, c: nc });
-                    } else {
-                        if (target.c !== color) moves.push({ r: nr, c: nc });
-                        break;
-                    }
-                    nr += dr;
-                    nc += dc;
-                }
+          // 드리프트 스파크 파티클 생성
+          if (Math.random() < 0.85) {
+            const rearX = this.x - fx * 20;
+            const rearY = this.y - fy * 20;
+            const sparkColor = this.driftCharge >= 100 ? '#38bdf8' : this.driftCharge >= 50 ? '#fb923c' : '#fde047';
+            particles.spawn({
+              x: rearX + (Math.random() - 0.5) * 16,
+              y: rearY + (Math.random() - 0.5) * 16,
+              vx: -fx * (80 + Math.random() * 90) + (Math.random() - 0.5) * 70,
+              vy: -fy * (80 + Math.random() * 90) + (Math.random() - 0.5) * 70,
+              size: this.driftCharge >= 100 ? 6.5 : 4.5,
+              color: sparkColor,
+              maxLife: 0.28,
+              glow: this.driftCharge >= 60
             });
+          }
+
+          // 드리프트 키를 놓거나 속도가 너무 줄어들면 미니 부스터 지급 체크!
+          if (!wantDrift || forwardSpeed < 150) {
+            if (this.driftCharge >= 45) {
+              const earnedDuration = 0.65 + (this.driftCharge / 100) * 0.95;
+              this.giveBoost(earnedDuration);
+              if (this.isPlayer) {
+                sound.playBoostWhoosh();
+                if (onNotice) {
+                  onNotice(this.driftCharge >= 95 ? '🔥 완벽 드리프트 부스터!' : '⚡ 드리프트 부스터!');
+                }
+              }
+            }
+            this.isDrifting = false;
+            this.driftDir = 0;
+            this.driftCharge = 0;
+          }
         }
 
-        // Find King Position
-        function findKing(color, currentBoard) {
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const p = currentBoard[r][c];
-                    if (p && p.t === 'k' && p.c === color) return { r, c };
-                }
-            }
-            return null;
+        // 일반 조향
+        if (!this.isDrifting && Math.abs(steer) > 0 && speedAbs > 25) {
+          const reverseSign = forwardSpeed >= 0 ? 1 : -1;
+          const speedFactor = Math.min(1, speedAbs / 240);
+          this.angle += steer * this.turnRate * speedFactor * reverseSign * dt;
         }
 
-        // Check if square is attacked by enemy
-        function isSquareAttacked(targetR, targetC, friendlyColor, currentBoard) {
-            const enemyColor = friendlyColor === 'w' ? 'b' : 'w';
-
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const p = currentBoard[r][c];
-                    if (p && p.c === enemyColor) {
-                        const rawMoves = getRawMoves(r, c, currentBoard);
-                        if (rawMoves.some(m => m.r === targetR && m.c === targetC)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
+        // 측면 그립(드리프트 중에는 의도적으로 슬라이드 허용)
+        const lateralGrip = this.isDrifting ? 2.4 : 8.8;
+        lateralSpeed *= Math.max(0, 1 - lateralGrip * dt);
+        if (this.isDrifting && this.driftDir !== 0) {
+          lateralSpeed += this.driftDir * 75 * dt;
         }
 
-        // Check if King is under attack
-        function isKingInCheck(color, currentBoard) {
-            const kingPos = findKing(color, currentBoard);
-            if (!kingPos) return false;
-            return isSquareAttacked(kingPos.r, kingPos.c, color, currentBoard);
+        const nfx = Math.cos(this.angle);
+        const nfy = Math.sin(this.angle);
+        const nrx = -nfy;
+        const nry = nfx;
+
+        this.vx = nfx * forwardSpeed + nrx * lateralSpeed;
+        this.vy = nfy * forwardSpeed + nry * lateralSpeed;
+
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.speed = Math.hypot(this.vx, this.vy);
+
+        // 시각적 차체 각도 (드리프트 시 안쪽으로 살짝 꺾인 연출)
+        const targetVisualAngle = this.angle + (this.isDrifting ? this.driftDir * 0.24 : 0);
+        let angleDiff = targetVisualAngle - this.visualAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        this.visualAngle += angleDiff * Math.min(1, dt * 14);
+
+        // 트랙 외곽 소프트 바운더리 복원력 (완전히 맵 밖으로 탈출 방지)
+        const b = track.bounds;
+        if (this.x < b.minX) { this.x = b.minX; this.vx = Math.abs(this.vx) * 0.4; }
+        if (this.x > b.maxX) { this.x = b.maxX; this.vx = -Math.abs(this.vx) * 0.4; }
+        if (this.y < b.minY) { this.y = b.minY; this.vy = Math.abs(this.vy) * 0.4; }
+        if (this.y > b.maxY) { this.y = b.maxY; this.vy = -Math.abs(this.vy) * 0.4; }
+
+        // 부스터 화염 파티클
+        if (isBoosting && Math.random() < 0.9) {
+          const backX = this.x - nfx * 24;
+          const backY = this.y - nfy * 24;
+          particles.spawn({
+            x: backX + (Math.random() - 0.5) * 10,
+            y: backY + (Math.random() - 0.5) * 10,
+            vx: -nfx * (220 + Math.random() * 140) + (Math.random() - 0.5) * 50,
+            vy: -nfy * (220 + Math.random() * 140) + (Math.random() - 0.5) * 50,
+            size: 7 + Math.random() * 4,
+            color: Math.random() < 0.5 ? '#38bdf8' : '#fb923c',
+            maxLife: 0.22,
+            glow: true
+          });
         }
 
-        // Evaluation Function for Minimax Engine
-        function evaluateBoard(currentBoard) {
-            let totalEval = 0;
-
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    const p = currentBoard[r][c];
-                    if (p) {
-                        // Base Material Value
-                        let value = PIECE_VALUES[p.t];
-                        
-                        // Positional Value from Piece-Square Tables
-                        let pstTable = PST[p.t];
-                        let pstValue = 0;
-                        if (pstTable) {
-                            pstValue = p.c === 'w' ? pstTable[r][c] : pstTable[7 - r][c];
-                        }
-
-                        let val = value + pstValue;
-                        totalEval += p.c === 'w' ? val : -val;
-                    }
-                }
+        // 부스터 패드 접촉 체크
+        for (const pad of track.boostPads) {
+          const d = Math.hypot(this.x - pad.x, this.y - pad.y);
+          if (d < pad.radius + this.radius * 0.5 && this.boostTimer < 0.55) {
+            this.giveBoost(1.15);
+            if (this.isPlayer) {
+              sound.playBoostWhoosh();
+              if (onNotice) onNotice('🚀 부스터 패드 가속!');
             }
-            return totalEval; // Positive favors White, Negative favors Black
+          }
         }
 
-        // Minimax Algorithm with Alpha-Beta Pruning
-        function minimax(currentBoard, depth, alpha, beta, isMaximizing, cRights) {
-            if (depth === 0) {
-                return evaluateBoard(currentBoard);
+        // 아이템 박스 접촉 체크
+        for (const box of track.itemBoxes) {
+          if (box.respawnTimer > 0) continue;
+          const d = Math.hypot(this.x - box.x, this.y - box.y);
+          if (d < box.radius + this.radius * 0.7) {
+            box.respawnTimer = 4.5;
+            const got = this.grantRandomItem();
+            if (this.isPlayer) {
+              sound.playPickup();
+              if (got && onNotice) {
+                const labelMap = { boost: '⚡ 부스터 획득!', turbo: '🚀 메가 터보 획득!', shield: '🛡️ 보호막 획득!' };
+                onNotice(labelMap[this.item] || '🎁 아이템 획득!');
+              }
+            } else if (this.item && Math.random() < 0.55) {
+              this.useItem(sound, null);
             }
-
-            const activeColor = isMaximizing ? 'w' : 'b';
-            const allMoves = [];
-
-            // Generate all legal moves
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (currentBoard[r][c] && currentBoard[r][c].c === activeColor) {
-                        const moves = getLegalMoves(r, c, currentBoard, cRights);
-                        moves.forEach(m => allMoves.push({ from: { r, c }, to: m }));
-                    }
-                }
-            }
-
-            if (allMoves.length === 0) {
-                if (isKingInCheck(activeColor, currentBoard)) {
-                    return isMaximizing ? -99999 + (3 - depth) : 99999 - (3 - depth); // Mate score
-                }
-                return 0; // Draw
-            }
-
-            if (isMaximizing) {
-                let maxEval = -Infinity;
-                for (let move of allMoves) {
-                    const tempBoard = currentBoard.map(row => [...row]);
-                    const piece = tempBoard[move.from.r][move.from.c];
-                    tempBoard[move.to.r][move.to.c] = piece;
-                    tempBoard[move.from.r][move.from.c] = null;
-
-                    if (move.to.isCastle) {
-                        if (move.to.castleType === 'K') {
-                            tempBoard[move.to.r][5] = tempBoard[move.to.r][7];
-                            tempBoard[move.to.r][7] = null;
-                        } else {
-                            tempBoard[move.to.r][3] = tempBoard[move.to.r][0];
-                            tempBoard[move.to.r][0] = null;
-                        }
-                    }
-
-                    let evalVal = minimax(tempBoard, depth - 1, alpha, beta, false, cRights);
-                    maxEval = Math.max(maxEval, evalVal);
-                    alpha = Math.max(alpha, evalVal);
-                    if (beta <= alpha) break; // Beta Cutoff
-                }
-                return maxEval;
-            } else {
-                let minEval = Infinity;
-                for (let move of allMoves) {
-                    const tempBoard = currentBoard.map(row => [...row]);
-                    const piece = tempBoard[move.from.r][move.from.c];
-                    tempBoard[move.to.r][move.to.c] = piece;
-                    tempBoard[move.from.r][move.from.c] = null;
-
-                    if (move.to.isCastle) {
-                        if (move.to.castleType === 'K') {
-                            tempBoard[move.to.r][5] = tempBoard[move.to.r][7];
-                            tempBoard[move.to.r][7] = null;
-                        } else {
-                            tempBoard[move.to.r][3] = tempBoard[move.to.r][0];
-                            tempBoard[move.to.r][0] = null;
-                        }
-                    }
-
-                    let evalVal = minimax(tempBoard, depth - 1, alpha, beta, true, cRights);
-                    minEval = Math.min(minEval, evalVal);
-                    beta = Math.min(beta, evalVal);
-                    if (beta <= alpha) break; // Alpha Cutoff
-                }
-                return minEval;
-            }
+          }
         }
 
-        // Advanced AI Move Selector
-        function triggerAIMove() {
-            if (isGameOver || turn !== 'b') return;
+        // 랩 및 트랙 진행도 업데이트
+        this.updateProgress(track, onLapChange);
+      }
 
-            const allMoves = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] && board[r][c].c === 'b') {
-                        const moves = getLegalMoves(r, c, board, movedRights);
-                        moves.forEach(m => allMoves.push({ from: { r, c }, to: m }));
-                    }
-                }
-            }
-
-            if (allMoves.length === 0) return;
-
-            let chosenMove = null;
-
-            // Check Opening Book for early turns (Turns 1 & 2)
-            if (history.length <= 3) {
-                const moveTurnNum = Math.floor(history.length / 2) + 1;
-                const lastWhiteMove = history[history.length - 1];
-                const files = ['a','b','c','d','e','f','g','h'];
-                const wFromStr = `${files[lastWhiteMove.from.c]}${8 - lastWhiteMove.from.r}`;
-                const wToStr = `${files[lastWhiteMove.to.c]}${8 - lastWhiteMove.to.r}`;
-
-                // Try matching selected opening variations
-                const currentBookLine = OPENING_BOOK[selectedOpeningIndex];
-                const bookStep = currentBookLine.find(step => step.moveNum === moveTurnNum && step.whiteFrom === wFromStr && step.whiteTo === wToStr);
-
-                if (bookStep) {
-                    const matchedMove = allMoves.find(m => 
-                        m.from.r === bookStep.replyFrom.r && 
-                        m.from.c === bookStep.replyFrom.c && 
-                        m.to.r === bookStep.replyTo.r && 
-                        m.to.c === bookStep.replyTo.c
-                    );
-                    if (matchedMove) {
-                        chosenMove = matchedMove;
-                    }
-                }
-
-                // Fallback: search across all opening variations if specific variation doesn't match
-                if (!chosenMove) {
-                    for (let line of OPENING_BOOK) {
-                        const fallbackStep = line.find(step => step.moveNum === moveTurnNum && step.whiteFrom === wFromStr && step.whiteTo === wToStr);
-                        if (fallbackStep) {
-                            const matchedMove = allMoves.find(m => 
-                                m.from.r === fallbackStep.replyFrom.r && 
-                                m.from.c === fallbackStep.replyFrom.c && 
-                                m.to.r === fallbackStep.replyTo.r && 
-                                m.to.c === fallbackStep.replyTo.c
-                            );
-                            if (matchedMove) {
-                                chosenMove = matchedMove;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!chosenMove) {
-                if (aiDifficulty === 'easy') {
-                    // Completely Random Move
-                    chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-                } else if (aiDifficulty === 'medium') {
-                    // 1-Depth Positional & Material Evaluation
-                    let bestEval = Infinity;
-                    allMoves.forEach(m => {
-                        const tempBoard = board.map(row => [...row]);
-                        tempBoard[m.to.r][m.to.c] = tempBoard[m.from.r][m.from.c];
-                        tempBoard[m.from.r][m.from.c] = null;
-
-                        let score = evaluateBoard(tempBoard) + (Math.random() * 10 - 5);
-                        if (score < bestEval) {
-                            bestEval = score;
-                            chosenMove = m;
-                        }
-                    });
-                } else {
-                    // Hard Level: Minimax Depth 3 Search with Alpha-Beta Pruning
-                    let bestEval = Infinity;
-                    
-                    // Shuffle moves to add slight unpredictability between equal lines
-                    allMoves.sort(() => Math.random() - 0.5);
-
-                    for (let move of allMoves) {
-                        const tempBoard = board.map(row => [...row]);
-                        const piece = tempBoard[move.from.r][move.from.c];
-                        tempBoard[move.to.r][move.to.c] = piece;
-                        tempBoard[move.from.r][move.from.c] = null;
-
-                        if (move.to.isCastle) {
-                            if (move.to.castleType === 'K') {
-                                tempBoard[move.to.r][5] = tempBoard[move.to.r][7];
-                                tempBoard[move.to.r][7] = null;
-                            } else {
-                                tempBoard[move.to.r][3] = tempBoard[move.to.r][0];
-                                tempBoard[move.to.r][0] = null;
-                            }
-                        }
-
-                        // Depth 3 search for AI (Black minimizes evaluation)
-                        let evalVal = minimax(tempBoard, 3, -Infinity, Infinity, true, movedRights);
-                        if (evalVal < bestEval) {
-                            bestEval = evalVal;
-                            chosenMove = move;
-                        }
-                    }
-                }
-            }
-
-            if (chosenMove) {
-                makeMove(chosenMove.from, chosenMove.to);
-            }
+      computeAiControl(dt, track) {
+        this.aiLaneTimer -= dt;
+        if (this.aiLaneTimer <= 0) {
+          this.aiLaneTimer = 1.6 + Math.random() * 2.2;
+          this.aiLaneOffset = (Math.random() * 2 - 1) * (track.roadWidth * 0.25);
         }
 
-        // Update UI Panel Display
-        function updateUI() {
-            // Turn Indicators
-            document.getElementById('white-turn-indicator').classList.toggle('hidden', turn !== 'w');
-            document.getElementById('black-turn-indicator').classList.toggle('hidden', turn !== 'b');
+        const targetProg = (this.progress + this.aiLookahead) % 1;
+        const lookPt = getSpineAtProgress(track.spine, targetProg);
+        const tx = lookPt.x + lookPt.nx * this.aiLaneOffset;
+        const ty = lookPt.y + lookPt.ny * this.aiLaneOffset;
 
-            // Status message
-            const statusEl = document.getElementById('status-bar');
-            if (isKingInCheck(turn, board)) {
-                statusEl.textContent = `${turn === 'w' ? '백색' : '흑색'} 경고: 체크 상태입니다!`;
-                statusEl.className = "bg-rose-500/20 border border-rose-500/40 text-rose-300 px-4 py-2.5 rounded-xl text-center text-xs font-semibold animate-pulse";
-            } else {
-                statusEl.textContent = `${turn === 'w' ? '백색 (플레이어)' : (gameMode === 'ai' ? '흑색 (AI 계산 중...)' : '흑색 (플레이어)')} 차례입니다.`;
-                statusEl.className = "bg-amber-500/10 border border-amber-500/30 text-amber-300 px-4 py-2.5 rounded-xl text-center text-xs font-medium";
-            }
+        const desiredAngle = Math.atan2(ty - this.y, tx - this.x);
+        let diff = desiredAngle - this.angle;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
 
-            // Captured Pieces Display
-            const renderCaptured = (list, containerId) => {
-                const el = document.getElementById(containerId);
-                el.innerHTML = '';
-                list.forEach(p => {
-                    const icon = document.createElement('i');
-                    icon.className = `fa-solid ${PIECE_ICONS[p]}`;
-                    el.appendChild(icon);
-                });
-            };
-            renderCaptured(capturedPieces.w, 'white-captured');
-            renderCaptured(capturedPieces.b, 'black-captured');
+        const steer = Math.max(-1, Math.min(1, diff * 2.4));
+        const sharpCorner = Math.abs(lookPt.curvature) > 0.24 && Math.abs(diff) > 0.22;
+        const wantDrift = sharpCorner && this.speed > 370;
 
-            // History Log Render
-            const logEl = document.getElementById('move-log');
-            document.getElementById('move-count').textContent = `${history.length} 수`;
-
-            if (history.length === 0) {
-                logEl.innerHTML = '<div class="text-slate-500 italic text-center py-4">게임을 시작하세요</div>';
-            } else {
-                logEl.innerHTML = '';
-                for (let i = 0; i < history.length; i += 2) {
-                    const row = document.createElement('div');
-                    row.className = 'flex justify-between py-0.5 border-b border-slate-800/50';
-                    
-                    const num = Math.floor(i / 2) + 1;
-                    const wMove = history[i] ? history[i].notation : '';
-                    const bMove = history[i + 1] ? history[i + 1].notation : '';
-
-                    row.innerHTML = `
-                        <span class="text-slate-500 w-8">${num}.</span>
-                        <span class="text-slate-200 flex-1">${wMove}</span>
-                        <span class="text-slate-400 flex-1">${bMove}</span>
-                    `;
-                    logEl.appendChild(row);
-                }
-                logEl.scrollTop = logEl.scrollHeight;
-            }
+        if (this.item && Math.random() < dt * 0.7) {
+          this.useItem({ playBoostWhoosh: () => {}, playPickup: () => {} }, null);
         }
 
-        // Game Over Trigger
-        function endGame(winner, reason) {
-            isGameOver = true;
-            clearInterval(timerInterval);
-
-            const modal = document.getElementById('game-over-modal');
-            const titleEl = document.getElementById('game-over-title');
-            const descEl = document.getElementById('game-over-desc');
-            const iconEl = document.getElementById('game-over-icon');
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-
-            if (winner === 'draw') {
-                titleEl.textContent = '무승부!';
-                descEl.textContent = reason;
-                iconEl.className = 'fa-solid fa-handshake text-5xl text-slate-400 mb-3';
-            } else {
-                const winnerText = winner === 'w' ? '백색' : '흑색';
-                titleEl.textContent = `${winnerText} 승리!`;
-                descEl.textContent = reason;
-                iconEl.className = 'fa-solid fa-trophy text-5xl text-amber-400 mb-3 animate-bounce';
-            }
-        }
-
-        // Event Listeners Setup
-        document.getElementById('btn-restart').addEventListener('click', initBoard);
-        document.getElementById('btn-modal-restart').addEventListener('click', () => {
-            document.getElementById('game-over-modal').classList.add('hidden');
-            document.getElementById('game-over-modal').classList.remove('flex');
-            initBoard();
-        });
-
-        // Toggle Audio
-        document.getElementById('btn-sound').addEventListener('click', (e) => {
-            soundEnabled = !soundEnabled;
-            e.currentTarget.innerHTML = soundEnabled 
-                ? '<i class="fa-solid fa-volume-high"></i>' 
-                : '<i class="fa-solid fa-volume-xmark text-rose-400"></i>';
-        });
-
-        // Mode Switching
-        const modeAiBtn = document.getElementById('mode-ai');
-        const modePvpBtn = document.getElementById('mode-pvp');
-        const aiDiffContainer = document.getElementById('ai-difficulty-container');
-        const blackNameEl = document.getElementById('black-name');
-        const blackIconEl = document.getElementById('black-avatar-icon');
-
-        modeAiBtn.addEventListener('click', () => {
-            gameMode = 'ai';
-            modeAiBtn.className = "py-2 px-3 text-xs font-bold rounded-lg border border-amber-500 bg-amber-500/20 text-amber-300 flex items-center justify-center gap-1.5 transition";
-            modePvpBtn.className = "py-2 px-3 text-xs font-bold rounded-lg border border-slate-600 bg-slate-700 text-slate-300 flex items-center justify-center gap-1.5 hover:bg-slate-650 transition";
-            aiDiffContainer.classList.remove('hidden');
-            blackNameEl.textContent = "AI 컴퓨터";
-            blackIconEl.className = "fa-solid fa-robot";
-            initBoard();
-        });
-
-        modePvpBtn.addEventListener('click', () => {
-            gameMode = 'pvp';
-            modePvpBtn.className = "py-2 px-3 text-xs font-bold rounded-lg border border-amber-500 bg-amber-500/20 text-amber-300 flex items-center justify-center gap-1.5 transition";
-            modeAiBtn.className = "py-2 px-3 text-xs font-bold rounded-lg border border-slate-600 bg-slate-700 text-slate-300 flex items-center justify-center gap-1.5 hover:bg-slate-650 transition";
-            aiDiffContainer.classList.add('hidden');
-            blackNameEl.textContent = "플레이어 (흑)";
-            blackIconEl.className = "fa-solid fa-user";
-            initBoard();
-        });
-
-        document.getElementById('ai-difficulty').addEventListener('change', (e) => {
-            aiDifficulty = e.target.value;
-        });
-
-        // Start initial game
-        window.onload = () => {
-            initBoard();
+        return {
+          throttle: sharpCorner && this.speed > 560 ? 0.65 : 1,
+          brake: 0,
+          steer,
+          wantDrift
         };
-    </script>
+      }
+
+      updateProgress(track, onLapChange) {
+        const nearest = findNearestSpinePoint(track.spine, this.x, this.y, this.spineIndex, 36);
+        this.spineIndex = nearest.index;
+        const newProg = nearest.point.progress;
+
+        let delta = newProg - this.prevProgress;
+        if (delta > 0.5) delta -= 1;
+        if (delta < -0.5) delta += 1;
+
+        this.prevProgress = newProg;
+        this.progress = newProg;
+        this.totalProgress += delta;
+
+        const computedLap = Math.floor(this.totalProgress) + 1;
+        if (computedLap > this.lap && !this.finished) {
+          this.lap = computedLap;
+          if (this.lap > track.config.laps) {
+            this.finished = true;
+          } else if (onLapChange) {
+            onLapChange(this, this.lap, track.config.laps);
+          }
+        }
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // 보호막 오라 렌더링
+        if (this.shieldTimer > 0) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, 34, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // 바닥 그림자
+        ctx.save();
+        ctx.translate(4, 7);
+        ctx.rotate(this.visualAngle);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+        ctx.beginPath();
+        ctx.roundRect(-24, -15, 48, 30, 10);
+        ctx.fill();
+        ctx.restore();
+
+        // 카트 본체 회전
+        ctx.rotate(this.visualAngle);
+
+        // 4개 바퀴
+        const wheelPositions = [
+          { x: 13, y: -15 },
+          { x: 13, y: 15 },
+          { x: -13, y: -15 },
+          { x: -13, y: 15 }
+        ];
+        ctx.fillStyle = this.wheelColor;
+        for (const w of wheelPositions) {
+          ctx.beginPath();
+          ctx.roundRect(w.x - 6.5, w.y - 4, 13, 8, 3);
+          ctx.fill();
+        }
+
+        // 부스터 화염 꼬리
+        if (this.boostTimer > 0) {
+          const flameLen = 18 + Math.sin(performance.now() * 0.04) * 7;
+          const grad = ctx.createLinearGradient(-22, 0, -22 - flameLen, 0);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.35, '#38bdf8');
+          grad.addColorStop(1, 'rgba(251, 146, 60, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.moveTo(-22, -7);
+          ctx.lineTo(-22 - flameLen, 0);
+          ctx.lineTo(-22, 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // 카트 바디 쉘 (2.5D 입체 상단 하이라이트)
+        ctx.fillStyle = this.bodyColor;
+        ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(25, 0);
+        ctx.quadraticCurveTo(18, -14, -6, -13);
+        ctx.lineTo(-22, -12);
+        ctx.lineTo(-22, 12);
+        ctx.lineTo(-6, 13);
+        ctx.quadraticCurveTo(18, 14, 25, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 중앙 레이싱 스트라이프
+        ctx.fillStyle = this.accentColor;
+        ctx.beginPath();
+        ctx.roundRect(-18, -4.5, 36, 9, 4);
+        ctx.fill();
+
+        // 리어 윙 스포일러
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(-25, -14, 7, 28, 2.5);
+        ctx.fill();
+        ctx.fillStyle = this.bodyColor;
+        ctx.fillRect(-24.5, -12, 5, 4);
+        ctx.fillRect(-24.5, 8, 5, 4);
+
+        // 드라이버 헬멧
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(1, 0, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = this.isPlayer ? '#38bdf8' : this.accentColor;
+        ctx.beginPath();
+        ctx.arc(2.5, 0, 5.2, -Math.PI * 0.45, Math.PI * 0.45);
+        ctx.fill();
+
+        // 플레이어 위치 마커 (상단/하단 삼각형 포인터, 텍스트 없음)
+        if (this.isPlayer) {
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.moveTo(0, -22);
+          ctx.lineTo(-6, -30);
+          ctx.lineTo(6, -30);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. 메인 게임 컨트롤러
+    // -------------------------------------------------------------------------
+    class KartRiderGame {
+      constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.minimapCanvas = document.getElementById('minimapCanvas');
+        this.minimapCtx = this.minimapCanvas.getContext('2d');
+
+        this.sound = new SoundManager();
+        this.particles = new ParticlePool();
+
+        this.selectedTrackIndex = 0;
+        this.track = buildTrackData(TRACK_CONFIGS[this.selectedTrackIndex]);
+        this.karts = KART_ROSTER.map((spec, idx) => new Kart(spec, idx, this.track));
+        this.player = this.karts[0];
+
+        // 게임 상태: 'menu' | 'countdown' | 'racing' | 'finished'
+        this.state = 'menu';
+        this.countdownTimer = 0;
+        this.lastCountdownInt = 4;
+        this.raceElapsed = 0;
+        this.camera = { x: this.player.x, y: this.player.y, zoom: 1 };
+        this.shakeTimer = 0;
+
+        // 입력 상태
+        this.input = {
+          left: false,
+          right: false,
+          up: false,
+          down: false,
+          drift: false
+        };
+        this.touchForceVisible = false;
+
+        this.lastFrameTime = performance.now();
+        this.hudUpdateAccum = 0;
+        this.toastTimeout = null;
+
+        this.bindEvents();
+        this.renderTrackSelector();
+        this.resizeCanvases();
+        this.syncHud(true);
+
+        requestAnimationFrame((t) => this.loop(t));
+      }
+
+      bindEvents() {
+        window.addEventListener('resize', () => this.resizeCanvases());
+
+        // 키보드 이벤트
+        window.addEventListener('keydown', (e) => {
+          this.sound.init();
+          const code = e.code;
+          if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
+            e.preventDefault();
+          }
+          if (code === 'ArrowLeft' || code === 'KeyA') this.input.left = true;
+          if (code === 'ArrowRight' || code === 'KeyD') this.input.right = true;
+          if (code === 'ArrowUp' || code === 'KeyW') this.input.up = true;
+          if (code === 'ArrowDown' || code === 'KeyS') this.input.down = true;
+          if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Space') {
+            this.input.drift = true;
+          }
+          if ((code === 'KeyE' || code === 'Enter') && this.state === 'racing') {
+            this.player.useItem(this.sound, (msg) => this.showToast(msg));
+          }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          const code = e.code;
+          if (code === 'ArrowLeft' || code === 'KeyA') this.input.left = false;
+          if (code === 'ArrowRight' || code === 'KeyD') this.input.right = false;
+          if (code === 'ArrowUp' || code === 'KeyW') this.input.up = false;
+          if (code === 'ArrowDown' || code === 'KeyS') this.input.down = false;
+          if (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'Space') {
+            this.input.drift = false;
+          }
+        });
+
+        // 터치 디바이스 자동 감지 및 온스크린 버튼 바인딩
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isTouchDevice) {
+          this.touchForceVisible = true;
+        }
+        this.updateTouchPadVisibility();
+
+        const bindTouchHold = (btnId, inputKey) => {
+          const el = document.getElementById(btnId);
+          if (!el) return;
+          const setPressed = (active) => {
+            this.sound.init();
+            this.input[inputKey] = active;
+            el.classList.toggle('active-touch', active);
+          };
+          el.addEventListener('pointerdown', (e) => { e.preventDefault(); setPressed(true); });
+          el.addEventListener('pointerup', (e) => { e.preventDefault(); setPressed(false); });
+          el.addEventListener('pointerleave', () => setPressed(false));
+          el.addEventListener('pointercancel', () => setPressed(false));
+        };
+
+        bindTouchHold('touchLeftBtn', 'left');
+        bindTouchHold('touchRightBtn', 'right');
+        bindTouchHold('touchAccelBtn', 'up');
+        bindTouchHold('touchBrakeBtn', 'down');
+        bindTouchHold('touchDriftBtn', 'drift');
+
+        document.getElementById('useItemBtn').addEventListener('click', () => {
+          this.sound.init();
+          if (this.state === 'racing') {
+            this.player.useItem(this.sound, (msg) => this.showToast(msg));
+            this.syncHud(true);
+          }
+        });
+
+        // 상단 컨트롤 버튼
+        document.getElementById('muteBtn').addEventListener('click', () => {
+          this.sound.init();
+          const nextMute = !this.sound.muted;
+          this.sound.setMuted(nextMute);
+          document.getElementById('muteIcon').textContent = nextMute ? '🔇' : '🔊';
+          this.showToast(nextMute ? '사운드가 꺼졌습니다' : '사운드가 켜졌습니다');
+        });
+
+        document.getElementById('touchToggleBtn').addEventListener('click', () => {
+          this.touchForceVisible = !this.touchForceVisible;
+          this.updateTouchPadVisibility();
+          this.showToast(this.touchForceVisible ? '터치 패드를 표시합니다' : '터치 패드를 숨깁니다');
+        });
+
+        document.getElementById('quickRestartBtn').addEventListener('click', () => {
+          this.sound.init();
+          this.startRace();
+        });
+
+        // 시작 / 결과 모달 버튼
+        document.getElementById('startRaceBtn').addEventListener('click', () => {
+          this.sound.init();
+          this.startRace();
+        });
+
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+          this.sound.init();
+          this.startRace();
+        });
+
+        document.getElementById('changeTrackBtn').addEventListener('click', () => {
+          this.openTrackMenu();
+        });
+      }
+
+      updateTouchPadVisibility() {
+        const pad = document.getElementById('touchControls');
+        const show = this.touchForceVisible && (this.state === 'racing' || this.state === 'countdown');
+        pad.classList.toggle('hidden', !show);
+      }
+
+      renderTrackSelector() {
+        const grid = document.getElementById('trackSelectorGrid');
+        grid.innerHTML = '';
+        TRACK_CONFIGS.forEach((cfg, idx) => {
+          const active = idx === this.selectedTrackIndex;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `arcade-btn text-left p-3 rounded-2xl border transition-all ${
+            active
+              ? 'bg-sky-500/20 border-sky-400 shadow-[0_0_20px_rgba(56,189,248,0.25)]'
+              : 'bg-slate-900/80 border-slate-700/80 hover:border-slate-500'
+          }`;
+          card.innerHTML = `
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="w-3 h-3 rounded-full" style="background:${cfg.theme.accent}"></span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">${cfg.laps}랩</span>
+            </div>
+            <div class="font-black text-sm text-white leading-snug">${cfg.name}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${cfg.badge}</div>
+          `;
+          card.addEventListener('click', () => {
+            this.sound.init();
+            this.selectedTrackIndex = idx;
+            this.track = buildTrackData(TRACK_CONFIGS[idx]);
+            this.karts = KART_ROSTER.map((spec, kIdx) => new Kart(spec, kIdx, this.track));
+            this.player = this.karts[0];
+            this.camera.x = this.player.x;
+            this.camera.y = this.player.y;
+            this.renderTrackSelector();
+            this.syncHud(true);
+          });
+          grid.appendChild(card);
+        });
+      }
+
+      openTrackMenu() {
+        this.state = 'menu';
+        document.getElementById('finishOverlay').classList.add('hidden');
+        document.getElementById('startOverlay').classList.remove('hidden');
+        document.getElementById('centerBanner').classList.add('hidden');
+        this.updateTouchPadVisibility();
+        this.renderTrackSelector();
+      }
+
+      startRace() {
+        this.track = buildTrackData(TRACK_CONFIGS[this.selectedTrackIndex]);
+        this.karts = KART_ROSTER.map((spec, idx) => new Kart(spec, idx, this.track));
+        this.player = this.karts[0];
+        this.particles.clear();
+
+        this.raceElapsed = 0;
+        this.countdownTimer = 3.2;
+        this.lastCountdownInt = 4;
+        this.state = 'countdown';
+
+        this.camera.x = this.player.x;
+        this.camera.y = this.player.y;
+
+        document.getElementById('startOverlay').classList.add('hidden');
+        document.getElementById('finishOverlay').classList.add('hidden');
+        const banner = document.getElementById('centerBanner');
+        banner.classList.remove('hidden');
+        document.getElementById('subBannerText').classList.add('hidden');
+
+        this.updateTouchPadVisibility();
+        this.syncHud(true);
+      }
+
+      finishRace() {
+        if (this.state === 'finished') return;
+        this.state = 'finished';
+        this.player.finished = true;
+        this.player.finishTime = this.raceElapsed;
+
+        // 아직 완주하지 못한 AI도 현재 진행도 기준으로 순위 정렬
+        const sorted = [...this.karts].sort((a, b) => b.totalProgress - a.totalProgress);
+        const playerRank = sorted.findIndex((k) => k.isPlayer) + 1;
+
+        this.sound.playFinishFanfare();
+        this.updateTouchPadVisibility();
+
+        const badge = document.getElementById('finishBadge');
+        const title = document.getElementById('finishTitle');
+        const subtitle = document.getElementById('finishSubtitle');
+
+        if (playerRank === 1) {
+          badge.textContent = '🏆 골드 트로피 획득!';
+          title.textContent = '1위 우승!';
+          subtitle.textContent = `완주 기록 ${this.formatTime(this.raceElapsed)} · 완벽한 레이스였습니다!`;
+        } else if (playerRank === 2) {
+          badge.textContent = '🥈 실버 포디움!';
+          title.textContent = '2위 완주!';
+          subtitle.textContent = `완주 기록 ${this.formatTime(this.raceElapsed)} · 조금만 더 밀면 1위입니다!`;
+        } else if (playerRank === 3) {
+          badge.textContent = '🥉 브론즈 포디움!';
+          title.textContent = '3위 완주!';
+          subtitle.textContent = `완주 기록 ${this.formatTime(this.raceElapsed)} · 코너 드리프트를 노려보세요!`;
+        } else {
+          badge.textContent = '🏁 레이스 완주!';
+          title.textContent = `${playerRank}위 완주`;
+          subtitle.textContent = `완주 기록 ${this.formatTime(this.raceElapsed)} · 부스터 패드를 적극 활용해보세요!`;
+        }
+
+        const list = document.getElementById('standingsList');
+        list.innerHTML = '';
+        sorted.forEach((k, idx) => {
+          const rankNum = idx + 1;
+          const medal = rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : `${rankNum}위`;
+          const estTime = k.finishTime ?? this.raceElapsed + Math.max(0.4, (sorted[0].totalProgress - k.totalProgress) * 9.5);
+          const row = document.createElement('div');
+          row.className = `flex items-center justify-between px-3.5 py-2 rounded-xl border ${
+            k.isPlayer
+              ? 'bg-sky-500/20 border-sky-400/60 text-white'
+              : 'bg-slate-900/70 border-slate-800 text-slate-300'
+          }`;
+          row.innerHTML = `
+            <div class="flex items-center gap-2.5">
+              <span class="font-display text-lg w-7 text-center text-amber-300">${medal}</span>
+              <span class="w-3 h-3 rounded-full" style="background:${k.bodyColor}"></span>
+              <span class="font-bold text-sm">${k.name}</span>
+            </div>
+            <span class="font-mono text-xs sm:text-sm font-bold text-slate-200">${this.formatTime(estTime)}</span>
+          `;
+          list.appendChild(row);
+        });
+
+        document.getElementById('finishOverlay').classList.remove('hidden');
+      }
+
+      showToast(message) {
+        const el = document.getElementById('toastNotice');
+        el.textContent = message;
+        el.style.opacity = '1';
+        clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+          el.style.opacity = '0';
+        }, 1600);
+      }
+
+      resizeCanvases() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = this.canvas.clientWidth || window.innerWidth;
+        const h = this.canvas.clientHeight || window.innerHeight;
+        this.canvas.width = Math.floor(w * dpr);
+        this.canvas.height = Math.floor(h * dpr);
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const mw = this.minimapCanvas.clientWidth || 120;
+        const mh = this.minimapCanvas.clientHeight || 90;
+        this.minimapCanvas.width = Math.floor(mw * dpr);
+        this.minimapCanvas.height = Math.floor(mh * dpr);
+        this.minimapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      loop(now) {
+        const rawDt = (now - this.lastFrameTime) / 1000;
+        this.lastFrameTime = now;
+        const dt = Math.min(rawDt, 0.05);
+
+        this.update(dt);
+        this.render();
+
+        requestAnimationFrame((t) => this.loop(t));
+      }
+
+      update(dt) {
+        // 아이템 박스 리스폰 타이머 갱신
+        for (const box of this.track.itemBoxes) {
+          if (box.respawnTimer > 0) {
+            box.respawnTimer = Math.max(0, box.respawnTimer - dt);
+          }
+          box.bobPhase += dt * 4;
+        }
+
+        // 카운트다운 처리
+        if (this.state === 'countdown') {
+          this.countdownTimer -= dt;
+          const displayNum = Math.ceil(this.countdownTimer);
+          const cdEl = document.getElementById('countdownText');
+
+          if (displayNum >= 1 && displayNum <= 3 && displayNum < this.lastCountdownInt) {
+            this.lastCountdownInt = displayNum;
+            cdEl.textContent = String(displayNum);
+            cdEl.className = 'font-display text-6xl sm:text-8xl text-amber-300 drop-shadow-[0_6px_24px_rgba(0,0,0,0.85)] countdown-pop';
+            this.sound.playBeep(false);
+          }
+
+          if (this.countdownTimer <= 0) {
+            this.state = 'racing';
+            this.sound.playBeep(true);
+            cdEl.textContent = '출발!';
+            cdEl.className = 'font-display text-6xl sm:text-8xl text-cyan-300 drop-shadow-[0_6px_24px_rgba(0,0,0,0.85)] countdown-pop';
+            setTimeout(() => {
+              if (this.state === 'racing') {
+                document.getElementById('centerBanner').classList.add('hidden');
+              }
+            }, 650);
+          }
+        }
+
+        const raceActive = this.state === 'racing';
+        if (raceActive) {
+          this.raceElapsed += dt;
+        }
+
+        // 카트 업데이트
+        for (const kart of this.karts) {
+          kart.update(
+            dt,
+            this.input,
+            this.track,
+            this.particles,
+            this.sound,
+            raceActive,
+            (changedKart, newLap, totalLaps) => {
+              if (changedKart.isPlayer) {
+                const isFinalLap = newLap === totalLaps;
+                this.sound.playLapChime(isFinalLap);
+                this.showToast(isFinalLap ? '🔥 마지막 랩(FINAL LAP)!' : `🏁 ${newLap} / ${totalLaps} 랩 진입!`);
+              }
+            },
+            (msg) => this.showToast(msg)
+          );
+        }
+
+        // 카트 간 충돌 처리
+        for (let i = 0; i < this.karts.length; i++) {
+          for (let j = i + 1; j < this.karts.length; j++) {
+            const a = this.karts[i];
+            const b = this.karts[j];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dist = Math.hypot(dx, dy);
+            const minDist = a.radius + b.radius;
+            if (dist > 0 && dist < minDist) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const overlap = (minDist - dist) * 0.5;
+              a.x -= nx * overlap;
+              a.y -= ny * overlap;
+              b.x += nx * overlap;
+              b.y += ny * overlap;
+
+              const imp = 140;
+              a.vx -= nx * imp;
+              a.vy -= ny * imp;
+              b.vx += nx * imp;
+              b.vy += ny * imp;
+            }
+          }
+        }
+
+        // 실시간 순위 계산
+        const rankOrder = [...this.karts].sort((a, b) => b.totalProgress - a.totalProgress);
+        rankOrder.forEach((k, idx) => {
+          k.rank = idx + 1;
+        });
+
+        // 플레이어 완주 체크
+        if (raceActive && this.player.finished) {
+          this.finishRace();
+        }
+
+        // 파티클 및 오디오 연속 사운드 업데이트
+        this.particles.update(dt);
+        const speedRatio = this.player.speed / this.player.baseMaxSpeed;
+        this.sound.updateContinuous(
+          speedRatio,
+          this.player.isDrifting,
+          this.player.boostTimer > 0,
+          raceActive
+        );
+
+        // 카메라 부드러운 추종 + 속도 기반 줌 조정
+        const viewW = this.canvas.clientWidth || window.innerWidth;
+        const baseScale = Math.max(0.62, Math.min(1.05, viewW / 1280));
+        const speedZoomOffset = -Math.min(0.11, (this.player.speed / 900) * 0.11);
+        const targetZoom = baseScale + speedZoomOffset;
+
+        const leadX = this.player.x + Math.cos(this.player.angle) * Math.min(95, this.player.speed * 0.12);
+        const leadY = this.player.y + Math.sin(this.player.angle) * Math.min(95, this.player.speed * 0.12);
+
+        this.camera.x += (leadX - this.camera.x) * Math.min(1, dt * 7.5);
+        this.camera.y += (leadY - this.camera.y) * Math.min(1, dt * 7.5);
+        this.camera.zoom += (targetZoom - this.camera.zoom) * Math.min(1, dt * 4.5);
+
+        if (this.shakeTimer > 0) {
+          this.shakeTimer = Math.max(0, this.shakeTimer - dt);
+        }
+
+        // HUD 주기적 동기화 (~20fps)
+        this.hudUpdateAccum += dt;
+        if (this.hudUpdateAccum >= 0.05) {
+          this.hudUpdateAccum = 0;
+          this.syncHud(false);
+        }
+      }
+
+      render() {
+        const ctx = this.ctx;
+        const w = this.canvas.clientWidth || window.innerWidth;
+        const h = this.canvas.clientHeight || window.innerHeight;
+        const theme = this.track.config.theme;
+
+        ctx.save();
+        ctx.fillStyle = theme.grassBase;
+        ctx.fillRect(0, 0, w, h);
+
+        // 카메라 변환 적용
+        const shakeX = this.shakeTimer > 0 ? (Math.random() - 0.5) * 7 : 0;
+        const shakeY = this.shakeTimer > 0 ? (Math.random() - 0.5) * 7 : 0;
+
+        ctx.translate(w * 0.5 + shakeX, h * 0.5 + shakeY);
+        ctx.scale(this.camera.zoom, this.camera.zoom);
+        ctx.translate(-this.camera.x, -this.camera.y);
+
+        // 1. 지면 패턴 격자 (오프로드 속도감 체감용)
+        this.drawGroundGrid(ctx, theme);
+
+        // 2. 2.5D 서킷 트랙 & 연석 & 출발선
+        this.drawTrack(ctx, theme);
+
+        // 3. 트랙 부스터 패드
+        this.drawBoostPads(ctx);
+
+        // 4. 트랙 아이템 박스
+        this.drawItemBoxes(ctx);
+
+        // 5. 파티클 (드리프트 스파크 & 부스터 화염)
+        this.particles.draw(ctx);
+
+        // 6. 카트 렌더링 (AI 후 플레이어 순서로 그려 시인성 확보)
+        for (const k of this.karts) {
+          if (!k.isPlayer) k.draw(ctx);
+        }
+        this.player.draw(ctx);
+
+        ctx.restore();
+
+        // 7. 미니맵 업데이트
+        this.drawMinimap();
+      }
+
+      drawGroundGrid(ctx, theme) {
+        const b = this.track.bounds;
+        const step = 140;
+        ctx.save();
+        ctx.strokeStyle = theme.grassStripe;
+        ctx.lineWidth = 2;
+
+        const startX = Math.floor(b.minX / step) * step;
+        const startY = Math.floor(b.minY / step) * step;
+
+        ctx.beginPath();
+        for (let x = startX; x <= b.maxX; x += step) {
+          ctx.moveTo(x, b.minY);
+          ctx.lineTo(x, b.maxY);
+        }
+        for (let y = startY; y <= b.maxY; y += step) {
+          ctx.moveTo(b.minX, y);
+          ctx.lineTo(b.maxX, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      traceSpinePath(ctx) {
+        const spine = this.track.spine;
+        if (!spine.length) return;
+        ctx.beginPath();
+        ctx.moveTo(spine[0].x, spine[0].y);
+        for (let i = 1; i < spine.length; i++) {
+          ctx.lineTo(spine[i].x, spine[i].y);
+        }
+        ctx.closePath();
+      }
+
+      drawTrack(ctx, theme) {
+        const rw = this.track.roadWidth;
+
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        // 2.5D 하단 그림자 레이어
+        ctx.save();
+        ctx.translate(0, 12);
+        this.traceSpinePath(ctx);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.lineWidth = rw + 28;
+        ctx.stroke();
+        ctx.restore();
+
+        // 외곽 숄더(연석) 베이스
+        this.traceSpinePath(ctx);
+        ctx.strokeStyle = theme.shoulderInner;
+        ctx.lineWidth = rw + 22;
+        ctx.stroke();
+
+        // 점선 연석 액센트
+        this.traceSpinePath(ctx);
+        ctx.setLineDash([28, 28]);
+        ctx.strokeStyle = theme.shoulderOuter;
+        ctx.lineWidth = rw + 22;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 메인 아스팔트/트랙 노면
+        this.traceSpinePath(ctx);
+        ctx.strokeStyle = theme.roadFill;
+        ctx.lineWidth = rw;
+        ctx.stroke();
+
+        // 안쪽 주행 라인 하이라이트
+        this.traceSpinePath(ctx);
+        ctx.strokeStyle = theme.roadInner;
+        ctx.lineWidth = rw * 0.72;
+        ctx.stroke();
+
+        // 중앙 점선
+        this.traceSpinePath(ctx);
+        ctx.setLineDash([24, 28]);
+        ctx.strokeStyle = theme.centerLine;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 출발/결승선 (progress = 0 지점)
+        const startPt = this.track.spine[0];
+        ctx.save();
+        ctx.translate(startPt.x, startPt.y);
+        ctx.rotate(startPt.angle);
+
+        const lineW = rw * 0.94;
+        const rows = 2;
+        const cols = 10;
+        const cellW = 14;
+        const cellH = lineW / cols;
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const isLight = (r + c) % 2 === 0;
+            ctx.fillStyle = isLight ? '#f8fafc' : '#0f172a';
+            ctx.fillRect(-cellW + r * cellW, -lineW * 0.5 + c * cellH, cellW, cellH);
+          }
+        }
+        ctx.restore();
+
+        ctx.restore();
+      }
+
+      drawBoostPads(ctx) {
+        const pulse = 0.75 + Math.sin(performance.now() * 0.008) * 0.25;
+        for (const pad of this.track.boostPads) {
+          ctx.save();
+          ctx.translate(pad.x, pad.y);
+          ctx.rotate(pad.angle);
+
+          ctx.globalAlpha = 0.35 + pulse * 0.25;
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.roundRect(-34, -22, 68, 44, 12);
+          ctx.fill();
+
+          ctx.globalAlpha = 0.92;
+          ctx.strokeStyle = '#7dd3fc';
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(-30, -18, 60, 36);
+
+          // 화살표 셰브론 3개 (순수 기하학 도형, 텍스트 없음)
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 3.5;
+          for (let i = -1; i <= 1; i++) {
+            const ox = i * 15;
+            ctx.beginPath();
+            ctx.moveTo(ox - 6, -10);
+            ctx.lineTo(ox + 6, 0);
+            ctx.lineTo(ox - 6, 10);
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        }
+      }
+
+      drawItemBoxes(ctx) {
+        for (const box of this.track.itemBoxes) {
+          if (box.respawnTimer > 0) continue;
+          const bob = Math.sin(box.bobPhase) * 3;
+          ctx.save();
+          ctx.translate(box.x, box.y + bob);
+          ctx.rotate(Math.sin(box.bobPhase * 0.5) * 0.22);
+
+          ctx.shadowColor = '#fbbf24';
+          ctx.shadowBlur = 12;
+
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.22)';
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.roundRect(-17, -17, 34, 34, 9);
+          ctx.fill();
+          ctx.stroke();
+
+          // 내부 다이아몬드 하이라이트
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.moveTo(0, -8);
+          ctx.lineTo(8, 0);
+          ctx.lineTo(0, 8);
+          ctx.lineTo(-8, 0);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.restore();
+        }
+      }
+
+      drawMinimap() {
+        const mctx = this.minimapCtx;
+        const mw = this.minimapCanvas.clientWidth || 120;
+        const mh = this.minimapCanvas.clientHeight || 90;
+
+        mctx.clearRect(0, 0, mw, mh);
+
+        const spine = this.track.spine;
+        if (!spine.length) return;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const p of spine) {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+        }
+
+        const pad = 12;
+        const spanX = Math.max(1, maxX - minX);
+        const spanY = Math.max(1, maxY - minY);
+        const scale = Math.min((mw - pad * 2) / spanX, (mh - pad * 2) / spanY);
+        const offsetX = (mw - spanX * scale) * 0.5 - minX * scale;
+        const offsetY = (mh - spanY * scale) * 0.5 - minY * scale;
+
+        mctx.save();
+        mctx.beginPath();
+        spine.forEach((p, idx) => {
+          const sx = p.x * scale + offsetX;
+          const sy = p.y * scale + offsetY;
+          if (idx === 0) mctx.moveTo(sx, sy);
+          else mctx.lineTo(sx, sy);
+        });
+        mctx.closePath();
+        mctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+        mctx.lineWidth = 4.5;
+        mctx.stroke();
+
+        // 출발점 점
+        const s0 = spine[0];
+        mctx.fillStyle = '#f8fafc';
+        mctx.fillRect(s0.x * scale + offsetX - 3, s0.y * scale + offsetY - 3, 6, 6);
+
+        // 각 카트 위치 점
+        for (const k of this.karts) {
+          const kx = k.x * scale + offsetX;
+          const ky = k.y * scale + offsetY;
+          mctx.fillStyle = k.bodyColor;
+          mctx.beginPath();
+          mctx.arc(kx, ky, k.isPlayer ? 4.2 : 3, 0, Math.PI * 2);
+          mctx.fill();
+          if (k.isPlayer) {
+            mctx.strokeStyle = '#ffffff';
+            mctx.lineWidth = 1.5;
+            mctx.stroke();
+          }
+        }
+        mctx.restore();
+      }
+
+      syncHud(force) {
+        const displayLap = Math.min(this.player.lap, this.track.config.laps);
+        document.getElementById('hudRank').textContent = String(this.player.rank);
+        document.getElementById('hudLap').textContent = `${displayLap}/${this.track.config.laps}`;
+        document.getElementById('hudTimer').textContent = this.formatTime(this.raceElapsed);
+        document.getElementById('hudTrackName').textContent = this.track.config.name;
+        document.getElementById('hudTrackDot').style.backgroundColor = this.track.config.theme.accent;
+
+        // 속도계 (시각적 KM/H 환산)
+        const kmh = Math.round((this.player.speed / this.player.baseMaxSpeed) * 185);
+        document.getElementById('speedValue').textContent = String(kmh);
+
+        // 드리프트 부스터 게이지
+        const pct = Math.round(this.player.driftCharge);
+        document.getElementById('boostPercentText').textContent = `${pct}%`;
+        document.getElementById('boostGaugeFill').style.width = `${pct}%`;
+
+        // 아이템 슬롯 동기화
+        const iconBox = document.getElementById('itemIconBox');
+        const nameLabel = document.getElementById('itemNameLabel');
+        if (this.player.item === 'boost') {
+          iconBox.textContent = '⚡';
+          nameLabel.textContent = '부스터';
+        } else if (this.player.item === 'turbo') {
+          iconBox.textContent = '🚀';
+          nameLabel.textContent = '메가 터보';
+        } else if (this.player.item === 'shield') {
+          iconBox.textContent = '🛡️';
+          nameLabel.textContent = '보호막';
+        } else {
+          iconBox.textContent = '—';
+          nameLabel.textContent = '비어있음';
+        }
+      }
+
+      formatTime(sec) {
+        const clamped = Math.max(0, sec);
+        const mins = Math.floor(clamped / 60);
+        const remSec = clamped % 60;
+        const wholeSec = Math.floor(remSec);
+        const hundredths = Math.floor((remSec - wholeSec) * 100);
+        return `${String(mins).padStart(2, '0')}:${String(wholeSec).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`;
+      }
+    }
+
+    // 페이지 로드 완료 후 게임 시작
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        new KartRiderGame();
+      } catch (err) {
+        console.error('게임 초기화 오류:', err);
+      }
+    });
+  </script>
 </body>
 </html>

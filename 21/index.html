@@ -1,830 +1,1585 @@
-
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Web FPS Game</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Inter', sans-serif; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        
-        #crosshair {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 20px; height: 20px;
-            transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 24px;
-            font-weight: bold;
-            text-align: center;
-            line-height: 20px;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JOKER DRAW — 다크 라운지 조커 뽑기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans KR"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            lounge: {
+              bg: '#090b10',
+              surface: '#111622',
+              card: '#171e2e',
+              felt: '#0d261e',
+              gold: '#eab308',
+              crimson: '#ef4444',
+            }
+          }
         }
+      }
+    }
+  </script>
+  <style>
+    /* 커스텀 스타일 및 애니메이션 정의 */
+    body {
+      background-color: #090b10;
+      color: #f8fafc;
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-        #hud {
-            position: absolute;
-            bottom: 20px; left: 20px;
-            color: white;
-            text-shadow: 1px 1px 2px black;
-        }
+    /* 카지노 라운지 펠트 테이블 텍스처 */
+    .lounge-table {
+      background:
+        radial-gradient(ellipse at 50% 35%, rgba(20, 83, 62, 0.32) 0%, rgba(13, 38, 30, 0.14) 55%, rgba(9, 11, 16, 0.92) 100%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 6px);
+    }
 
-        #blocker {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: auto;
-            color: white;
-        }
+    /* 입체적인 카드 뒷면 패턴 */
+    .card-back-pattern {
+      background-color: #16213e;
+      background-image:
+        radial-gradient(circle at 50% 50%, rgba(234, 179, 8, 0.22) 0%, transparent 65%),
+        repeating-linear-gradient(
+          45deg,
+          rgba(234, 179, 8, 0.12) 0px,
+          rgba(234, 179, 8, 0.12) 2px,
+          transparent 2px,
+          transparent 10px
+        ),
+        repeating-linear-gradient(
+          -45deg,
+          rgba(234, 179, 8, 0.12) 0px,
+          rgba(234, 179, 8, 0.12) 2px,
+          transparent 2px,
+          transparent 10px
+        );
+      box-shadow:
+        inset 0 0 0 2px rgba(234, 179, 8, 0.45),
+        inset 0 0 14px rgba(0, 0, 0, 0.7),
+        0 8px 20px -4px rgba(0, 0, 0, 0.75);
+    }
 
-        .hidden { display: none !important; }
-        
-        #spectator-ui {
-            position: absolute;
-            top: 20px; left: 50%;
-            transform: translateX(-50%);
-            color: #ff4444;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 2px 2px 4px black;
-            text-align: center;
-        }
-    </style>
+    /* 입체적인 카드 앞면 스타일 */
+    .card-front-face {
+      background: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
+      box-shadow:
+        inset 0 0 0 1.5px rgba(15, 23, 42, 0.12),
+        0 10px 24px -5px rgba(0, 0, 0, 0.65);
+    }
+
+    /* 조커 카드 특별 글로우 */
+    .joker-card-face {
+      background: radial-gradient(circle at 50% 35%, #fef08a 0%, #fde047 35%, #f59e0b 100%);
+      box-shadow:
+        0 0 28px rgba(239, 68, 68, 0.85),
+        0 0 55px rgba(234, 179, 8, 0.55),
+        inset 0 0 0 2px #dc2626;
+    }
+
+    /* 뽑기 가능 카드 호버 & 부양 효과 */
+    .selectable-card {
+      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+    }
+    .selectable-card:hover {
+      transform: translateY(-12px) scale(1.04);
+      box-shadow: 0 16px 28px -6px rgba(234, 179, 8, 0.38), 0 0 0 1.5px rgba(234, 179, 8, 0.75);
+    }
+    .selectable-card:active {
+      transform: translateY(-6px) scale(0.98);
+    }
+
+    /* 카드 등장 애니메이션 */
+    @keyframes dealPop {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(0.85);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .animate-deal {
+      animation: dealPop 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* 페어 매치 펄스 애니메이션 */
+    @keyframes pairFlash {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.8); }
+      50% { transform: scale(1.08); box-shadow: 0 0 24px 6px rgba(34, 197, 94, 0.45); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .animate-pair-match {
+      animation: pairFlash 0.65s ease-out;
+    }
+
+    /* 조커 발각 시 화면 흔들림 */
+    @keyframes screenShake {
+      0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+      12% { transform: translate3d(-10px, 6px, 0) rotate(-1.2deg); }
+      24% { transform: translate3d(10px, -7px, 0) rotate(1.2deg); }
+      36% { transform: translate3d(-9px, -5px, 0) rotate(-0.9deg); }
+      48% { transform: translate3d(9px, 6px, 0) rotate(0.9deg); }
+      60% { transform: translate3d(-6px, 3px, 0) rotate(-0.5deg); }
+      72% { transform: translate3d(6px, -3px, 0) rotate(0.5deg); }
+      84% { transform: translate3d(-3px, 2px, 0) rotate(-0.2deg); }
+    }
+    .shake-active {
+      animation: screenShake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    /* 붉은 긴장감 플래시 오버레이 */
+    @keyframes crimsonPulse {
+      0% { opacity: 0; }
+      25% { opacity: 0.48; }
+      60% { opacity: 0.22; }
+      100% { opacity: 0; }
+    }
+    .crimson-flash {
+      animation: crimsonPulse 0.75s ease-out forwards;
+    }
+
+    /* 스크롤바 최소화 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+  </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col justify-between lounge-table relative">
 
-    <!-- Three.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- 조커 발각 시 붉은 긴장감 플래시 레이어 -->
+  <div id="jokerFlashOverlay" class="pointer-events-none fixed inset-0 bg-red-600 opacity-0 z-40"></div>
 
-    <!-- UI Elements -->
-    <div id="ui-layer">
-        <div id="crosshair" class="hidden">+</div>
-        <div id="headshot-text" class="hidden absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-yellow-400 font-extrabold text-4xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-widest animate-bounce pointer-events-none z-50">
-            HEADSHOT!
-        </div>
-        <div id="hud" class="hidden">
-            <div class="mb-2">
-                <div class="text-xl font-bold text-white mb-1 drop-shadow-md">체력: <span id="healthValue">100</span></div>
-                <div class="w-64 h-6 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
-                    <div id="healthBar" class="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-200" style="width: 100%"></div>
-                </div>
-            </div>
-            <div class="text-2xl font-bold text-blue-400 mt-2 bg-black bg-opacity-50 p-2 rounded inline-block border border-blue-900">
-                킬: <span id="killsValue">0</span>
-            </div>
-        </div>
-        <div id="spectator-ui" class="hidden bg-black bg-opacity-50 px-6 py-2 rounded-lg border-2 border-red-500">
-            사망했습니다.<br><span class="text-lg text-white">팀원 관전 중...</span>
-        </div>
-    </div>
+  <!-- 메인 앱 래퍼 (흔들림 효과 적용 대상) -->
+  <div id="appShakeContainer" class="flex-1 flex flex-col max-w-6xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-5 gap-3 sm:gap-4 relative z-10">
 
-    <div id="blocker">
-        <h1 class="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-red-500">WEB FPS</h1>
-        <p class="text-xl mb-6 text-gray-300">화면을 클릭하거나 아래의 버튼(또는 실제 Space 키)을 눌러 시작하세요</p>
-        
-        <!-- 스페이스바 모양으로 디자인된 시작 버튼 -->
-        <button id="startButton" class="mb-8 w-72 h-16 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-2xl tracking-widest shadow-[0_6px_0_rgb(156,163,175)] active:shadow-[0_0px_0_rgb(156,163,175)] active:translate-y-1.5 transition-all duration-100 flex items-center justify-center">
-            SPACE
+    <!-- 상단 헤더 & 전적 / 컨트롤 바 -->
+    <header class="bg-lounge-surface/90 backdrop-blur-md border border-white/10 rounded-2xl p-3 sm:px-5 sm:py-3.5 shadow-xl flex flex-wrap items-center justify-between gap-3">
+      <!-- 로고 & 타이틀 -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-yellow-500 to-red-600 flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-200/40">
+          <span class="text-slate-950 font-black text-xl leading-none">🃏</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-xl font-black tracking-tight text-white">JOKER DRAW</h1>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/30">
+              NOIR LOUNGE
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">상대의 카드 중 하나를 뽑아 조커를 피하고 짝을 맞춰 끝까지 살아남으세요!</p>
+        </div>
+      </div>
+
+      <!-- 전적 요약 (승/패/연승) -->
+      <div class="flex items-center gap-2 sm:gap-3 bg-slate-950/70 border border-white/10 rounded-xl px-3 py-1.5">
+        <div class="text-center px-1.5">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">승리</div>
+          <div id="statWins" class="text-sm sm:text-base font-extrabold text-emerald-400">0</div>
+        </div>
+        <div class="w-px h-6 bg-white/10"></div>
+        <div class="text-center px-1.5">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">패배</div>
+          <div id="statLosses" class="text-sm sm:text-base font-extrabold text-rose-400">0</div>
+        </div>
+        <div class="w-px h-6 bg-white/10"></div>
+        <div class="text-center px-1.5">
+          <div class="text-[10px] uppercase tracking-wider text-slate-400">연승</div>
+          <div id="statStreak" class="text-sm sm:text-base font-extrabold text-amber-400">0</div>
+        </div>
+      </div>
+
+      <!-- 사운드 토글 & 규칙 버튼 -->
+      <div class="flex items-center gap-2">
+        <button id="btnSoundToggle" type="button" aria-label="효과음 토글"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm font-semibold text-slate-200 transition cursor-pointer">
+          <span id="soundIcon">🔊</span>
+          <span id="soundLabel" class="hidden sm:inline">소리 ON</span>
         </button>
+        <button id="btnRulesModal" type="button"
+          class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm font-semibold text-amber-300 transition cursor-pointer">
+          규칙
+        </button>
+      </div>
+    </header>
 
-        <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-600 text-center">
-            <h2 class="text-2xl font-bold mb-4">조작 방법</h2>
-            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">W</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">A</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">S</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">D</kbd> : 이동</p>
-            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">L Shift</kbd> : 달리기 (계속 누르기)</p>
-            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">Space</kbd> : 시작 / 부활 (사망 시)</p>
-            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">Q</kbd> : 체력 회복 (힐)</p>
-            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">마우스</kbd> : 시점 이동 &nbsp;&nbsp; <kbd class="bg-gray-700 px-2 py-1 rounded">좌클릭</kbd> : 사격 &nbsp;&nbsp; <kbd class="bg-gray-700 px-2 py-1 rounded">우클릭</kbd> : 줌(확대)</p>
-            <p class="text-sm text-yellow-400 mt-4">* 파란색은 아군, 빨간색은 적입니다. (머리를 맞추면 헤드샷!)</p>
+    <!-- 모드 & 덱 설정 바 -->
+    <section class="bg-lounge-surface/80 backdrop-blur-md border border-white/10 rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-3">
+      <!-- 모드 선택 탭 -->
+      <div class="flex flex-wrap items-center gap-1.5 bg-slate-950/75 p-1 rounded-xl border border-white/5">
+        <button data-mode="ai" type="button"
+          class="mode-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer bg-amber-500 text-slate-950 shadow">
+          🤖 1:1 AI 대전
+        </button>
+        <button data-mode="solo" type="button"
+          class="mode-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5">
+          🎯 솔로 조커 피하기
+        </button>
+        <button data-mode="pvp" type="button"
+          class="mode-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5">
+          👥 2인 로컬 교대
+        </button>
+      </div>
+
+      <!-- 덱 구성 옵션 (페어 수 & 조커 수) & 새 게임 -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <label class="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-950/60 px-2.5 py-1.5 rounded-xl border border-white/10">
+          <span class="text-slate-400">페어:</span>
+          <select id="selectPairs" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
+            <option value="6" class="bg-slate-900">6쌍 (12장)</option>
+            <option value="8" class="bg-slate-900" selected>8쌍 (16장)</option>
+            <option value="10" class="bg-slate-900">10쌍 (20장)</option>
+            <option value="13" class="bg-slate-900">13쌍 (26장)</option>
+          </select>
+        </label>
+
+        <label class="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-950/60 px-2.5 py-1.5 rounded-xl border border-white/10">
+          <span class="text-slate-400">조커:</span>
+          <select id="selectJokers" class="bg-transparent text-amber-300 font-bold focus:outline-none cursor-pointer">
+            <option value="1" class="bg-slate-900" selected>1장</option>
+            <option value="2" class="bg-slate-900">2장</option>
+          </select>
+        </label>
+
+        <button id="btnNewGame" type="button"
+          class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition active:scale-95 cursor-pointer">
+          ↻ 새 게임
+        </button>
+      </div>
+    </section>
+
+    <!-- 게임 메인 보드 -->
+    <main class="flex-1 flex flex-col justify-between bg-lounge-surface/65 backdrop-blur-md border border-white/10 rounded-3xl p-3 sm:p-6 shadow-2xl gap-4">
+
+      <!-- 상단 영역: AI / 상대 / 조커 덱 영역 -->
+      <div id="topOpponentZone" class="flex flex-col gap-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+          <div class="flex items-center gap-2.5">
+            <span id="opponentBadge" class="px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold">
+              🤖 딜러 AI
+            </span>
+            <span id="opponentStatusText" class="text-xs sm:text-sm text-slate-300 font-medium">
+              카드를 고르세요
+            </span>
+          </div>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="text-slate-400">남은 카드: <strong id="opponentCardCount" class="text-white text-sm">0</strong>장</span>
+            <span class="text-slate-400">제거된 페어: <strong id="opponentPairsCount" class="text-emerald-400 text-sm">0</strong>쌍</span>
+          </div>
         </div>
+
+        <!-- 상대 패 / 뽑기 대상 카드 그리드 -->
+        <div id="opponentHandContainer"
+          class="min-h-[118px] sm:min-h-[136px] bg-slate-950/55 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3 transition-all">
+          <!-- 동적 카드 렌더링 -->
+        </div>
+      </div>
+
+      <!-- 중앙 상태 & 실시간 이벤트 배너 -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-slate-950/80 border border-amber-400/20 rounded-2xl px-4 py-2.5">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span id="turnIndicatorDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+          <p id="statusMessage" class="text-xs sm:text-sm font-bold text-amber-200 truncate">
+            게임 준비 완료! 상대의 카드 중 하나를 선택해 뽑아보세요.
+          </p>
+        </div>
+        <div class="flex items-center gap-3 text-xs text-slate-400 shrink-0">
+          <span>전체 잔여 카드: <strong id="totalRemainingCards" class="text-amber-300">0</strong>장</span>
+          <span>조커 수: <strong id="activeJokerCount" class="text-rose-400">1</strong>장</span>
+        </div>
+      </div>
+
+      <!-- 하단 영역: 플레이어 1 (나) 핸드 -->
+      <div class="flex flex-col gap-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+          <div class="flex items-center gap-2.5">
+            <span id="playerBadge" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold">
+              ♠ 플레이어 1 (나)
+            </span>
+            <span id="playerTurnHint" class="text-xs sm:text-sm text-emerald-300 font-semibold">
+              내 차례
+            </span>
+          </div>
+          <div class="flex items-center gap-3 text-xs">
+            <span class="text-slate-400">내 카드: <strong id="playerCardCount" class="text-white text-sm">0</strong>장</span>
+            <span class="text-slate-400">맞춘 페어: <strong id="playerPairsCount" class="text-emerald-400 text-sm">0</strong>쌍</span>
+          </div>
+        </div>
+
+        <!-- 플레이어 카드 핸드 컨테이너 -->
+        <div id="playerHandContainer"
+          class="min-h-[126px] sm:min-h-[146px] bg-slate-950/65 border border-white/10 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3 transition-all">
+          <!-- 동적 카드 렌더링 -->
+        </div>
+      </div>
+
+    </main>
+
+    <!-- 하단 최근 로그 / 안내 푸터 -->
+    <footer class="bg-lounge-surface/70 border border-white/10 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+      <div class="flex items-center gap-2 truncate w-full sm:w-auto">
+        <span class="text-amber-400 font-bold shrink-0">[로그]</span>
+        <span id="lastActionLog" class="truncate text-slate-300">라운지에 입장했습니다.</span>
+      </div>
+      <div class="shrink-0 text-[11px] text-slate-500">
+        전적은 브라우저에 자동 저장됩니다
+      </div>
+    </footer>
+  </div>
+
+  <!-- 2인 로컬 교대 모드 '카드 넘기기(프라이버시)' 오버레이 -->
+  <div id="passDeviceModal" class="hidden fixed inset-0 z-40 bg-slate-950/92 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-lounge-surface border border-amber-400/30 rounded-3xl p-6 sm:p-8 text-center shadow-2xl space-y-5">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-3xl">
+        🔄
+      </div>
+      <div class="space-y-2">
+        <h2 id="passDeviceTitle" class="text-xl sm:text-2xl font-black text-white">플레이어 2에게 기기를 넘겨주세요</h2>
+        <p id="passDeviceDesc" class="text-sm text-slate-300 leading-relaxed">
+          상대방이 내 패를 보지 않도록 준비한 뒤 아래 버튼을 눌러 차례를 시작하세요.
+        </p>
+      </div>
+      <button id="btnConfirmPassDevice" type="button"
+        class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-base shadow-lg shadow-amber-500/25 transition cursor-pointer">
+        내 패 확인 및 차례 시작
+      </button>
     </div>
+  </div>
 
-    <script>
-        // --- 1. 기본 설정 및 전역 변수 ---
-        let camera, scene, renderer;
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
-        let isZoomed = false;
-        let headshotTimeout = null; // 헤드샷 UI 타이머 관리용 변수
-        const DEFAULT_FOV = 75;
-        const ZOOM_FOV = 30;
-        let prevTime = performance.now();
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        
-        let yawObject, pitchObject; // 카메라 컨트롤용
-        let raycaster;
-        let isLocked = false;
-        let mapObjects = [];
-        let bots = [];
-        let lasers = [];
+  <!-- 게임 종료 (승리 / 패배 / 조커 발각) 결과 모달 -->
+  <div id="gameOverModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="gameOverCard" class="max-w-md w-full bg-lounge-surface border border-white/15 rounded-3xl p-6 sm:p-8 text-center shadow-2xl space-y-5 animate-deal">
+      <div id="resultIconBox" class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-4xl border">
+        🃏
+      </div>
+      <div class="space-y-1.5">
+        <div id="resultBadge" class="inline-block text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+          RESULT
+        </div>
+        <h2 id="resultTitle" class="text-2xl sm:text-3xl font-black text-white">승리했습니다!</h2>
+        <p id="resultDescription" class="text-sm text-slate-300 leading-relaxed">
+          조커를 멋지게 피하고 모든 패를 정리했습니다.
+        </p>
+      </div>
 
-        // 게임 상태 변수
-        let playerState = {
-            health: 100,
-            kills: 0,
-            isDead: false,
-            spectatingBot: null
-        };
+      <!-- 라운드 요약 통계 -->
+      <div class="grid grid-cols-3 gap-2 bg-slate-950/75 border border-white/10 rounded-2xl p-3 text-center">
+        <div>
+          <div class="text-[11px] text-slate-400">총 턴 수</div>
+          <div id="summaryTurns" class="text-base font-extrabold text-white">0</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-slate-400">제거한 페어</div>
+          <div id="summaryPairs" class="text-base font-extrabold text-emerald-400">0</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-slate-400">현재 연승</div>
+          <div id="summaryStreak" class="text-base font-extrabold text-amber-400">0</div>
+        </div>
+      </div>
 
-        const TEAM_BLUE = 0; // 플레이어 팀
-        const TEAM_RED = 1;  // 적 팀
+      <div class="flex flex-col sm:flex-row gap-2.5 pt-1">
+        <button id="btnPlayAgain" type="button"
+          class="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/20 transition cursor-pointer">
+          한 판 더 하기
+        </button>
+        <button id="btnCloseResult" type="button"
+          class="px-4 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-sm transition cursor-pointer">
+          보드 보기
+        </button>
+      </div>
+    </div>
+  </div>
 
-        // Three.js 라이브러리가 완전히 로드되었는지 확인 후 실행 (로딩 에러 방지)
-        const checkThreeLoaded = setInterval(() => {
-            if (typeof THREE !== 'undefined') {
-                clearInterval(checkThreeLoaded);
-                init();
-                animate();
-            }
-        }, 100);
+  <!-- 게임 규칙 안내 모달 -->
+  <div id="rulesModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="max-w-lg w-full bg-lounge-surface border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-black text-white flex items-center gap-2">
+          <span>🃏</span> 조커 뽑기 게임 규칙
+        </h2>
+        <button id="btnCloseRules" type="button"
+          class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 flex items-center justify-center font-bold cursor-pointer">
+          ✕
+        </button>
+      </div>
+      <div class="space-y-3 text-sm text-slate-300 leading-relaxed">
+        <div class="bg-slate-950/60 border border-white/10 rounded-2xl p-3.5 space-y-1.5">
+          <div class="font-bold text-amber-300">1. 기본 진행 (짝 맞추기 &amp; 조커 회피)</div>
+          <p>동일한 숫자/랭크(예: 7♠ + 7♥)의 카드 페어가 있으면 자동으로 짝을 맞춰 제거됩니다. 조커는 짝이 없는 홀로 남는 카드입니다.</p>
+        </div>
+        <div class="bg-slate-950/60 border border-white/10 rounded-2xl p-3.5 space-y-1.5">
+          <div class="font-bold text-emerald-300">2. 1:1 AI 대전 &amp; 2인 로컬 교대</div>
+          <p>내 차례에 상대 패에서 뒷면 카드 한 장을 선택해 뽑습니다. 내 패와 짝이 맞으면 즉시 제거되며, <strong>조커를 뽑거나 끝까지 조커를 들고 남게 되면 패배</strong>합니다!</p>
+        </div>
+        <div class="bg-slate-950/60 border border-white/10 rounded-2xl p-3.5 space-y-1.5">
+          <div class="font-bold text-indigo-300">3. 솔로 조커 피하기 모드</div>
+          <p>뒤집힌 카드 덱에서 한 장씩 뽑아 짝을 맞추며 진행합니다. <strong>조커를 뽑으면 즉시 패배</strong>하고, 조커를 모두 피하며 모든 페어를 제거하면 승리합니다.</p>
+        </div>
+      </div>
+      <button id="btnGotItRules" type="button"
+        class="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition cursor-pointer">
+        이해했습니다
+      </button>
+    </div>
+  </div>
 
-        function init() {
-            // 씬 설정
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // 하늘색
-            scene.fog = new THREE.Fog(0x87CEEB, 0, 150);
+  <script>
+    /**
+     * =========================================================================
+     * JOKER DRAW — 다크 라운지 조커 뽑기 게임 엔진
+     * =========================================================================
+     * 아키텍처 개요:
+     * 1. SoundEngine: Web Audio API를 이용해 외부 파일 없이 효과음(카드 뽑기,
+     *    페어 매치 차임, 조커 발각 긴장감 저음/경고음, 승리 팬파레)을 합성합니다.
+     * 2. Deck & GameState: 선택된 페어 수(6~13쌍)와 조커 수(1~2장)로 덱을 생성하고,
+     *    'ai' | 'solo' | 'pvp' 세 가지 모드의 턴 진행, 자동 페어 제거, 승패 판정을 관리합니다.
+     * 3. Renderer & UI: 반응형 카드 핸드 렌더링, 화면 흔들림 및 플래시 효과,
+     *    전적(승/패/연승) localStorage 저장 및 모달 제어를 담당합니다.
+     * =========================================================================
+     */
 
-            // 카메라 설정
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            // 커스텀 1인칭 컨트롤러 (PointerLock 기반)
-            pitchObject = new THREE.Object3D();
-            pitchObject.add(camera);
-            yawObject = new THREE.Object3D();
-            yawObject.position.y = 2; // 눈높이
-            yawObject.add(pitchObject);
-            scene.add(yawObject);
+    // --- 1. Web Audio API 효과음 합성기 ---
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
 
-            // 조명 설정
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
-            hemiLight.position.set(0, 200, 0);
-            scene.add(hemiLight);
+      ensureContext() {
+        if (!this.enabled) return null;
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        return this.ctx;
+      }
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(0, 50, -50);
-            dirLight.castShadow = true;
-            scene.add(dirLight);
+      toggle() {
+        this.enabled = !this.enabled;
+        if (this.enabled) {
+          this.ensureContext();
+          this.playClick();
+        }
+        return this.enabled;
+      }
 
-            // 렌더러 설정
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            document.body.appendChild(renderer.domElement);
+      playClick() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(780, now + 0.06);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      }
 
-            // 맵 생성
-            createMap();
+      playCardDraw() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
 
-            // 봇 생성 (아군 3명, 적군 6명)
-            for(let i=0; i<3; i++) createBot(TEAM_BLUE);
-            for(let i=0; i<6; i++) createBot(TEAM_RED);
-
-            // 레이캐스터 (사격용)
-            raycaster = new THREE.Raycaster();
-
-            // 이벤트 리스너
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mouseup', onMouseUp);
-            document.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('contextmenu', (e) => e.preventDefault());
-            window.addEventListener('resize', onWindowResize);
-
-            setupPointerLock();
+        // 화이트 노이즈 스냅(카드 스치는 소리) + 피치 스윕
+        const bufferSize = Math.floor(ctx.sampleRate * 0.08);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
         }
 
-        // --- 2. 맵 생성 ---
-        function createMap() {
-            // 바닥
-            const floorGeo = new THREE.PlaneGeometry(100, 100);
-            const floorMat = new THREE.MeshLambertMaterial({ color: 0x334433 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
 
-            // 외벽
-            const wallMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
-            const wallGeo = new THREE.BoxGeometry(100, 10, 2);
-            
-            const wall1 = new THREE.Mesh(wallGeo, wallMat);
-            wall1.position.set(0, 5, -50);
-            scene.add(wall1); mapObjects.push(wall1);
-            
-            const wall2 = new THREE.Mesh(wallGeo, wallMat);
-            wall2.position.set(0, 5, 50);
-            scene.add(wall2); mapObjects.push(wall2);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.Q.setValueAtTime(1.4, now);
 
-            const wallGeoSide = new THREE.BoxGeometry(2, 10, 100);
-            const wall3 = new THREE.Mesh(wallGeoSide, wallMat);
-            wall3.position.set(-50, 5, 0);
-            scene.add(wall3); mapObjects.push(wall3);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.08);
 
-            const wall4 = new THREE.Mesh(wallGeoSide, wallMat);
-            wall4.position.set(50, 5, 0);
-            scene.add(wall4); mapObjects.push(wall4);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start(now);
+      }
 
-            // 장애물 (상자들)
-            const boxGeo = new THREE.BoxGeometry(4, 4, 4);
-            const boxMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // 갈색
-            
-            for (let i = 0; i < 20; i++) {
-                const box = new THREE.Mesh(boxGeo, boxMat);
-                box.position.x = Math.floor(Math.random() * 20 - 10) * 4;
-                box.position.y = 2;
-                box.position.z = Math.floor(Math.random() * 20 - 10) * 4;
-                
-                // 스폰 지점(0,0)은 비우기
-                if(Math.abs(box.position.x) < 8 && Math.abs(box.position.z) < 8) continue;
-                
-                box.castShadow = true;
-                box.receiveShadow = true;
-                scene.add(box);
-                mapObjects.push(box);
-            }
+      playPairMatch() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          const start = now + idx * 0.07;
+          osc.frequency.setValueAtTime(freq, start);
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.linearRampToValueAtTime(0.12, start + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.24);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(start);
+          osc.stop(start + 0.25);
+        });
+      }
+
+      playJokerCaught() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        // 긴장감 있는 불협화음 + 저음 임팩트
+        const freqs = [110, 155.56, 220, 311.13];
+        freqs.forEach((f, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = i < 2 ? 'sawtooth' : 'square';
+          osc.frequency.setValueAtTime(f, now);
+          osc.frequency.linearRampToValueAtTime(f * 0.72, now + 0.65);
+
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.68);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.7);
+        });
+      }
+
+      playWin() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const melody = [523.25, 659.25, 783.99, 1046.5];
+        melody.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          const t = now + idx * 0.1;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.14, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.36);
+        });
+      }
+
+      playLose() {
+        const ctx = this.ensureContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const notes = [392.0, 349.23, 311.13, 261.63];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          const t = now + idx * 0.13;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.08, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.32);
+        });
+      }
+    }
+
+    // --- 2. 상수 및 상태 관리 ---
+    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const SUITS = [
+      { symbol: '♠', name: 'spade', color: 'text-slate-900' },
+      { symbol: '♥', name: 'heart', color: 'text-rose-600' },
+      { symbol: '♦', name: 'diamond', color: 'text-rose-600' },
+      { symbol: '♣', name: 'club', color: 'text-slate-900' },
+    ];
+    const STORAGE_KEY = 'joker_draw_lounge_stats_v1';
+
+    const sound = new SoundEngine();
+
+    let stats = loadStats();
+    let state = {
+      mode: 'ai', // 'ai' | 'solo' | 'pvp'
+      pairCount: 8,
+      jokerCount: 1,
+      p1Hand: [],
+      p2Hand: [], // AI 또는 2인 로컬 플레이어 2의 패
+      soloDeck: [], // 솔로 모드 뒤집힌 카드 덱
+      p1Pairs: 0,
+      p2Pairs: 0,
+      turn: 'p1', // 'p1' | 'p2'
+      turnsCount: 0,
+      isBusy: false,
+      gameOver: false,
+      lastMatchedRank: null,
+      revealedJokerId: null,
+    };
+
+    // DOM 요소 참조 캐싱
+    const els = {
+      shakeContainer: document.getElementById('appShakeContainer'),
+      jokerFlash: document.getElementById('jokerFlashOverlay'),
+      statWins: document.getElementById('statWins'),
+      statLosses: document.getElementById('statLosses'),
+      statStreak: document.getElementById('statStreak'),
+      btnSoundToggle: document.getElementById('btnSoundToggle'),
+      soundIcon: document.getElementById('soundIcon'),
+      soundLabel: document.getElementById('soundLabel'),
+      btnRulesModal: document.getElementById('btnRulesModal'),
+      selectPairs: document.getElementById('selectPairs'),
+      selectJokers: document.getElementById('selectJokers'),
+      btnNewGame: document.getElementById('btnNewGame'),
+      modeButtons: document.querySelectorAll('.mode-btn'),
+      opponentBadge: document.getElementById('opponentBadge'),
+      opponentStatusText: document.getElementById('opponentStatusText'),
+      opponentCardCount: document.getElementById('opponentCardCount'),
+      opponentPairsCount: document.getElementById('opponentPairsCount'),
+      opponentHandContainer: document.getElementById('opponentHandContainer'),
+      turnIndicatorDot: document.getElementById('turnIndicatorDot'),
+      statusMessage: document.getElementById('statusMessage'),
+      totalRemainingCards: document.getElementById('totalRemainingCards'),
+      activeJokerCount: document.getElementById('activeJokerCount'),
+      playerBadge: document.getElementById('playerBadge'),
+      playerTurnHint: document.getElementById('playerTurnHint'),
+      playerCardCount: document.getElementById('playerCardCount'),
+      playerPairsCount: document.getElementById('playerPairsCount'),
+      playerHandContainer: document.getElementById('playerHandContainer'),
+      lastActionLog: document.getElementById('lastActionLog'),
+      passDeviceModal: document.getElementById('passDeviceModal'),
+      passDeviceTitle: document.getElementById('passDeviceTitle'),
+      passDeviceDesc: document.getElementById('passDeviceDesc'),
+      btnConfirmPassDevice: document.getElementById('btnConfirmPassDevice'),
+      gameOverModal: document.getElementById('gameOverModal'),
+      resultIconBox: document.getElementById('resultIconBox'),
+      resultBadge: document.getElementById('resultBadge'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultDescription: document.getElementById('resultDescription'),
+      summaryTurns: document.getElementById('summaryTurns'),
+      summaryPairs: document.getElementById('summaryPairs'),
+      summaryStreak: document.getElementById('summaryStreak'),
+      btnPlayAgain: document.getElementById('btnPlayAgain'),
+      btnCloseResult: document.getElementById('btnCloseResult'),
+      rulesModal: document.getElementById('rulesModal'),
+      btnCloseRules: document.getElementById('btnCloseRules'),
+      btnGotItRules: document.getElementById('btnGotItRules'),
+    };
+
+    // --- 3. 전적 로드/저장 및 유틸리티 ---
+    function loadStats() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return {
+            wins: Number(parsed.wins) || 0,
+            losses: Number(parsed.losses) || 0,
+            streak: Number(parsed.streak) || 0,
+          };
+        }
+      } catch (err) {
+        console.warn('전적 불러오기 실패:', err);
+      }
+      return { wins: 0, losses: 0, streak: 0 };
+    }
+
+    function saveStats() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+      } catch (err) {
+        console.warn('전적 저장 실패:', err);
+      }
+      updateStatsUI();
+    }
+
+    function recordOutcome(isWin) {
+      if (isWin) {
+        stats.wins += 1;
+        stats.streak += 1;
+      } else {
+        stats.losses += 1;
+        stats.streak = 0;
+      }
+      saveStats();
+    }
+
+    function updateStatsUI() {
+      els.statWins.textContent = stats.wins;
+      els.statLosses.textContent = stats.losses;
+      els.statStreak.textContent = stats.streak;
+    }
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function setLog(text) {
+      els.lastActionLog.textContent = text;
+    }
+
+    function triggerJokerEffects() {
+      sound.playJokerCaught();
+      els.shakeContainer.classList.remove('shake-active');
+      void els.shakeContainer.offsetWidth; // 리플로우 강제
+      els.shakeContainer.classList.add('shake-active');
+
+      els.jokerFlash.classList.remove('crimson-flash');
+      void els.jokerFlash.offsetWidth;
+      els.jokerFlash.classList.add('crimson-flash');
+    }
+
+    // --- 4. 덱 생성 및 초기 페어 제거 ---
+    function createDeck(pairCount, jokerCount) {
+      const selectedRanks = RANKS.slice(0, pairCount);
+      const cards = [];
+      let uid = 1;
+
+      // 각 랭크마다 2장씩(페어) 생성
+      selectedRanks.forEach((rank, idx) => {
+        const suitA = SUITS[(idx * 2) % SUITS.length];
+        const suitB = SUITS[(idx * 2 + 1) % SUITS.length];
+
+        cards.push({
+          id: `card-${uid++}`,
+          type: 'normal',
+          rank,
+          suit: suitA.symbol,
+          color: suitA.color,
+        });
+        cards.push({
+          id: `card-${uid++}`,
+          type: 'normal',
+          rank,
+          suit: suitB.symbol,
+          color: suitB.color,
+        });
+      });
+
+      // 조커 카드 추가
+      for (let j = 0; j < jokerCount; j++) {
+        cards.push({
+          id: `joker-${uid++}`,
+          type: 'joker',
+          rank: 'JOKER',
+          suit: '🃏',
+          color: 'text-red-600',
+          label: j === 0 ? 'JOKER' : 'JOKER II',
+        });
+      }
+
+      return shuffleArray(cards);
+    }
+
+    /**
+     * 핸드 안에서 같은 rank를 가진 카드 쌍을 찾아 제거하고 제거된 쌍 수를 반환
+     */
+    function removeMatchingPairsInHand(hand) {
+      const map = new Map();
+      const remaining = [];
+      let removedPairs = 0;
+      const matchedRanks = [];
+
+      for (const card of hand) {
+        if (card.type === 'joker') {
+          remaining.push(card);
+          continue;
+        }
+        if (map.has(card.rank)) {
+          const pairCard = map.get(card.rank);
+          map.delete(card.rank);
+          removedPairs += 1;
+          matchedRanks.push(card.rank);
+          // remaining에서 pairCard 제거
+          const idx = remaining.findIndex((c) => c.id === pairCard.id);
+          if (idx !== -1) remaining.splice(idx, 1);
+        } else {
+          map.set(card.rank, card);
+          remaining.push(card);
+        }
+      }
+
+      return { remaining, removedPairs, matchedRanks };
+    }
+
+    // --- 5. 새 게임 시작 ---
+    function startNewGame() {
+      try {
+        sound.playClick();
+        els.gameOverModal.classList.add('hidden');
+        els.passDeviceModal.classList.add('hidden');
+
+        state.pairCount = parseInt(els.selectPairs.value, 10) || 8;
+        state.jokerCount = parseInt(els.selectJokers.value, 10) || 1;
+        state.turnsCount = 0;
+        state.p1Pairs = 0;
+        state.p2Pairs = 0;
+        state.turn = 'p1';
+        state.isBusy = false;
+        state.gameOver = false;
+        state.lastMatchedRank = null;
+        state.revealedJokerId = null;
+
+        const deck = createDeck(state.pairCount, state.jokerCount);
+
+        if (state.mode === 'solo') {
+          // 솔로 모드: 손패 4장 분배 후 초기 페어 정리, 나머지는 뒤집힌 덱에 배치
+          const initialHandCount = Math.min(4, Math.floor(deck.length / 2));
+          const initialHand = deck.splice(0, initialHandCount);
+          const cleaned = removeMatchingPairsInHand(initialHand);
+          state.p1Hand = shuffleArray(cleaned.remaining);
+          state.p1Pairs = cleaned.removedPairs;
+          state.p2Hand = [];
+          state.soloDeck = deck;
+
+          if (cleaned.removedPairs > 0) {
+            state.lastMatchedRank = cleaned.matchedRanks[cleaned.matchedRanks.length - 1];
+          }
+          setLog(`솔로 모드 시작! 뒤집힌 덱에서 카드를 뽑아 짝을 맞추고 조커를 피하세요.`);
+          setStatus(`내 차례: 중앙 덱에서 카드 한 장을 뽑아 짝을 맞추세요!`);
+        } else {
+          // 1:1 AI 또는 2인 로컬 교대 모드: 절반씩 나누고 초기 페어 정리
+          const mid = Math.ceil(deck.length / 2);
+          const rawP1 = deck.slice(0, mid);
+          const rawP2 = deck.slice(mid);
+
+          const clean1 = removeMatchingPairsInHand(rawP1);
+          const clean2 = removeMatchingPairsInHand(rawP2);
+
+          state.p1Hand = shuffleArray(clean1.remaining);
+          state.p1Pairs = clean1.removedPairs;
+          state.p2Hand = shuffleArray(clean2.remaining);
+          state.p2Pairs = clean2.removedPairs;
+          state.soloDeck = [];
+
+          // 시작 시 이미 한쪽 패가 비어있는 희박한 케이스 체크
+          if (checkBattleEnd()) {
+            renderAll();
+            return;
+          }
+
+          if (state.mode === 'ai') {
+            setLog(`1:1 AI 대전 시작! 초기 페어(나 ${state.p1Pairs}쌍 / AI ${state.p2Pairs}쌍) 정리 완료.`);
+            setStatus(`내 차례입니다. 상대(AI)의 카드 중 하나를 선택해 뽑으세요.`);
+          } else {
+            setLog(`2인 로컬 교대 대전 시작! 플레이어 1부터 차례를 진행합니다.`);
+            setStatus(`플레이어 1 차례: 플레이어 2의 카드 중 하나를 선택해 뽑으세요.`);
+          }
         }
 
-        // --- 3. 봇(AI) 클래스 및 로직 ---
-        class Bot {
-            constructor(team) {
-                this.team = team;
-                this.health = 50;
-                this.isDead = false;
-                this.speed = 4.0;
-                this.lastShootTime = 0;
-                
-                // 외형 생성 (사람 모형으로 변경)
-                this.color = team === TEAM_BLUE ? 0x2244ff : 0xff2222;
-                this.mesh = new THREE.Group(); // 여러 파츠를 묶기 위한 그룹
-                const mat = new THREE.MeshLambertMaterial({ color: this.color });
-                
-                // 머리
-                const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-                const head = new THREE.Mesh(headGeo, mat);
-                head.position.y = 3.2;
-                head.castShadow = true;
-                head.userData = { isHead: true }; // 헤드샷 판정용 데이터
-                this.mesh.add(head);
+        renderAll();
+      } catch (err) {
+        console.error('게임 시작 오류:', err);
+        setStatus('게임을 초기화하는 중 문제가 발생했습니다. 새 게임을 눌러주세요.');
+      }
+    }
 
-                // 몸통
-                const bodyGeo = new THREE.BoxGeometry(1.2, 1.4, 0.6);
-                const body = new THREE.Mesh(bodyGeo, mat);
-                body.position.y = 2.1;
-                body.castShadow = true;
-                this.mesh.add(body);
+    function setStatus(msg) {
+      els.statusMessage.textContent = msg;
+    }
 
-                // 양팔
-                const armGeo = new THREE.BoxGeometry(0.4, 1.4, 0.4);
-                const leftArm = new THREE.Mesh(armGeo, mat);
-                leftArm.position.set(-0.9, 2.1, 0);
-                leftArm.castShadow = true;
-                this.mesh.add(leftArm);
+    // --- 6. 승패 판정 로직 ---
+    /**
+     * 솔로 모드 승패 판정:
+     * - 조커를 뽑으면 즉시 패배
+     * - 덱과 손패에 조커만 남거나 모든 카드가 소진되면 승리
+     */
+    function checkSoloEnd(justDrewJoker = false) {
+      if (state.gameOver) return true;
 
-                const rightArm = new THREE.Mesh(armGeo, mat);
-                rightArm.position.set(0.9, 2.1, 0);
-                rightArm.castShadow = true;
-                this.mesh.add(rightArm);
+      if (justDrewJoker) {
+        finishGame(
+          false,
+          '조커 발각! 솔로 실패',
+          '조커 카드를 뽑아버렸습니다! 긴장감 넘치는 라운지에서 아쉽게 탈락했어요.'
+        );
+        return true;
+      }
 
-                // 양다리
-                const legGeo = new THREE.BoxGeometry(0.5, 1.4, 0.5);
-                const leftLeg = new THREE.Mesh(legGeo, mat);
-                leftLeg.position.set(-0.35, 0.7, 0);
-                leftLeg.castShadow = true;
-                this.mesh.add(leftLeg);
+      const hasJokerInHand = state.p1Hand.some((c) => c.type === 'joker');
+      const hasJokerInDeck = state.soloDeck.some((c) => c.type === 'joker');
 
-                const rightLeg = new THREE.Mesh(legGeo, mat);
-                rightLeg.position.set(0.35, 0.7, 0);
-                rightLeg.castShadow = true;
-                this.mesh.add(rightLeg);
+      // 조커가 덱에 남아있고, 손패에 짝 맞출 카드가 없으며 손패가 비어있을 때 -> 다음 카드 뽑아야 함
+      // 모든 일반 카드 페어를 제거하고 조커만 남았거나 덱과 손패가 모두 비었을 때 승리
+      if (state.p1Hand.length === 0 && state.soloDeck.length === 0) {
+        finishGame(
+          true,
+          '완벽한 클리어! 승리',
+          '조커를 피하고 모든 카드 페어를 깔끔하게 정리했습니다!'
+        );
+        return true;
+      }
 
-                // 총을 쐈을 때 맞추기 위해 모든 부위에 userData(본체 연결) 할당
-                this.mesh.children.forEach(child => {
-                    const isHead = child.userData && child.userData.isHead;
-                    child.userData = { bot: this, isHead: !!isHead };
-                });
+      // 덱이 비었고 손패에 조커만 남아있는 경우(조커를 직접 뽑지 않고 마지막에 남은 경우 처리)
+      if (!hasJokerInDeck && state.soloDeck.length === 0 && hasJokerInHand && state.p1Hand.length === 1) {
+        finishGame(
+          false,
+          '마지막에 조커가 남았습니다!',
+          '다른 카드를 모두 제거했지만 마지막으로 조커가 손에 남았습니다.'
+        );
+        return true;
+      }
 
-                // 맵 내 랜덤 위치 생성 (발바닥이 지면 y=0에 위치하도록 봇 그룹의 position.y는 0으로 고정)
-                this.targetPos = new THREE.Vector3();
-                this.respawn();
-                scene.add(this.mesh);
-            }
+      return false;
+    }
 
-            respawn() {
-                this.isDead = false;
-                this.health = 50;
-                this.mesh.rotation.x = 0; // 다시 일어서기
-                
-                // 맵 중앙 부근(-35 ~ 35)에 스폰되도록 설정하여 가시성 확보
-                const spawnX = (Math.random() - 0.5) * 70;
-                const spawnZ = (Math.random() - 0.5) * 70;
-                this.mesh.position.set(spawnX, 0, spawnZ);
-                
-                this.mesh.children.forEach(child => child.material.color.setHex(this.color));
-                this.pickNewTarget();
-            }
+    /**
+     * 1:1 AI / 2인 로컬 대전 승패 판정:
+     * - 한쪽 손패가 0장이 되면, 조커를 들고 있는 쪽이 패배 (조커 없이 손패가 먼저 비면 승리)
+     * - 양쪽 손패에 조커만 남거나 카드가 소진된 경우 판정
+     */
+    function checkBattleEnd() {
+      if (state.gameOver) return true;
 
-            pickNewTarget() {
-                this.targetPos.set(
-                    (Math.random() - 0.5) * 70,
-                    0,
-                    (Math.random() - 0.5) * 70
-                );
-            }
+      const p1Empty = state.p1Hand.length === 0;
+      const p2Empty = state.p2Hand.length === 0;
 
-            takeDamage(amount, attackerIsPlayer) {
-                if(this.isDead) return;
-                this.health -= amount;
-                
-                // 피격 시 잠시 하얗게 깜빡임 효과 (모든 부위)
-                this.mesh.children.forEach(child => child.material.color.setHex(0xffffff));
-                setTimeout(() => { 
-                    if(!this.isDead) this.mesh.children.forEach(child => child.material.color.setHex(this.color)); 
-                }, 100);
+      if (p1Empty && p2Empty) {
+        finishGame(true, '무승부 / 동시 정리', '양쪽 모두 모든 카드를 깔끔하게 정리했습니다!');
+        return true;
+      }
 
-                if (this.health <= 0) {
-                    this.die(attackerIsPlayer);
-                }
-            }
+      if (p1Empty) {
+        if (state.mode === 'ai') {
+          finishGame(true, '승리! 패를 모두 비웠습니다', '상대보다 먼저 모든 카드를 없애고 조커를 피했습니다!');
+        } else {
+          finishGame(true, '플레이어 1 승리!', '플레이어 1이 먼저 모든 카드를 비워 승리했습니다!');
+        }
+        return true;
+      }
 
-            die(attackerIsPlayer) {
-                this.isDead = true;
-                this.mesh.rotation.x = -Math.PI / 2; // 뒤로 눕히기(죽음 표현)
-                this.mesh.position.y = 0.5; // 살짝 띄움
-                this.mesh.children.forEach(child => child.material.color.setHex(0x333333)); // 회색으로 변경
-                
-                if (attackerIsPlayer && this.team === TEAM_RED) {
-                    playerState.kills++;
-                    document.getElementById('killsValue').innerText = playerState.kills;
-                }
+      if (p2Empty) {
+        if (state.mode === 'ai') {
+          finishGame(false, '패배! AI가 먼저 패를 비웠습니다', 'AI가 카드를 먼저 모두 없애면서 조커가 당신에게 남았습니다.');
+        } else {
+          finishGame(false, '플레이어 2 승리!', '플레이어 2가 먼저 모든 카드를 비워 승리했습니다!');
+        }
+        return true;
+      }
 
-                // 관전 중인 봇이 죽으면 다른 봇을 찾음
-                if(playerState.spectatingBot === this) {
-                    findNewSpectateTarget();
-                }
+      return false;
+    }
 
-                // 리스폰 로직 (2초 후 부활)
-                setTimeout(() => {
-                    this.respawn();
-                }, 2000);
-            }
+    function finishGame(isPlayerWin, title, description) {
+      state.gameOver = true;
+      state.isBusy = false;
 
-            update(delta) {
-                if (this.isDead) return;
+      // 게임 종료 시 남은 조커 위치 공개
+      const jokerInP1 = state.p1Hand.find((c) => c.type === 'joker');
+      const jokerInP2 = state.p2Hand.find((c) => c.type === 'joker');
+      if (!state.revealedJokerId) {
+        if (jokerInP1) state.revealedJokerId = jokerInP1.id;
+        else if (jokerInP2) state.revealedJokerId = jokerInP2.id;
+      }
 
-                // 간단한 AI: 적 찾기
-                let nearestEnemy = null;
-                let minDist = 30; // 시야 거리
+      recordOutcome(isPlayerWin);
+      if (isPlayerWin) {
+        sound.playWin();
+      } else {
+        sound.playLose();
+      }
 
-                // 플레이어 확인 (적팀 봇일 경우)
-                if (this.team === TEAM_RED && !playerState.isDead) {
-                    const distToPlayer = this.mesh.position.distanceTo(yawObject.position);
-                    if (distToPlayer < minDist) {
-                        minDist = distToPlayer;
-                        nearestEnemy = yawObject;
-                    }
-                }
+      renderAll();
 
-                // 다른 봇 확인
-                bots.forEach(otherBot => {
-                    if (!otherBot.isDead && otherBot.team !== this.team) {
-                        const dist = this.mesh.position.distanceTo(otherBot.mesh.position);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nearestEnemy = otherBot.mesh;
-                        }
-                    }
-                });
+      // 결과 모달 구성
+      els.resultIconBox.className = isPlayerWin
+        ? 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-4xl border bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+        : 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-4xl border bg-rose-500/20 border-rose-400/40 text-rose-300';
+      els.resultIconBox.textContent = isPlayerWin ? '🏆' : '🃏';
 
-                if (nearestEnemy) {
-                    // 적을 향해 바라보고 사격
-                    this.mesh.lookAt(nearestEnemy.position.x, this.mesh.position.y, nearestEnemy.position.z);
-                    
-                    const now = performance.now();
-                    if (now - this.lastShootTime > 1500) { // 1.5초마다 사격
-                        this.lastShootTime = now;
-                        this.shootTarget(nearestEnemy);
-                    }
-                } else {
-                    // 순찰 이동
-                    const distToTarget = this.mesh.position.distanceTo(this.targetPos);
-                    if (distToTarget < 2) {
-                        this.pickNewTarget();
-                    }
-                    
-                    this.mesh.lookAt(this.targetPos.x, this.mesh.position.y, this.targetPos.z);
-                    this.mesh.translateZ(this.speed * delta);
-                }
-            }
+      els.resultBadge.className = isPlayerWin
+        ? 'inline-block text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+        : 'inline-block text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-400/30';
+      els.resultBadge.textContent = isPlayerWin ? 'VICTORY' : 'JOKER / DEFEAT';
 
-            shootTarget(target) {
-                // 시각적 레이저 효과 (사람 모형의 가슴 높이인 2.5에서 발사)
-                const start = this.mesh.position.clone().setY(2.5);
-                const end = target.position.clone().setY(2);
-                createLaser(start, end, this.team === TEAM_RED ? 0xff0000 : 0x0044ff);
+      els.resultTitle.textContent = title;
+      els.resultDescription.textContent = description;
+      els.summaryTurns.textContent = state.turnsCount;
+      els.summaryPairs.textContent = state.p1Pairs;
+      els.summaryStreak.textContent = stats.streak;
 
-                // 데미지 판정
-                if (target === yawObject && !playerState.isDead) {
-                    damagePlayer(10);
-                } else if (target.userData && target.userData.bot) {
-                    target.userData.bot.takeDamage(15, false);
-                }
-            }
+      setTimeout(() => {
+        if (state.gameOver) {
+          els.gameOverModal.classList.remove('hidden');
+        }
+      }, 420);
+    }
+
+    // --- 7. 카드 뽑기 및 턴 진행 ---
+    function handleDrawFromOpponent(index) {
+      if (state.isBusy || state.gameOver || state.turn !== 'p1') return;
+      if (index < 0 || index >= state.p2Hand.length) return;
+
+      state.isBusy = true;
+      state.turnsCount += 1;
+      sound.playCardDraw();
+
+      const [drawnCard] = state.p2Hand.splice(index, 1);
+      const actorName = state.mode === 'pvp' ? '플레이어 1' : '나';
+      const targetName = state.mode === 'pvp' ? '플레이어 2' : 'AI';
+
+      // 조커를 뽑은 경우: 긴장감 연출 및 즉시/연계 처리
+      if (drawnCard.type === 'joker') {
+        state.revealedJokerId = drawnCard.id;
+        state.p1Hand.push(drawnCard);
+        triggerJokerEffects();
+        setLog(`💥 ${actorName}가 ${targetName}의 패에서 조커를 뽑았습니다!`);
+        setStatus(`조커가 나왔습니다! 조커를 손에 쥐게 되었습니다!`);
+        renderAll();
+
+        // 상대 패가 비었는지 먼저 확인
+        if (checkBattleEnd()) return;
+
+        setTimeout(() => {
+          if (state.gameOver) return;
+          if (state.mode === 'ai') {
+            state.turn = 'p2';
+            state.isBusy = false;
+            renderAll();
+            runAiTurn();
+          } else {
+            // 2인 로컬 모드: 턴 넘김 안내
+            state.turn = 'p2';
+            state.isBusy = false;
+            renderAll();
+            openPassDeviceModal('플레이어 2', '조커가 등장했습니다! 플레이어 2에게 기기를 넘겨주세요.');
+          }
+        }, 700);
+        return;
+      }
+
+      // 일반 카드를 뽑은 경우: 내 패에 넣고 자동 페어 제거
+      state.p1Hand.push(drawnCard);
+      const cleaned = removeMatchingPairsInHand(state.p1Hand);
+      state.p1Hand = shuffleArray(cleaned.remaining);
+      state.p1Pairs += cleaned.removedPairs;
+
+      if (cleaned.removedPairs > 0) {
+        sound.playPairMatch();
+        const rankText = cleaned.matchedRanks.join(', ');
+        state.lastMatchedRank = cleaned.matchedRanks[cleaned.matchedRanks.length - 1];
+        setLog(`✨ ${actorName}가 [${drawnCard.rank}${drawnCard.suit}]를 뽑아 [${rankText}] 페어 제거! (누적 ${state.p1Pairs}쌍)`);
+        setStatus(`짝이 맞았습니다! [${rankText}] 페어 자동 제거!`);
+      } else {
+        setLog(`${actorName}가 ${targetName}의 카드 한 장을 뽑았습니다.`);
+        setStatus(`카드를 뽑았습니다. 짝이 맞지 않아 패에 보관합니다.`);
+      }
+
+      renderAll();
+
+      if (checkBattleEnd()) return;
+
+      setTimeout(() => {
+        if (state.gameOver) return;
+        if (state.mode === 'ai') {
+          state.turn = 'p2';
+          state.isBusy = false;
+          renderAll();
+          runAiTurn();
+        } else {
+          state.turn = 'p2';
+          state.isBusy = false;
+          renderAll();
+          openPassDeviceModal('플레이어 2', '플레이어 1의 차례가 끝났습니다. 플레이어 2에게 기기를 넘겨주세요.');
+        }
+      }, 520);
+    }
+
+    // 2인 로컬 모드: 플레이어 2가 플레이어 1의 카드 중 하나를 뽑는 함수
+    function handleP2DrawFromP1(index) {
+      if (state.mode !== 'pvp' || state.isBusy || state.gameOver || state.turn !== 'p2') return;
+      if (index < 0 || index >= state.p1Hand.length) return;
+
+      state.isBusy = true;
+      state.turnsCount += 1;
+      sound.playCardDraw();
+
+      const [drawnCard] = state.p1Hand.splice(index, 1);
+
+      if (drawnCard.type === 'joker') {
+        state.revealedJokerId = drawnCard.id;
+        state.p2Hand.push(drawnCard);
+        triggerJokerEffects();
+        setLog(`💥 플레이어 2가 플레이어 1의 패에서 조커를 뽑았습니다!`);
+        setStatus(`플레이어 2가 조커를 뽑았습니다!`);
+        renderAll();
+
+        if (checkBattleEnd()) return;
+
+        setTimeout(() => {
+          if (state.gameOver) return;
+          state.turn = 'p1';
+          state.isBusy = false;
+          renderAll();
+          openPassDeviceModal('플레이어 1', '조커가 등장했습니다! 플레이어 1에게 기기를 넘겨주세요.');
+        }, 700);
+        return;
+      }
+
+      state.p2Hand.push(drawnCard);
+      const cleaned = removeMatchingPairsInHand(state.p2Hand);
+      state.p2Hand = shuffleArray(cleaned.remaining);
+      state.p2Pairs += cleaned.removedPairs;
+
+      if (cleaned.removedPairs > 0) {
+        sound.playPairMatch();
+        const rankText = cleaned.matchedRanks.join(', ');
+        setLog(`✨ 플레이어 2가 [${drawnCard.rank}${drawnCard.suit}]를 뽑아 [${rankText}] 페어 제거!`);
+        setStatus(`플레이어 2가 [${rankText}] 페어를 맞췄습니다!`);
+      } else {
+        setLog(`플레이어 2가 플레이어 1의 카드 한 장을 뽑았습니다.`);
+        setStatus(`플레이어 2가 카드를 뽑았습니다.`);
+      }
+
+      renderAll();
+
+      if (checkBattleEnd()) return;
+
+      setTimeout(() => {
+        if (state.gameOver) return;
+        state.turn = 'p1';
+        state.isBusy = false;
+        renderAll();
+        openPassDeviceModal('플레이어 1', '플레이어 2의 차례가 끝났습니다. 플레이어 1에게 기기를 넘겨주세요.');
+      }, 520);
+    }
+
+    // AI 턴 진행
+    function runAiTurn() {
+      if (state.mode !== 'ai' || state.gameOver || state.turn !== 'p2') return;
+      if (state.p1Hand.length === 0) {
+        checkBattleEnd();
+        return;
+      }
+
+      state.isBusy = true;
+      setStatus(`🤖 AI가 내 패 중 한 장을 고르고 있습니다...`);
+      renderAll();
+
+      setTimeout(() => {
+        if (state.gameOver || state.p1Hand.length === 0) {
+          state.isBusy = false;
+          checkBattleEnd();
+          return;
         }
 
-        function createBot(team) {
-            const bot = new Bot(team);
-            bots.push(bot);
+        state.turnsCount += 1;
+        sound.playCardDraw();
+        const randIdx = Math.floor(Math.random() * state.p1Hand.length);
+        const [drawnCard] = state.p1Hand.splice(randIdx, 1);
+
+        if (drawnCard.type === 'joker') {
+          state.revealedJokerId = drawnCard.id;
+          state.p2Hand.push(drawnCard);
+          triggerJokerEffects();
+          setLog(`⚡ AI가 내 패에서 조커를 뽑았습니다!`);
+          setStatus(`AI가 조커를 뽑았습니다! AI가 조커를 쥐게 되었습니다!`);
+          renderAll();
+
+          if (checkBattleEnd()) return;
+
+          setTimeout(() => {
+            if (state.gameOver) return;
+            state.turn = 'p1';
+            state.isBusy = false;
+            setStatus(`내 차례입니다! 상대 카드 중 하나를 선택해 뽑으세요.`);
+            renderAll();
+          }, 700);
+          return;
         }
 
-        // --- 4. 플레이어 기능 및 입력 ---
-        function setupPointerLock() {
-            const blocker = document.getElementById('blocker');
-            const crosshair = document.getElementById('crosshair');
-            const hud = document.getElementById('hud');
-            const startButton = document.getElementById('startButton');
+        state.p2Hand.push(drawnCard);
+        const cleaned = removeMatchingPairsInHand(state.p2Hand);
+        state.p2Hand = shuffleArray(cleaned.remaining);
+        state.p2Pairs += cleaned.removedPairs;
 
-            const tryLock = () => {
-                if(!isLocked && !playerState.isDead) {
-                    try {
-                        document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
-                        const promise = document.body.requestPointerLock();
-                        if (promise !== undefined) {
-                            promise.catch(e => {
-                                console.warn("마우스 잠금 에러:", e);
-                            });
-                        }
-                    } catch (e) {
-                        console.warn("Pointer Lock failed:", e);
-                    }
-                }
-            };
+        if (cleaned.removedPairs > 0) {
+          sound.playPairMatch();
+          setLog(`🤖 AI가 카드를 뽑아 [${cleaned.matchedRanks.join(', ')}] 페어를 제거했습니다. (AI ${state.p2Pairs}쌍)`);
+          setStatus(`AI가 페어를 맞췄습니다. 이제 내 차례입니다!`);
+        } else {
+          setLog(`🤖 AI가 내 카드 한 장을 뽑아갔습니다.`);
+          setStatus(`AI의 차례가 끝났습니다. 내 차례입니다!`);
+        }
 
-            // 클릭 또는 버튼 수동 클릭 시 포인터 잠금 요청
-            blocker.addEventListener('click', tryLock);
-            startButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                tryLock();
+        renderAll();
+
+        if (checkBattleEnd()) return;
+
+        setTimeout(() => {
+          if (state.gameOver) return;
+          state.turn = 'p1';
+          state.isBusy = false;
+          setStatus(`내 차례입니다! 상대(AI)의 카드 중 하나를 선택해 뽑으세요.`);
+          renderAll();
+        }, 480);
+      }, 650);
+    }
+
+    // 솔로 모드: 뒤집힌 덱에서 카드 한 장 뽑기
+    function handleSoloDrawFromDeck(index) {
+      if (state.mode !== 'solo' || state.isBusy || state.gameOver) return;
+      if (state.soloDeck.length === 0) return;
+
+      const targetIdx = (typeof index === 'number' && index >= 0 && index < state.soloDeck.length)
+        ? index
+        : 0;
+
+      state.isBusy = true;
+      state.turnsCount += 1;
+      sound.playCardDraw();
+
+      const [drawnCard] = state.soloDeck.splice(targetIdx, 1);
+
+      if (drawnCard.type === 'joker') {
+        state.revealedJokerId = drawnCard.id;
+        state.p1Hand.push(drawnCard);
+        triggerJokerEffects();
+        setLog(`💥 조커 등장! 솔로 라운드 종료!`);
+        setStatus(`조커를 뽑았습니다!`);
+        renderAll();
+        setTimeout(() => {
+          checkSoloEnd(true);
+        }, 550);
+        return;
+      }
+
+      state.p1Hand.push(drawnCard);
+      const cleaned = removeMatchingPairsInHand(state.p1Hand);
+      state.p1Hand = shuffleArray(cleaned.remaining);
+      state.p1Pairs += cleaned.removedPairs;
+
+      if (cleaned.removedPairs > 0) {
+        sound.playPairMatch();
+        const rankText = cleaned.matchedRanks.join(', ');
+        state.lastMatchedRank = cleaned.matchedRanks[cleaned.matchedRanks.length - 1];
+        setLog(`✨ [${drawnCard.rank}${drawnCard.suit}] 뽑기 성공! [${rankText}] 페어 제거 (누적 ${state.p1Pairs}쌍)`);
+        setStatus(`조커 회피 & [${rankText}] 페어 제거! 계속 진행하세요.`);
+      } else {
+        setLog(`안전! [${drawnCard.rank}${drawnCard.suit}] 카드를 뽑았습니다.`);
+        setStatus(`조커가 아닙니다! 다음 카드를 선택해 보세요.`);
+      }
+
+      renderAll();
+
+      setTimeout(() => {
+        if (state.gameOver) return;
+        state.isBusy = false;
+        checkSoloEnd(false);
+        renderAll();
+      }, 280);
+    }
+
+    // 2인 로컬 교대 프라이버시 모달
+    function openPassDeviceModal(nextPlayerLabel, desc) {
+      if (state.gameOver) return;
+      els.passDeviceTitle.textContent = `${nextPlayerLabel}에게 기기를 넘겨주세요`;
+      els.passDeviceDesc.textContent = desc;
+      els.passDeviceModal.classList.remove('hidden');
+    }
+
+    // --- 8. UI 렌더링 ---
+    function createCardElement(card, options = {}) {
+      const {
+        faceUp = false,
+        clickable = false,
+        onClick = null,
+        highlightMatch = false,
+      } = options;
+
+      const wrapper = document.createElement('button');
+      wrapper.type = 'button';
+      wrapper.disabled = !clickable;
+
+      const baseSize = 'w-[64px] h-[94px] sm:w-[78px] sm:h-[114px] rounded-xl relative flex flex-col justify-between p-1.5 sm:p-2 animate-deal';
+
+      if (!faceUp) {
+        // 뒷면 카드
+        wrapper.className = `${baseSize} card-back-pattern border border-amber-400/35 ${
+          clickable ? 'selectable-card cursor-pointer' : 'cursor-default opacity-95'
+        }`;
+        wrapper.innerHTML = `
+          <div class="w-full h-full rounded-lg border border-amber-300/20 flex items-center justify-center">
+            <span class="text-amber-300/75 text-lg sm:text-xl font-black">♛</span>
+          </div>
+        `;
+      } else if (card.type === 'joker') {
+        // 조커 앞면 카드
+        wrapper.className = `${baseSize} joker-card-face cursor-default ${
+          highlightMatch ? 'animate-pair-match' : ''
+        }`;
+        wrapper.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] sm:text-xs font-black text-red-700 leading-none">
+            <span>JKR</span>
+            <span>🃏</span>
+          </div>
+          <div class="text-center leading-tight">
+            <div class="text-xl sm:text-2xl">🃏</div>
+            <div class="text-[10px] sm:text-[11px] font-black tracking-tighter text-red-800 bg-white/75 rounded px-1 mt-0.5">
+              JOKER
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-[10px] sm:text-xs font-black text-red-700 leading-none rotate-180">
+            <span>JKR</span>
+            <span>🃏</span>
+          </div>
+        `;
+      } else {
+        // 일반 트럼프 카드 앞면
+        wrapper.className = `${baseSize} card-front-face cursor-default ${
+          highlightMatch ? 'animate-pair-match ring-2 ring-emerald-400' : ''
+        }`;
+        wrapper.innerHTML = `
+          <div class="flex flex-col items-start leading-none ${card.color}">
+            <span class="text-xs sm:text-sm font-black">${card.rank}</span>
+            <span class="text-xs sm:text-sm">${card.suit}</span>
+          </div>
+          <div class="text-center ${card.color} text-xl sm:text-2xl font-bold select-none">
+            ${card.suit}
+          </div>
+          <div class="flex flex-col items-end leading-none ${card.color} rotate-180">
+            <span class="text-xs sm:text-sm font-black">${card.rank}</span>
+            <span class="text-xs sm:text-sm">${card.suit}</span>
+          </div>
+        `;
+      }
+
+      if (clickable && typeof onClick === 'function') {
+        wrapper.addEventListener('click', onClick);
+      }
+
+      return wrapper;
+    }
+
+    function renderAll() {
+      updateStatsUI();
+
+      // 모드 탭 스타일 동기화
+      els.modeButtons.forEach((btn) => {
+        const isActive = btn.dataset.mode === state.mode;
+        btn.className = isActive
+          ? 'mode-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer bg-amber-500 text-slate-950 shadow'
+          : 'mode-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer text-slate-300 hover:text-white hover:bg-white/5';
+      });
+
+      // 상단 & 하단 영역 헤더 업데이트
+      if (state.mode === 'solo') {
+        els.opponentBadge.className = 'px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs font-bold';
+        els.opponentBadge.textContent = '🎴 뒤집힌 카드 덱';
+        els.opponentStatusText.textContent = state.gameOver ? '라운드 종료' : '원하는 카드 한 장을 뽑으세요';
+        els.opponentCardCount.textContent = state.soloDeck.length;
+        els.opponentPairsCount.textContent = `${state.p1Pairs}`;
+
+        els.playerBadge.className = 'px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold';
+        els.playerBadge.textContent = '♠ 내 패 (자동 페어 제거)';
+        els.playerTurnHint.textContent = state.gameOver ? '종료' : '조커 회피 중';
+        els.playerCardCount.textContent = state.p1Hand.length;
+        els.playerPairsCount.textContent = state.p1Pairs;
+      } else if (state.mode === 'ai') {
+        els.opponentBadge.className = 'px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold';
+        els.opponentBadge.textContent = '🤖 딜러 AI';
+        els.opponentStatusText.textContent = state.turn === 'p2' ? '차례 진행 중...' : '카드 선택 대기 중';
+        els.opponentCardCount.textContent = state.p2Hand.length;
+        els.opponentPairsCount.textContent = state.p2Pairs;
+
+        els.playerBadge.className = 'px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold';
+        els.playerBadge.textContent = '♠ 플레이어 1 (나)';
+        els.playerTurnHint.textContent = state.turn === 'p1' && !state.gameOver ? '내 차례 — 상대 카드를 뽑으세요' : '상대 차례';
+        els.playerCardCount.textContent = state.p1Hand.length;
+        els.playerPairsCount.textContent = state.p1Pairs;
+      } else {
+        // 2인 로컬 교대 ('pvp')
+        els.opponentBadge.className = 'px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-400/30 text-purple-200 text-xs font-bold';
+        els.opponentBadge.textContent = '♦ 플레이어 2';
+        els.opponentStatusText.textContent = state.turn === 'p2' && !state.gameOver ? '플레이어 2 차례: 플레이어 1 패에서 뽑기' : '대기 중';
+        els.opponentCardCount.textContent = state.p2Hand.length;
+        els.opponentPairsCount.textContent = state.p2Pairs;
+
+        els.playerBadge.className = 'px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-xs font-bold';
+        els.playerBadge.textContent = '♠ 플레이어 1';
+        els.playerTurnHint.textContent = state.turn === 'p1' && !state.gameOver ? '플레이어 1 차례: 플레이어 2 패에서 뽑기' : '대기 중';
+        els.playerCardCount.textContent = state.p1Hand.length;
+        els.playerPairsCount.textContent = state.p1Pairs;
+      }
+
+      // 전체 잔여 카드 수
+      const remainingTotal = state.mode === 'solo'
+        ? state.p1Hand.length + state.soloDeck.length
+        : state.p1Hand.length + state.p2Hand.length;
+      els.totalRemainingCards.textContent = remainingTotal;
+      els.activeJokerCount.textContent = state.jokerCount;
+
+      // 상단 컨테이너 렌더링
+      els.opponentHandContainer.innerHTML = '';
+      if (state.mode === 'solo') {
+        if (state.soloDeck.length === 0) {
+          els.opponentHandContainer.innerHTML = `<span class="text-xs text-slate-400">덱의 모든 카드를 뽑았습니다.</span>`;
+        } else {
+          state.soloDeck.forEach((card, idx) => {
+            const canClick = !state.isBusy && !state.gameOver;
+            const cardEl = createCardElement(card, {
+              faceUp: false,
+              clickable: canClick,
+              onClick: () => handleSoloDrawFromDeck(idx),
             });
-
-            document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement === document.body || document.mozPointerLockElement === document.body) {
-                    // 마우스 잠금 성공 (게임 재개)
-                    isLocked = true;
-                    blocker.style.display = 'none';
-                    if (!playerState.isDead) {
-                        crosshair.classList.remove('hidden');
-                        hud.classList.remove('hidden');
-                    }
-                } else {
-                    // 마우스 잠금 해제됨 (ESC 누름 -> 일시정지)
-                    isLocked = false;
-                    resetZoom();
-                    if (!playerState.isDead) {
-                        blocker.style.display = 'flex';
-                        crosshair.classList.add('hidden');
-                        hud.classList.add('hidden');
-                    }
-                }
+            els.opponentHandContainer.appendChild(cardEl);
+          });
+        }
+      } else {
+        if (state.p2Hand.length === 0) {
+          els.opponentHandContainer.innerHTML = `<span class="text-xs text-emerald-400 font-semibold">상대 패가 비었습니다.</span>`;
+        } else {
+          state.p2Hand.forEach((card, idx) => {
+            const canP1Draw = state.mode !== 'pvp' && state.turn === 'p1' && !state.isBusy && !state.gameOver;
+            const showFace = state.gameOver && (card.type === 'joker' || card.id === state.revealedJokerId);
+            const cardEl = createCardElement(card, {
+              faceUp: showFace,
+              clickable: canP1Draw,
+              onClick: () => handleDrawFromOpponent(idx),
             });
+            els.opponentHandContainer.appendChild(cardEl);
+          });
         }
+      }
 
-        function onKeyDown(event) {
-            // 게임 시작 전(마우스 잠금 해제 상태)에 스페이스바를 누르면 시작 버튼 클릭 이벤트 유발
-            if (!isLocked && !playerState.isDead && event.code === 'Space') {
-                event.preventDefault();
-                document.getElementById('startButton').click();
-                return;
-            }
+      // 하단 컨테이너 렌더링
+      els.playerHandContainer.innerHTML = '';
+      if (state.p1Hand.length === 0) {
+        els.playerHandContainer.innerHTML = `<span class="text-xs text-emerald-400 font-semibold">내 패가 비었습니다.</span>`;
+      } else {
+        state.p1Hand.forEach((card, idx) => {
+          // 2인 로컬 모드에서 플레이어 2 차례일 때는 플레이어 1의 카드를 뒷면으로 숨기고 뽑기 가능하게 표시
+          const hideForP2Turn = state.mode === 'pvp' && state.turn === 'p2' && !state.gameOver;
+          const canP2Draw = hideForP2Turn && !state.isBusy;
+          const isMatchedHighlight = state.lastMatchedRank && card.rank === state.lastMatchedRank;
 
-            if(playerState.isDead) {
-                // 사망 상태일 때 스페이스바로 부활
-                if (event.code === 'Space') {
-                    playerRespawn();
-                }
-                return;
-            }
-            switch (event.code) {
-                case 'KeyW': moveForward = true; break;
-                case 'KeyA': moveLeft = true; break;
-                case 'KeyS': moveBackward = true; break;
-                case 'KeyD': moveRight = true; break;
-                case 'ShiftLeft': isRunning = true; break; // 왼쪽 쉬프트 누르면 달리기
-                case 'KeyQ': healPlayer(30); break; // Q 누르면 힐
-            }
+          const cardEl = createCardElement(card, {
+            faceUp: !hideForP2Turn,
+            clickable: canP2Draw,
+            highlightMatch: isMatchedHighlight,
+            onClick: () => handleP2DrawFromP1(idx),
+          });
+          els.playerHandContainer.appendChild(cardEl);
+        });
+      }
+    }
+
+    // --- 9. 이벤트 리스너 바인딩 ---
+    function bindEvents() {
+      // 사운드 토글
+      els.btnSoundToggle.addEventListener('click', () => {
+        const enabled = sound.toggle();
+        els.soundIcon.textContent = enabled ? '🔊' : '🔇';
+        els.soundLabel.textContent = enabled ? '소리 ON' : '음소거';
+      });
+
+      // 새 게임
+      els.btnNewGame.addEventListener('click', () => {
+        startNewGame();
+      });
+
+      // 모드 변경
+      els.modeButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const nextMode = btn.dataset.mode;
+          if (state.mode === nextMode) return;
+          state.mode = nextMode;
+          startNewGame();
+        });
+      });
+
+      // 페어 수 / 조커 수 변경 시 즉시 새 게임
+      els.selectPairs.addEventListener('change', () => {
+        startNewGame();
+      });
+      els.selectJokers.addEventListener('change', () => {
+        startNewGame();
+      });
+
+      // 2인 로컬 기기 넘기기 확인
+      els.btnConfirmPassDevice.addEventListener('click', () => {
+        sound.playClick();
+        els.passDeviceModal.classList.add('hidden');
+        if (state.turn === 'p2') {
+          setStatus(`플레이어 2 차례: 아래 플레이어 1의 카드 중 하나를 선택해 뽑으세요!`);
+        } else {
+          setStatus(`플레이어 1 차례: 위 플레이어 2의 카드 중 하나를 선택해 뽑으세요!`);
         }
+        renderAll();
+      });
 
-        function onKeyUp(event) {
-            if(playerState.isDead) return;
-            switch (event.code) {
-                case 'KeyW': moveForward = false; break;
-                case 'KeyA': moveLeft = false; break;
-                case 'KeyS': moveBackward = false; break;
-                case 'KeyD': moveRight = false; break;
-                case 'ShiftLeft': isRunning = false; break; // 쉬프트 떼면 걷기
-            }
-        }
+      // 결과 모달 버튼
+      els.btnPlayAgain.addEventListener('click', () => {
+        startNewGame();
+      });
+      els.btnCloseResult.addEventListener('click', () => {
+        sound.playClick();
+        els.gameOverModal.classList.add('hidden');
+      });
 
-        const PI_2 = Math.PI / 2;
-        function onMouseMove(event) {
-            if (!isLocked || playerState.isDead) return;
+      // 규칙 모달 버튼
+      els.btnRulesModal.addEventListener('click', () => {
+        sound.playClick();
+        els.rulesModal.classList.remove('hidden');
+      });
+      els.btnCloseRules.addEventListener('click', () => {
+        sound.playClick();
+        els.rulesModal.classList.add('hidden');
+      });
+      els.btnGotItRules.addEventListener('click', () => {
+        sound.playClick();
+        els.rulesModal.classList.add('hidden');
+      });
+    }
 
-            const movementX = event.movementX || 0;
-            const movementY = event.movementY || 0;
-
-            yawObject.rotation.y -= movementX * 0.002;
-            pitchObject.rotation.x -= movementY * 0.002;
-
-            // 위아래 각도 제한
-            pitchObject.rotation.x = Math.max(-PI_2, Math.min(PI_2, pitchObject.rotation.x));
-        }
-
-        function onMouseDown(event) {
-            if (!isLocked || playerState.isDead) return;
-
-            if (event.button === 0) { // 마우스 좌클릭 (사격)
-                playerShoot();
-            } else if (event.button === 2) { // 마우스 우클릭 (줌)
-                setZoom(true);
-            }
-        }
-
-        function onMouseUp(event) {
-            if (event.button === 2) { // 마우스 우클릭 해제 (줌 해제)
-                setZoom(false);
-            }
-        }
-
-        function setZoom(zoomIn) {
-            isZoomed = zoomIn;
-            if (!camera) return;
-            camera.fov = isZoomed ? ZOOM_FOV : DEFAULT_FOV;
-            camera.updateProjectionMatrix();
-
-            // 줌 인시 조준선 크기 조절 효과
-            const crosshair = document.getElementById('crosshair');
-            if (crosshair) {
-                if (isZoomed) {
-                    crosshair.style.fontSize = '16px';
-                    crosshair.style.color = '#00ff88';
-                } else {
-                    crosshair.style.fontSize = '24px';
-                    crosshair.style.color = 'rgba(255, 255, 255, 0.8)';
-                }
-            }
-        }
-
-        function resetZoom() {
-            setZoom(false);
-        }
-
-        function showHeadshotUI() {
-            const hsText = document.getElementById('headshot-text');
-            if (!hsText) return;
-
-            // 기존 진행 중인 타이머가 있다면 취소하여 중첩 방지
-            if (headshotTimeout) {
-                clearTimeout(headshotTimeout);
-            }
-
-            hsText.classList.remove('hidden');
-
-            // 0.8초 후 확실하게 숨기기
-            headshotTimeout = setTimeout(() => {
-                hsText.classList.add('hidden');
-                headshotTimeout = null;
-            }, 800);
-        }
-
-        function playerShoot() {
-            // 화면 중앙(카메라 중심)에서 레이캐스트
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            
-            // 봇들의 모든 파츠 Mesh 수집
-            const botMeshes = bots.flatMap(b => b.mesh.children);
-            const intersects = raycaster.intersectObjects([...botMeshes, ...mapObjects]);
-
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                
-                // 시각적 레이저
-                const start = yawObject.position.clone().setY(2);
-                const end = hit.point;
-                createLaser(start, end, 0xffff00); // 플레이어 사격은 노란색
-
-                // 데미지 처리
-                if (hit.object.userData && hit.object.userData.bot) {
-                    const hitBot = hit.object.userData.bot;
-                    if(hitBot.team === TEAM_RED) { // 적군만 데미지
-                        const isHeadshot = hit.object.userData.isHead;
-                        if (isHeadshot) {
-                            showHeadshotUI();
-                            hitBot.takeDamage(999, true); // 헤드샷 원샷원킬
-                        } else {
-                            hitBot.takeDamage(20, true);
-                        }
-                    }
-                }
-            } else {
-                // 허공에 쐈을 때의 시각적 효과
-                const start = yawObject.position.clone().setY(2);
-                const end = raycaster.ray.at(50, new THREE.Vector3());
-                createLaser(start, end, 0xffff00);
-            }
-        }
-
-        function damagePlayer(amount) {
-            if(playerState.isDead) return;
-            
-            playerState.health -= amount;
-            
-            // 화면 붉은색 깜빡임 효과
-            const prevBg = document.body.style.backgroundColor;
-            document.body.style.backgroundColor = '#aa0000';
-            setTimeout(() => document.body.style.backgroundColor = prevBg, 100);
-
-            if (playerState.health <= 0) {
-                playerState.health = 0;
-                playerDie();
-            }
-            document.getElementById('healthValue').innerText = playerState.health;
-            document.getElementById('healthBar').style.width = playerState.health + '%';
-        }
-
-        function healPlayer(amount) {
-            if(playerState.isDead) return;
-            
-            playerState.health += amount;
-            if(playerState.health > 100) playerState.health = 100;
-            
-            // 화면 초록색 깜빡임 효과 (회복 시각 효과)
-            const prevBg = document.body.style.backgroundColor;
-            document.body.style.backgroundColor = '#005500';
-            setTimeout(() => document.body.style.backgroundColor = prevBg, 100);
-
-            // UI 업데이트
-            document.getElementById('healthValue').innerText = playerState.health;
-            document.getElementById('healthBar').style.width = playerState.health + '%';
-        }
-
-        // --- 5. 사망 및 관전 모드 ---
-        function playerDie() {
-            playerState.isDead = true;
-            
-            // 브라우저/환경에 따라 exitPointerLock이 제한되어 튕기는 현상 방지
-            if (document.exitPointerLock) {
-                document.exitPointerLock();
-            }
-            
-            // UI 업데이트
-            document.getElementById('crosshair').classList.add('hidden');
-            document.getElementById('hud').classList.add('hidden');
-            
-            document.getElementById('spectator-ui').innerHTML = `사망했습니다.<br><span class="text-lg text-white">팀원 관전 중...<br>스페이스바(Space)를 눌러 부활하세요!</span>`;
-            document.getElementById('spectator-ui').classList.remove('hidden');
-
-            findNewSpectateTarget();
-        }
-
-        function playerRespawn() {
-            playerState.isDead = false;
-            playerState.health = 100;
-            playerState.spectatingBot = null;
-            resetZoom();
-
-            // 부활 시 헤드샷 UI 및 타이머 클린업
-            if (headshotTimeout) {
-                clearTimeout(headshotTimeout);
-                headshotTimeout = null;
-            }
-            const hsText = document.getElementById('headshot-text');
-            if (hsText) hsText.classList.add('hidden');
-            
-            // 이동 키 입력 및 관성(속도) 완벽 초기화
-            moveForward = false; moveBackward = false; moveLeft = false; moveRight = false; isRunning = false;
-            velocity.set(0, 0, 0);
-            
-            // 스폰 위치 및 시점(회전값) 완벽 초기화
-            yawObject.position.set(0, 2, 0);
-            yawObject.rotation.set(0, 0, 0); // 좌우 회전 초기화
-            pitchObject.rotation.set(0, 0, 0); // 상하 회전 초기화
-            
-            // UI 업데이트
-            document.getElementById('healthValue').innerText = playerState.health;
-            document.getElementById('healthBar').style.width = playerState.health + '%';
-            document.getElementById('spectator-ui').classList.add('hidden');
-            
-            // 다시 게임에 진입하도록 시작(일시정지) 화면 표시
-            const blocker = document.getElementById('blocker');
-            blocker.style.display = 'flex';
-            document.querySelector('#blocker p').innerText = "부활했습니다! 화면을 클릭하거나 SPACE를 눌러 다시 참전하세요.";
-        }
-
-        function findNewSpectateTarget() {
-            // 살아있는 아군 찾기
-            const aliveBlueBots = bots.filter(b => b.team === TEAM_BLUE && !b.isDead);
-            
-            if (aliveBlueBots.length > 0) {
-                // 첫 번째 아군을 관전 대상으로 지정
-                playerState.spectatingBot = aliveBlueBots[0];
-            } else {
-                // 살아있는 아군이 없으면 죽은 자리에서 쓰러진 시점 유지
-                playerState.spectatingBot = null;
-                yawObject.position.y = 0.5;
-                pitchObject.rotation.x = -Math.PI / 4;
-            }
-        }
-
-        // --- 6. 시각 효과 (레이저 궤적) ---
-        function createLaser(start, end, colorHex) {
-            const material = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2 });
-            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-            const line = new THREE.Line(geometry, material);
-            scene.add(line);
-            
-            lasers.push({
-                mesh: line,
-                life: 1.0 // 수명 (1초)
-            });
-        }
-
-        // --- 7. 메인 게임 루프 ---
-        function onWindowResize() {
-            if (!camera || !renderer) return; // 게임 로드 전 화면 크기 변경 시 에러 방지
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            const time = performance.now();
-            // 델타 타임 계산 및 제한 (탭 전환 시 물리 엔진 폭주 방지용 max 0.1초)
-            const delta = Math.min((time - prevTime) / 1000, 0.1);
-            prevTime = time;
-
-            // 1. 봇 업데이트
-            bots.forEach(bot => bot.update(delta));
-
-            // 2. 레이저(총알 궤적) 페이드아웃 효과
-            for (let i = lasers.length - 1; i >= 0; i--) {
-                lasers[i].life -= delta * 5; // 빠르게 사라짐
-                lasers[i].mesh.material.opacity = lasers[i].life;
-                lasers[i].mesh.material.transparent = true;
-                
-                if (lasers[i].life <= 0) {
-                    scene.remove(lasers[i].mesh);
-                    lasers.splice(i, 1);
-                }
-            }
-
-            // 3. 플레이어 로직 및 카메라 제어
-            if (playerState.isDead) {
-                // 관전 모드 카메라 업데이트
-                if (playerState.spectatingBot && !playerState.spectatingBot.isDead) {
-                    const target = playerState.spectatingBot.mesh;
-                    // 카메라를 봇 약간 뒤/위로 부드럽게 이동 (사람 모형 높이에 맞춰 Y축 +3.5로 수정)
-                    yawObject.position.lerp(
-                        new THREE.Vector3(target.position.x, target.position.y + 3.5, target.position.z), 
-                        0.1
-                    );
-                    
-                    // 봇이 바라보는 방향 구하기
-                    const dir = new THREE.Vector3(0, 0, 1);
-                    dir.applyQuaternion(target.quaternion);
-                    
-                    const lookTarget = target.position.clone().add(dir.multiplyScalar(5));
-                    yawObject.lookAt(lookTarget);
-                    pitchObject.rotation.set(0,0,0); // pitch 초기화
-                }
-            } else if (isLocked) {
-                // 플레이어 이동 물리 (관성 포함)
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveLeft) - Number(moveRight); // 좌우 반전 버그 수정
-                direction.normalize();
-
-                // Shift 누르고 있을 때 달리기 속도 적용 (기본 40 -> 달리기 90)
-                const speed = isRunning ? 90.0 : 40.0;
-
-                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
-
-                yawObject.translateX(velocity.x * delta);
-                yawObject.translateZ(velocity.z * delta);
-
-                // 매우 간단한 맵 이탈 방지 (벽 충돌)
-                if(yawObject.position.x < -48) yawObject.position.x = -48;
-                if(yawObject.position.x > 48) yawObject.position.x = 48;
-                if(yawObject.position.z < -48) yawObject.position.z = -48;
-                if(yawObject.position.z > 48) yawObject.position.z = 48;
-            }
-
-            renderer.render(scene, camera);
-        }
-    </script>
+    // 앱 초기화
+    window.addEventListener('DOMContentLoaded', () => {
+      bindEvents();
+      startNewGame();
+    });
+  </script>
 </body>
 </html>

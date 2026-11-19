@@ -1,0 +1,1109 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Top-Down FPS - Wave Survival</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap');
+        
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+        }
+
+        /* 흰색 배경 캔버스 */
+        #gameCanvas {
+            background-color: #ffffff;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-center items-center p-2 sm:p-4">
+
+    <!-- Game Header Container -->
+    <div class="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center mb-2 px-2 gap-2">
+        <div class="flex items-center gap-3">
+            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <i class="fa-solid fa-crosshairs text-indigo-500"></i> 2D FPS 서바이벌
+            </h1>
+            <span id="waveBadge" class="px-3 py-1 rounded-full bg-indigo-600 text-xs font-bold tracking-wider">
+                WAVE 1
+            </span>
+        </div>
+
+        <!-- HUD Stats Bar -->
+        <div class="flex items-center gap-3 sm:gap-4 bg-slate-800/80 backdrop-blur px-3 sm:px-4 py-2 rounded-xl border border-slate-700/50 text-xs sm:text-sm">
+            <!-- Player Health -->
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-heart text-rose-500"></i>
+                <span class="font-semibold text-slate-400 hidden xs:inline">체력:</span>
+                <div class="w-20 sm:w-28 bg-slate-700 h-3.5 rounded-full overflow-hidden border border-slate-600 relative">
+                    <div id="hpBar" class="bg-rose-500 h-full transition-all duration-200" style="width: 100%;"></div>
+                    <span id="hpText" class="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white leading-none">150 / 150</span>
+                </div>
+            </div>
+
+            <!-- Dash Skill Cooldown HUD -->
+            <div class="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                <i class="fa-solid fa-bolt text-amber-400"></i>
+                <span class="font-semibold text-slate-400 hidden xs:inline">대쉬[E]:</span>
+                <div id="dashContainer" class="relative w-12 sm:w-16 bg-slate-700 h-3.5 rounded-full overflow-hidden border border-slate-600">
+                    <div id="dashBar" class="bg-amber-400 h-full transition-all duration-75" style="width: 100%;"></div>
+                    <span id="dashText" class="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-slate-900 leading-none">READY</span>
+                </div>
+            </div>
+
+            <!-- Enemy Count -->
+            <div class="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                <i class="fa-solid fa-skull text-amber-400"></i>
+                <span id="enemyCountText" class="font-bold text-amber-400 font-mono text-base">0</span>
+            </div>
+
+            <!-- Sound Toggle -->
+            <button id="soundToggleBtn" class="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition text-slate-200 ml-1">
+                <i id="soundIcon" class="fa-solid fa-volume-high text-xs"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Game Viewport -->
+    <div class="relative w-full max-w-4xl flex justify-center items-center">
+        <!-- Canvas Element -->
+        <canvas id="gameCanvas" width="900" height="600" class="w-full h-auto max-h-[75vh] border-2 border-slate-700"></canvas>
+
+        <!-- Overlay UI (Start / Game Over / Victory) -->
+        <div id="overlay" class="absolute inset-0 bg-slate-900/85 backdrop-blur-md rounded-xl flex flex-col items-center justify-center p-6 text-center z-10 transition-all duration-300">
+            <div id="overlayContent" class="max-w-md">
+                <div class="w-16 h-16 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 text-3xl">
+                    <i id="overlayIcon" class="fa-solid fa-gun"></i>
+                </div>
+                <h2 id="overlayTitle" class="text-3xl font-black mb-2 text-white">2D FPS 챌린지</h2>
+                <p id="overlayDesc" class="text-sm text-slate-300 mb-6 leading-relaxed">
+                    <b class="text-indigo-400">WASD</b> 키로 이동하고 <b class="text-indigo-400">K</b> 키를 눌러 자동 조준 사격하세요!<br>
+                    <b class="text-amber-400">E</b> 키로 대쉬(쿨타임 5초) 사용 시 <b class="text-cyan-400">적 돌진 50 데미지</b>!<br>
+                    처치 시 <b class="text-emerald-400">10% 확률로 50 HP 회복 팩</b>이 드랍됩니다.
+                </p>
+
+                <!-- Key Bindings Guide Box -->
+                <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60 mb-6 grid grid-cols-3 gap-2 text-xs text-slate-300">
+                    <div class="flex items-center gap-1.5 justify-center">
+                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">WASD</span>
+                        <span>이동</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 justify-center">
+                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">E</span>
+                        <span>대쉬</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 justify-center">
+                        <span class="px-2 py-1 bg-slate-700 rounded font-mono font-bold text-white">K</span>
+                        <span>자동사격</span>
+                    </div>
+                </div>
+
+                <button id="startBtn" class="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition font-extrabold text-lg text-white shadow-lg shadow-indigo-600/30 tracking-wide flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> 게임 시작
+                </button>
+            </div>
+        </div>
+
+        <!-- Boss Health Bar (Top Center of Canvas Area) -->
+        <div id="bossHpContainer" class="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-rose-500/50 px-5 py-2 rounded-xl flex flex-col items-center gap-1 opacity-0 pointer-events-none transition-opacity duration-300 z-0">
+            <div class="flex items-center gap-2 text-xs font-bold text-rose-400 uppercase tracking-wider">
+                <i class="fa-solid fa-crown text-amber-400 animate-bounce"></i>
+                <span id="bossName">BOSS WAVE</span>
+            </div>
+            <div class="w-64 sm:w-80 h-3 bg-slate-800 rounded-full border border-rose-900 overflow-hidden relative">
+                <div id="bossHpBar" class="h-full bg-gradient-to-r from-rose-600 to-amber-500 transition-all duration-150" style="width: 100%;"></div>
+            </div>
+            <span id="bossHpText" class="text-[11px] font-mono font-bold text-slate-300">100 / 100</span>
+        </div>
+
+        <!-- Wave Start Notification Overlay Banner -->
+        <div id="waveBanner" class="absolute pointer-events-none opacity-0 transition-all duration-500 transform scale-75 flex flex-col items-center justify-center z-20 drop-shadow-2xl">
+            <h2 id="waveBannerText" class="text-4xl sm:text-6xl font-black text-amber-400 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]">
+                WAVE 1 START!
+            </h2>
+            <p id="waveBannerSub" class="text-slate-800 font-bold text-sm sm:text-base mt-1 bg-white/80 px-4 py-1 rounded-full border border-amber-400 shadow">
+                모든 적을 처치하세요!
+            </p>
+        </div>
+    </div>
+
+    <!-- Footer Guide -->
+    <div class="mt-3 text-xs text-slate-500 text-center flex items-center justify-center gap-4 flex-wrap">
+        <span><i class="fa-solid fa-shield-halved text-slate-400"></i> 체력: 150</span>
+        <span><i class="fa-solid fa-bolt text-amber-400"></i> 대쉬 공격: 50 딜</span>
+        <span><i class="fa-solid fa-notes-medical text-emerald-400"></i> 회복 드랍율: 10% (+50 HP)</span>
+        <span><i class="fa-solid fa-bullseye text-slate-400"></i> 10/25/50 Wave 보스</span>
+    </div>
+
+    <!-- JavaScript Game Engine Code -->
+    <script>
+        // --- Web Audio API SFX Synth Generator ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playShot() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.08);
+
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e){}
+            }
+
+            playHit() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.05);
+
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.05);
+                } catch(e){}
+            }
+
+            playPlayerHit() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(60, this.ctx.currentTime + 0.15);
+
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e){}
+            }
+
+            playHeal() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const now = this.ctx.currentTime;
+                    [300, 450, 600].forEach((f, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(f, now + idx * 0.06);
+                        gain.gain.setValueAtTime(0.15, now + idx * 0.06);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.12);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.06);
+                        osc.stop(now + idx * 0.06 + 0.12);
+                    });
+                } catch(e){}
+            }
+
+            playWaveClear() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const now = this.ctx.currentTime;
+                    [440, 554.37, 659.25, 880].forEach((f, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(f, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.15);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.15);
+                    });
+                } catch(e){}
+            }
+
+            playDash() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.12);
+
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                } catch(e){}
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- Game Specifications & Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const PLAYER_MAX_HP = 150;
+        const BULLET_DAMAGE = 10;
+        const DASH_DAMAGE = 50; 
+        const HEAL_AMOUNT = 50;  
+        const HEAL_DROP_RATE = 0.10; 
+        const ENEMY_DAMAGE = 10;
+        const NORMAL_ENEMY_HP = 10;
+        const DASH_COOLDOWN_MS = 5000; 
+        const SHOOT_COOLDOWN = 120; // ms
+
+        let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
+        let currentWave = 1;
+        let lastShootTime = 0;
+        let lastDashTime = -DASH_COOLDOWN_MS;
+
+        // Keyboard State
+        const keys = {
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+            e: false,
+            k: false
+        };
+
+        // Entities Containers
+        let player;
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+        let healthPacks = []; 
+
+        // UI References
+        const waveBadge = document.getElementById('waveBadge');
+        const hpBar = document.getElementById('hpBar');
+        const hpText = document.getElementById('hpText');
+        const dashBar = document.getElementById('dashBar');
+        const dashText = document.getElementById('dashText');
+        const enemyCountText = document.getElementById('enemyCountText');
+        const bossHpContainer = document.getElementById('bossHpContainer');
+        const bossHpBar = document.getElementById('bossHpBar');
+        const bossHpText = document.getElementById('bossHpText');
+        const bossName = document.getElementById('bossName');
+        const waveBanner = document.getElementById('waveBanner');
+        const waveBannerText = document.getElementById('waveBannerText');
+        const waveBannerSub = document.getElementById('waveBannerSub');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlayDesc = document.getElementById('overlayDesc');
+        const overlayIcon = document.getElementById('overlayIcon');
+        const startBtn = document.getElementById('startBtn');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundIcon = document.getElementById('soundIcon');
+
+        // --- Health Pack Class ---
+        class HealthPack {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 12;
+                this.pulse = 0;
+            }
+
+            update() {
+                this.pulse += 0.08;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                const scale = 1 + Math.sin(this.pulse) * 0.1;
+                ctx.scale(scale, scale);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius + 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#10b981';
+                ctx.fill();
+                ctx.strokeStyle = '#047857';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-6, -2, 12, 4);
+                ctx.fillRect(-2, -6, 4, 12);
+
+                ctx.restore();
+            }
+        }
+
+        // --- Player Class ---
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 16;
+                this.speed = 3.8;
+                this.hp = PLAYER_MAX_HP;
+                this.angle = 0;
+                this.moveAngle = 0;
+            }
+
+            update() {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys.w) dy -= 1;
+                if (keys.s) dy += 1;
+                if (keys.a) dx -= 1;
+                if (keys.d) dx += 1;
+
+                if (dx !== 0 || dy !== 0) {
+                    const len = Math.hypot(dx, dy);
+                    dx /= len;
+                    dy /= len;
+
+                    this.x += dx * this.speed;
+                    this.y += dy * this.speed;
+
+                    this.moveAngle = Math.atan2(dy, dx);
+                    this.angle = this.moveAngle;
+                }
+
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+            }
+
+            dash() {
+                const now = performance.now();
+                if (now - lastDashTime >= DASH_COOLDOWN_MS) {
+                    lastDashTime = now;
+
+                    let dashAngle = this.angle;
+                    let dx = 0, dy = 0;
+                    if (keys.w) dy -= 1;
+                    if (keys.s) dy += 1;
+                    if (keys.a) dx -= 1;
+                    if (keys.d) dx += 1;
+
+                    if (dx !== 0 || dy !== 0) {
+                        dashAngle = Math.atan2(dy, dx);
+                    }
+
+                    const startX = this.x;
+                    const startY = this.y;
+                    const dashDistance = 120;
+
+                    this.x += Math.cos(dashAngle) * dashDistance;
+                    this.y += Math.sin(dashAngle) * dashDistance;
+
+                    this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                    this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+
+                    const endX = this.x;
+                    const endY = this.y;
+
+                    enemies.forEach(enemy => {
+                        const hitDistance = distToSegment({ x: enemy.x, y: enemy.y }, { x: startX, y: startY }, { x: endX, y: endY });
+                        if (hitDistance < enemy.radius + 20) {
+                            enemy.hp -= DASH_DAMAGE;
+                            createHitParticles(enemy.x, enemy.y, '#38bdf8', 12);
+                            sound.playHit();
+
+                            if (enemy.isBoss) {
+                                updateBossHpUI(enemy.hp, enemy.maxHp);
+                            }
+
+                            if (enemy.hp <= 0) {
+                                createHitParticles(enemy.x, enemy.y, enemy.color, 20);
+                                handleEnemyDrop(enemy.x, enemy.y);
+                            }
+                        }
+                    });
+
+                    createDashWindParticles(this.x, this.y, dashAngle);
+                    sound.playDash();
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(4, -3, 18, 6);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#3b82f6'; 
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e40af';
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(6, -4, 3, 0, Math.PI * 2);
+                ctx.arc(6, 4, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // --- Bullet Class ---
+        class Bullet {
+            constructor(x, y, angle, isEnemy = false) {
+                this.x = x;
+                this.y = y;
+                this.speed = isEnemy ? 4.5 : 9;
+                this.vx = Math.cos(angle) * this.speed;
+                this.vy = Math.sin(angle) * this.speed;
+                this.radius = isEnemy ? 5 : 4;
+                this.isEnemy = isEnemy;
+                this.markedForRemoval = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) {
+                    this.markedForRemoval = true;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.isEnemy ? '#ef4444' : '#f59e0b';
+                ctx.fill();
+                
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = this.isEnemy ? '#991b1b' : '#b45309';
+                ctx.stroke();
+            }
+        }
+
+        // Helper: Point to Line Segment Distance Calculation
+        function distToSegment(p, v, w) {
+            const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+        }
+
+        // --- Enemy Class ---
+        class Enemy {
+            constructor(x, y, isBoss = false, bossHp = 100) {
+                this.x = x;
+                this.y = y;
+                this.isBoss = isBoss;
+                this.maxHp = isBoss ? bossHp : NORMAL_ENEMY_HP;
+                this.hp = this.maxHp;
+                this.radius = isBoss ? 32 : 15;
+                this.speed = isBoss ? 1.6 : 2.2 + Math.min(currentWave * 0.05, 1.5);
+                this.color = isBoss ? '#dc2626' : '#ea580c';
+                this.lastShootTime = 0;
+                this.shootInterval = isBoss ? 500 : 2200;
+                this.angle = 0;
+            }
+
+            update() {
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const dist = Math.hypot(dx, dy);
+
+                this.angle = Math.atan2(dy, dx);
+
+                if (dist > this.radius + player.radius) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+
+                const now = performance.now();
+                if (now - this.lastShootTime > this.shootInterval) {
+                    this.lastShootTime = now;
+                    this.shoot();
+                }
+            }
+
+            shoot() {
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                bullets.push(new Bullet(this.x, this.y, angle, true));
+
+                if (this.isBoss) {
+                    bullets.push(new Bullet(this.x, this.y, angle - 0.25, true));
+                    bullets.push(new Bullet(this.x, this.y, angle + 0.25, true));
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                if (this.isBoss) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius + 4, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#991b1b';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.lineWidth = 2.5;
+                ctx.strokeStyle = '#7c2d12';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(4, -5, 3.5, 0, Math.PI * 2);
+                ctx.arc(4, 5, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(5, -5, 1.5, 0, Math.PI * 2);
+                ctx.arc(5, 5, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                if (this.hp < this.maxHp) {
+                    const barWidth = this.radius * 2;
+                    const barHeight = 5;
+                    const hpRatio = this.hp / this.maxHp;
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth, barHeight);
+
+                    ctx.fillStyle = this.isBoss ? '#ef4444' : '#22c55e';
+                    ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth * hpRatio, barHeight);
+                }
+            }
+        }
+
+        // Helper: Enemy Spawn Coordinates
+        function getRandomSpawnPos() {
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? 20 : canvas.width - 20;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? 20 : canvas.height - 20;
+            }
+            return { x, y };
+        }
+
+        // Banner Display Animation Logic
+        function showWaveBanner(wave, isBossWave) {
+            if (isBossWave) {
+                waveBannerText.innerText = `WAVE ${wave} BOSS!`;
+                waveBannerText.className = "text-4xl sm:text-6xl font-black text-rose-500 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] animate-pulse";
+                waveBannerSub.innerText = "보스가 등장했습니다! 사격에 주의하세요!";
+            } else {
+                waveBannerText.innerText = `WAVE ${wave} START!`;
+                waveBannerText.className = "text-4xl sm:text-6xl font-black text-amber-400 tracking-wider stroke-black drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]";
+                waveBannerSub.innerText = "모든 적을 처치하세요!";
+            }
+
+            waveBanner.classList.remove('opacity-0', 'scale-75');
+            waveBanner.classList.add('opacity-100', 'scale-100');
+
+            setTimeout(() => {
+                waveBanner.classList.remove('opacity-100', 'scale-100');
+                waveBanner.classList.add('opacity-0', 'scale-75');
+            }, 1800);
+        }
+
+        // --- Spawn Wave Enemies Logic ---
+        function spawnWave(wave) {
+            enemies = [];
+            waveBadge.innerText = `WAVE ${wave}`;
+
+            const isBossWave = (wave === 10 || wave === 25 || wave === 50);
+
+            showWaveBanner(wave, isBossWave);
+
+            // Wave 당 적 2명씩 늘어나되 최대 30명으로 제한
+            let normalEnemyCount = (wave % 10 === 0) ? 30 : Math.min(30, wave * 2);
+
+            for (let i = 0; i < normalEnemyCount; i++) {
+                const pos = getRandomSpawnPos();
+                enemies.push(new Enemy(pos.x, pos.y, false));
+            }
+
+            if (isBossWave) {
+                let bossHp = 100;
+                if (wave === 25) bossHp = 300;
+                if (wave === 50) bossHp = 500;
+
+                enemies.push(new Enemy(canvas.width / 2, 80, true, bossHp));
+
+                bossHpContainer.classList.remove('opacity-0');
+                bossName.innerText = `WAVE ${wave} BOSS`;
+                updateBossHpUI(bossHp, bossHp);
+            } else {
+                bossHpContainer.classList.add('opacity-0');
+            }
+
+            updateHUD();
+        }
+
+        // --- Handle Enemy Drop Item ---
+        function handleEnemyDrop(x, y) {
+            if (Math.random() < HEAL_DROP_RATE) {
+                healthPacks.push(new HealthPack(x, y));
+            }
+        }
+
+        // --- Game Setup & Initialization ---
+        function initGame() {
+            player = new Player(canvas.width / 2, canvas.height / 2);
+            bullets = [];
+            enemies = [];
+            particles = [];
+            healthPacks = [];
+            currentWave = 1;
+            lastDashTime = -DASH_COOLDOWN_MS;
+
+            spawnWave(currentWave);
+            updateHUD();
+        }
+
+        function createHitParticles(x, y, color = '#ef4444', count = 8) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function createHealParticles(x, y) {
+            for (let i = 0; i < 12; i++) {
+                particles.push(new Particle(x, y, '#10b981', 4));
+            }
+        }
+
+        // --- Dash Skyblue Wind Particle Effect ---
+        function createDashWindParticles(x, y, angle) {
+            const windColors = ['#38bdf8', '#7dd3fc', '#bae6fd', '#0284c7'];
+            for (let i = 0; i < 22; i++) {
+                const color = windColors[Math.floor(Math.random() * windColors.length)];
+                particles.push(new DashWindParticle(x, y, angle, color));
+            }
+        }
+
+        // --- Particle Effect Class ---
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 3 + 2;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.04 + 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- Dash Wind Trail Particle ---
+        class DashWindParticle {
+            constructor(x, y, dashAngle, color) {
+                const spreadAngle = (dashAngle + Math.PI) + (Math.random() - 0.5) * 1.2;
+                const speed = Math.random() * 6 + 2;
+
+                this.x = x + (Math.random() - 0.5) * 20;
+                this.y = y + (Math.random() - 0.5) * 20;
+                this.vx = Math.cos(spreadAngle) * speed;
+                this.vy = Math.sin(spreadAngle) * speed;
+                this.length = Math.random() * 12 + 8;
+                this.width = Math.random() * 3 + 1.5;
+                this.angle = spreadAngle;
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.05 + 0.03;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.width;
+                ctx.lineCap = 'round';
+
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - Math.cos(this.angle) * this.length, this.y - Math.sin(this.angle) * this.length);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // --- Shooting & Control Logic ---
+        function handleShooting() {
+            if (!keys.k) return;
+
+            const now = performance.now();
+            if (now - lastShootTime >= SHOOT_COOLDOWN) {
+                lastShootTime = now;
+
+                let targetAngle = player.angle;
+
+                if (enemies.length > 0) {
+                    let nearestEnemy = null;
+                    let minDistance = Infinity;
+
+                    enemies.forEach(enemy => {
+                        const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            nearestEnemy = enemy;
+                        }
+                    });
+
+                    if (nearestEnemy) {
+                        targetAngle = Math.atan2(nearestEnemy.y - player.y, nearestEnemy.x - player.x);
+                        player.angle = targetAngle; 
+                    }
+                }
+
+                bullets.push(new Bullet(player.x, player.y, targetAngle, false));
+                sound.playShot();
+            }
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop() {
+            if (gameState === 'PLAYING') {
+                update();
+                render();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update() {
+            // 1. Player Movement & Shooting
+            player.update();
+            handleShooting();
+
+            // 2. Update Health Packs & Pickup Check
+            healthPacks.forEach(hp => hp.update());
+            for (let i = healthPacks.length - 1; i >= 0; i--) {
+                const hp = healthPacks[i];
+                const dist = Math.hypot(player.x - hp.x, player.y - hp.y);
+                if (dist < player.radius + hp.radius) {
+                    player.hp = Math.min(PLAYER_MAX_HP, player.hp + HEAL_AMOUNT);
+                    createHealParticles(hp.x, hp.y);
+                    sound.playHeal();
+                    healthPacks.splice(i, 1);
+                    updateHUD();
+                }
+            }
+
+            // 3. Update Bullets
+            bullets.forEach(b => b.update());
+            bullets = bullets.filter(b => !b.markedForRemoval);
+
+            // 4. Update Particles
+            particles.forEach(p => p.update());
+            particles = particles.filter(p => p.alpha > 0);
+
+            // 5. Update Enemies & Collision Logic
+            enemies.forEach(enemy => {
+                enemy.update();
+
+                // Player vs Enemy Collision
+                const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                if (distToPlayer < player.radius + enemy.radius) {
+                    player.hp -= 0.5;
+                    sound.playPlayerHit();
+                    updateHUD();
+
+                    if (player.hp <= 0) {
+                        triggerGameOver();
+                    }
+                }
+            });
+
+            // 6. Bullet Collisions
+            bullets.forEach(bullet => {
+                if (bullet.isEnemy) {
+                    const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
+                    if (dist < player.radius + bullet.radius) {
+                        bullet.markedForRemoval = true;
+                        player.hp -= ENEMY_DAMAGE;
+                        createHitParticles(player.x, player.y, '#3b82f6', 10);
+                        sound.playPlayerHit();
+                        updateHUD();
+
+                        if (player.hp <= 0) {
+                            triggerGameOver();
+                        }
+                    }
+                } else {
+                    enemies.forEach(enemy => {
+                        const dist = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
+                        if (dist < enemy.radius + bullet.radius) {
+                            bullet.markedForRemoval = true;
+                            enemy.hp -= BULLET_DAMAGE;
+                            createHitParticles(bullet.x, bullet.y, enemy.color, 6);
+                            sound.playHit();
+
+                            if (enemy.isBoss) {
+                                updateBossHpUI(enemy.hp, enemy.maxHp);
+                            }
+
+                            if (enemy.hp <= 0) {
+                                createHitParticles(enemy.x, enemy.y, enemy.color, 20);
+                                handleEnemyDrop(enemy.x, enemy.y);
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Filter Dead Enemies
+            const prevCount = enemies.length;
+            enemies = enemies.filter(e => e.hp > 0);
+
+            if (enemies.length !== prevCount) {
+                updateHUD();
+            }
+
+            updateDashHUD();
+
+            // 7. Wave Clear Check
+            if (enemies.length === 0) {
+                if (currentWave === 50) {
+                    triggerVictory();
+                } else {
+                    currentWave++;
+                    sound.playWaveClear();
+                    spawnWave(currentWave);
+                }
+            }
+        }
+
+        // --- Render Engine (Canvas) ---
+        function render() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#f1f5f9';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            healthPacks.forEach(hp => hp.draw());
+            particles.forEach(p => p.draw());
+            bullets.forEach(b => b.draw());
+            enemies.forEach(e => e.draw());
+            player.draw();
+        }
+
+        // --- HUD & UI Updates ---
+        function updateHUD() {
+            const hpRatio = Math.max(0, player.hp / PLAYER_MAX_HP);
+            hpBar.style.width = `${hpRatio * 100}%`;
+            hpText.innerText = `${Math.max(0, Math.ceil(player.hp))} / ${PLAYER_MAX_HP}`;
+
+            enemyCountText.innerText = enemies.length;
+        }
+
+        function updateDashHUD() {
+            const elapsed = performance.now() - lastDashTime;
+            const progress = Math.min(1, elapsed / DASH_COOLDOWN_MS);
+
+            dashBar.style.width = `${progress * 100}%`;
+
+            if (progress >= 1) {
+                dashText.innerText = 'READY';
+                dashText.className = 'absolute inset-0 flex items-center justify-center text-[9px] font-bold text-slate-900 leading-none';
+                dashBar.className = 'bg-amber-400 h-full transition-all duration-75';
+            } else {
+                const remainingSec = ((DASH_COOLDOWN_MS - elapsed) / 1000).toFixed(1);
+                dashText.innerText = `${remainingSec}s`;
+                dashText.className = 'absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white leading-none';
+                dashBar.className = 'bg-slate-500 h-full transition-all duration-75';
+            }
+        }
+
+        function updateBossHpUI(hp, maxHp) {
+            const ratio = Math.max(0, hp / maxHp);
+            bossHpBar.style.width = `${ratio * 100}%`;
+            bossHpText.innerText = `${Math.max(0, hp)} / ${maxHp}`;
+        }
+
+        // --- State Management Screen Handlers ---
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            bossHpContainer.classList.add('opacity-0');
+
+            overlayTitle.innerText = "GAME OVER";
+            overlayTitle.className = "text-3xl font-black mb-2 text-rose-500";
+            overlayDesc.innerText = `Wave ${currentWave}에서 전사하셨습니다. 다시 도전하여 50 Wave 보스를 격파하세요!`;
+            overlayIcon.className = "fa-solid fa-skull-crossbones";
+            startBtn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> 다시 도전하기`;
+
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function triggerVictory() {
+            gameState = 'VICTORY';
+            bossHpContainer.classList.add('opacity-0');
+
+            overlayTitle.innerText = "VICTORY! 승리!";
+            overlayTitle.className = "text-3xl font-black mb-2 text-emerald-400";
+            overlayDesc.innerText = `축하합니다! 50 Wave 최종 보스를 격파하고 전장을 지켜냈습니다!`;
+            overlayIcon.className = "fa-solid fa-trophy text-amber-400";
+            startBtn.innerHTML = `<i class="fa-solid fa-play"></i> 새 게임 시작`;
+
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        // --- Event Listeners & Controls Setup ---
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = true;
+            }
+
+            if (key === 'e' && gameState === 'PLAYING' && player) {
+                player.dash();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = false;
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            sound.init();
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            gameState = 'PLAYING';
+            initGame();
+        });
+
+        soundToggleBtn.addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            if (sound.enabled) {
+                soundIcon.className = 'fa-solid fa-volume-high text-xs';
+            } else {
+                soundIcon.className = 'fa-solid fa-volume-xmark text-xs text-slate-500';
+            }
+        });
+
+        // Initialize Canvas & Start Frame Loop on Load
+        window.onload = () => {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,996 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Sci-Fi FPS Survival</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js (3D Engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Tone.js (Procedural Sound Effects) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* HUD Glassmorphism */
+        .hud-card {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.15);
+        }
+
+        /* Crosshair */
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .crosshair-line {
+            position: absolute;
+            background-color: rgba(56, 189, 248, 0.9);
+            box-shadow: 0 0 4px #38bdf8;
+        }
+
+        .ch-top { width: 2px; height: 10px; top: -14px; left: -1px; }
+        .ch-bottom { width: 2px; height: 10px; bottom: -14px; left: -1px; }
+        .ch-left { width: 10px; height: 2px; left: -14px; top: -1px; }
+        .ch-right { width: 10px; height: 2px; right: -14px; top: -1px; }
+        .ch-dot { width: 4px; height: 4px; top: -2px; left: -2px; border-radius: 50%; background-color: #f43f5e; }
+
+        /* Hit marker animation */
+        @keyframes hit-pulse {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+
+        .hit-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            display: none;
+        }
+        .hit-marker.active {
+            display: block;
+            animation: hit-pulse 0.15s ease-out forwards;
+        }
+
+        /* Damage Vignette Screen Effect */
+        #damageFlash {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            box-shadow: inset 0 0 100px rgba(244, 63, 94, 0.8);
+            opacity: 0;
+            transition: opacity 0.1s ease-out;
+        }
+
+        /* Canvas fit */
+        #gameCanvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen">
+
+    <!-- 3D WebGL Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Crosshair HUD -->
+    <div class="crosshair">
+        <div class="ch-dot"></div>
+        <div class="crosshair-line ch-top"></div>
+        <div class="crosshair-line ch-bottom"></div>
+        <div class="crosshair-line ch-left"></div>
+        <div class="crosshair-line ch-right"></div>
+    </div>
+
+    <!-- Hit Marker Overlay -->
+    <div id="hitMarker" class="hit-marker">
+        <svg viewBox="0 0 100 100" class="w-full h-full stroke-rose-500 stroke-[8] fill-none">
+            <line x1="20" y1="20" x2="40" y2="40" />
+            <line x1="80" y1="20" x2="60" y2="40" />
+            <line x1="20" y1="80" x2="40" y2="60" />
+            <line x1="80" y1="80" x2="60" y2="60" />
+        </svg>
+    </div>
+
+    <!-- Red Screen Damage Overlay -->
+    <div id="damageFlash"></div>
+
+    <!-- HUD Overlay UI -->
+    <div id="hudUI" class="absolute inset-0 pointer-events-none p-4 sm:p-6 flex flex-col justify-between hidden">
+        <!-- Top Header Info -->
+        <div class="flex justify-between items-start w-full">
+            <!-- Health & Shield -->
+            <div class="hud-card p-4 rounded-xl min-w-[200px] border-l-4 border-l-sky-400">
+                <div class="text-xs uppercase font-orbitron text-sky-400 font-semibold mb-1 flex items-center justify-between">
+                    <span><i class="fa-solid fa-heart-pulse mr-1.5"></i>HEALTH</span>
+                    <span id="hpText" class="text-white font-bold">100 HP</span>
+                </div>
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                    <div id="hpBar" class="bg-gradient-to-r from-emerald-500 to-sky-400 h-full w-full transition-all duration-200"></div>
+                </div>
+            </div>
+
+            <!-- Wave & Score Info -->
+            <div class="hud-card px-6 py-3 rounded-xl text-center border-t-2 border-amber-400">
+                <div class="text-xs text-amber-400 font-orbitron font-bold tracking-widest uppercase">CURRENT WAVE</div>
+                <div id="waveNum" class="text-3xl font-black font-orbitron text-amber-300">1</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">남은 적: <span id="enemiesLeft" class="text-rose-400 font-bold">0</span></div>
+            </div>
+
+            <!-- MiniMap HUD -->
+            <div class="hud-card p-2 rounded-xl border border-sky-500/40 relative">
+                <canvas id="minimapCanvas" width="110" height="110" class="rounded-lg bg-slate-950/80"></canvas>
+                <div class="absolute bottom-1 right-2 text-[9px] font-orbitron text-sky-400">RADAR</div>
+            </div>
+        </div>
+
+        <!-- Center Notification Banner -->
+        <div id="centerBanner" class="self-center text-center opacity-0 transition-opacity duration-300">
+            <h2 id="bannerTitle" class="text-4xl sm:text-5xl font-black font-orbitron tracking-wider text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]">
+                WAVE 1
+            </h2>
+            <p id="bannerSub" class="text-sm font-semibold text-sky-200 mt-1">적 군단이 몰려옵니다!</p>
+        </div>
+
+        <!-- Bottom Ammo & Gun HUD -->
+        <div class="flex justify-between items-end w-full">
+            <div class="text-xs text-slate-400 space-y-1">
+                <div class="flex items-center space-x-2"><span class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-sky-400 font-bold">WASD</span><span>이동</span></div>
+                <div class="flex items-center space-x-2"><span class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-sky-400 font-bold">Space</span><span>점프</span></div>
+                <div class="flex items-center space-x-2"><span class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-sky-400 font-bold">E / 우클릭</span><span>조준(확대)</span></div>
+                <div class="flex items-center space-x-2"><span class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-sky-400 font-bold">L-Click</span><span>사격</span></div>
+                <div class="flex items-center space-x-2"><span class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-sky-400 font-bold">R</span><span>재장전</span></div>
+            </div>
+
+            <div class="hud-card p-4 rounded-xl flex items-center space-x-4 border-r-4 border-r-amber-400">
+                <div class="text-right">
+                    <div class="text-xs font-orbitron text-amber-400 font-semibold uppercase">PLASMA RIFLE</div>
+                    <div class="font-orbitron font-black text-3xl tracking-tight text-white">
+                        <span id="currentAmmo" class="text-amber-400">30</span> <span class="text-slate-500 text-xl">/ <span id="maxAmmo">30</span></span>
+                    </div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 text-xl">
+                    <i class="fa-solid fa-gun"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start / Pause Overlay Screen -->
+    <div id="startMenu" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center z-50 p-6">
+        <div class="max-w-md w-full hud-card p-8 rounded-2xl border-2 border-sky-400/60 text-center space-y-6 shadow-2xl shadow-sky-500/20">
+            <div>
+                <div class="inline-block px-3 py-1 bg-sky-500/20 text-sky-400 border border-sky-400/40 rounded-full text-xs font-orbitron tracking-widest font-bold mb-2">
+                    3D SCI-FI FPS
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-black font-orbitron tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-amber-300 to-rose-400">
+                    CYBER SURVIVOR
+                </h1>
+                <p class="text-xs text-slate-400 mt-2">사이버 에일리언 드론의 공습에서 살아남으세요!</p>
+            </div>
+
+            <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 text-left space-y-2 text-xs text-slate-300">
+                <div class="font-semibold text-amber-400 mb-1 border-b border-slate-700 pb-1 font-orbitron">조작 방법</div>
+                <div class="flex justify-between"><span>이동:</span> <span class="text-sky-300 font-mono">W, A, S, D</span></div>
+                <div class="flex justify-between"><span>점프:</span> <span class="text-sky-300 font-mono">Space</span></div>
+                <div class="flex justify-between"><span>총기 확대(조준):</span> <span class="text-sky-300 font-mono">E 키 또는 우클릭</span></div>
+                <div class="flex justify-between"><span>시점 조종 / 사격:</span> <span class="text-sky-300 font-mono">마우스 이동 / 좌클릭</span></div>
+                <div class="flex justify-between"><span>무기 재장전:</span> <span class="text-sky-300 font-mono">R 키</span></div>
+                <div class="flex justify-between"><span>마우스 포인터 해제:</span> <span class="text-sky-300 font-mono">ESC 키</span></div>
+            </div>
+
+            <button id="startBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-sky-400 via-sky-500 to-amber-400 hover:from-sky-500 hover:to-amber-500 text-slate-950 font-orbitron font-black text-xl tracking-wider shadow-lg shadow-sky-500/30 transition-transform active:scale-95 cursor-pointer">
+                GAME START
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverMenu" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-50 p-6 hidden">
+        <div class="max-w-md w-full hud-card p-8 rounded-2xl border-2 border-rose-500/60 text-center space-y-6 shadow-2xl shadow-rose-500/20">
+            <div>
+                <h1 class="text-4xl font-black font-orbitron tracking-wider text-rose-500 mb-2">
+                    MISSION FAILED
+                </h1>
+                <p class="text-xs text-slate-400">생존 임무에 실패하였습니다.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="text-[10px] font-orbitron text-slate-400">도달한 웨이브</div>
+                    <div id="finalWave" class="text-2xl font-black font-orbitron text-amber-400">1</div>
+                </div>
+                <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                    <div class="text-[10px] font-orbitron text-slate-400">처치한 적 수</div>
+                    <div id="finalKills" class="text-2xl font-black font-orbitron text-sky-400">0</div>
+                </div>
+            </div>
+
+            <button id="restartBtn" class="w-full py-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-400 hover:from-rose-600 hover:to-amber-500 text-slate-950 font-orbitron font-black text-xl tracking-wider shadow-lg shadow-rose-500/30 transition-transform active:scale-95 cursor-pointer">
+                RETRY MISSION
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Logic -->
+    <script>
+        // --- Global Game Variables & Engine States ---
+        let scene, camera, renderer, clock;
+        let player = {
+            hp: 100,
+            maxHp: 100,
+            ammo: 30,
+            maxAmmo: 30,
+            isReloading: false,
+            isAiming: false,
+            isGrounded: true,
+            velocityY: 0,
+            speed: 12,
+            sprintSpeed: 20,
+            height: 1.8,
+            kills: 0
+        };
+
+        let keys = { w: false, a: false, s: false, d: false, shift: false };
+        let isMouseDown = false;
+        let isGameRunning = false;
+        let wave = 1;
+        let enemiesToSpawn = 0;
+        let lastSpawnTime = 0;
+        let lastShotTime = 0;
+
+        let enemies = [];
+        let particles = [];
+        let gunMesh;
+        let minimapCanvas, minimapCtx;
+
+        // UI Element References
+        let hpBar, hpText, waveNumEl, enemiesLeftEl, currentAmmoEl, maxAmmoEl;
+        let centerBanner, bannerTitle, bannerSub, damageFlash, hitMarker;
+        let finalWaveEl, finalKillsEl;
+
+        // --- Initialize Engine & 3D Scene ---
+        function initEngine() {
+            // DOM References
+            hpBar = document.getElementById('hpBar');
+            hpText = document.getElementById('hpText');
+            waveNumEl = document.getElementById('waveNum');
+            enemiesLeftEl = document.getElementById('enemiesLeft');
+            currentAmmoEl = document.getElementById('currentAmmo');
+            maxAmmoEl = document.getElementById('maxAmmo');
+            centerBanner = document.getElementById('centerBanner');
+            bannerTitle = document.getElementById('bannerTitle');
+            bannerSub = document.getElementById('bannerSub');
+            damageFlash = document.getElementById('damageFlash');
+            hitMarker = document.getElementById('hitMarker');
+            finalWaveEl = document.getElementById('finalWave');
+            finalKillsEl = document.getElementById('finalKills');
+
+            minimapCanvas = document.getElementById('minimapCanvas');
+            minimapCtx = minimapCanvas.getContext('2d');
+
+            // Three.js Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x030712);
+            scene.fog = new THREE.FogExp2(0x030712, 0.025);
+
+            clock = new THREE.Clock();
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.rotation.order = 'YXZ';
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0xf472b6, 1, 50);
+            pointLight.position.set(0, 10, 0);
+            scene.add(pointLight);
+
+            // Arena Environment (Floor & Walls)
+            const floorGeo = new THREE.PlaneGeometry(80, 80, 32, 32);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.4,
+                metalness: 0.6
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(80, 40, 0x38bdf8, 0x1e293b);
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
+
+            // Arena Outer Pillars
+            const pillarGeo = new THREE.BoxGeometry(2, 10, 2);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+            for (let x = -35; x <= 35; x += 35) {
+                for (let z = -35; z <= 35; z += 35) {
+                    if (x === 0 && z === 0) continue;
+                    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                    pillar.position.set(x, 5, z);
+                    pillar.castShadow = true;
+                    scene.add(pillar);
+                }
+            }
+
+            // Create Player Gun Model
+            createGunModel();
+
+            // Resize Event
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createGunModel() {
+            gunMesh = new THREE.Group();
+
+            const bodyGeo = new THREE.BoxGeometry(0.12, 0.15, 0.6);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            gunMesh.add(body);
+
+            const barrelGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4);
+            const barrelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9 });
+            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(0, 0.03, -0.4);
+            gunMesh.add(barrel);
+
+            const glowGeo = new THREE.BoxGeometry(0.08, 0.04, 0.3);
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.set(0, 0.08, -0.1);
+            gunMesh.add(glow);
+
+            gunMesh.position.set(0.25, -0.22, -0.45);
+            camera.add(gunMesh);
+            scene.add(camera);
+        }
+
+        // --- Wave & Enemy Logic ---
+        function startWave(nextWave) {
+            wave = nextWave;
+            enemiesToSpawn = wave * 8 + 5; // 적 수 증가
+            updateWaveInfoUI();
+
+            bannerTitle.textContent = `WAVE ${wave}`;
+            bannerSub.textContent = `총 ${enemiesToSpawn}마리의 사이버 드론 스폰!`;
+            centerBanner.style.opacity = '1';
+
+            setTimeout(() => {
+                centerBanner.style.opacity = '0';
+            }, 2500);
+
+            // 시작 시 즉시 5마리 생성
+            for (let i = 0; i < Math.min(5, enemiesToSpawn); i++) {
+                spawnEnemy();
+            }
+        }
+
+        function spawnEnemy() {
+            if (enemiesToSpawn <= 0) return;
+
+            // 적 종류 선택 (일반: 핑크, 스피더: 파랑, 탱커: 노랑)
+            const typeRoll = Math.random();
+            let type = 'normal';
+            let color = 0xf472b6; // 핑크
+            let size = 0.9;
+            let speed = 6;
+            let hp = 40;
+            let damage = 10;
+
+            if (typeRoll < 0.3) {
+                type = 'speeder';
+                color = 0x38bdf8; // 파랑
+                size = 0.65;
+                speed = 10;
+                hp = 25;
+                damage = 6;
+            } else if (typeRoll > 0.75) {
+                type = 'tanker';
+                color = 0xeab308; // 노랑
+                size = 1.4;
+                speed = 3.8;
+                hp = 110;
+                damage = 22;
+            }
+
+            // Create Drone Mesh
+            const enemyGroup = new THREE.Group();
+
+            const coreGeo = new THREE.OctahedronGeometry(size);
+            const coreMat = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.6,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            core.castShadow = true;
+            enemyGroup.add(core);
+
+            const ringGeo = new THREE.TorusGeometry(size * 1.3, 0.05, 8, 24);
+            const ringMat = new THREE.MeshBasicMaterial({ color: color });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            enemyGroup.add(ring);
+
+            // Spawn inside distance range around player
+            const angle = Math.random() * Math.PI * 2;
+            const dist = THREE.MathUtils.randFloat(14, 28);
+            enemyGroup.position.set(
+                camera.position.x + Math.cos(angle) * dist,
+                1.5,
+                camera.position.z + Math.sin(angle) * dist
+            );
+
+            // Clamp inside arena bounds
+            enemyGroup.position.x = Math.max(-36, Math.min(36, enemyGroup.position.x));
+            enemyGroup.position.z = Math.max(-36, Math.min(36, enemyGroup.position.z));
+
+            scene.add(enemyGroup);
+
+            enemies.push({
+                mesh: enemyGroup,
+                type: type,
+                hp: hp,
+                maxHp: hp,
+                speed: speed,
+                damage: damage,
+                lastAttackTime: 0
+            });
+
+            enemiesToSpawn--;
+            lastSpawnTime = clock.getElapsedTime();
+            updateWaveInfoUI();
+        }
+
+        // --- Shooting & Damage Systems ---
+        function shootWeapon() {
+            const now = clock.getElapsedTime();
+            if (now - lastShotTime < 0.12) return; // 연사 속도
+            if (player.isReloading) return;
+
+            if (player.ammo <= 0) {
+                reloadWeapon();
+                return;
+            }
+
+            player.ammo--;
+            updateAmmoUI();
+            lastShotTime = now;
+            playSound('gun');
+
+            // Gun Recoil Effect
+            gunMesh.position.z += 0.08;
+            gunMesh.rotation.x += 0.08;
+
+            // Raycasting Shot
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+            const enemyMeshes = enemies.map(e => e.mesh.children[0]);
+            const intersects = raycaster.intersectObjects(enemyMeshes, true);
+
+            if (intersects.length > 0) {
+                const hitObj = intersects[0].object;
+                const enemyIndex = enemies.findIndex(e => e.mesh.children[0] === hitObj || e.mesh.contains(hitObj));
+
+                if (enemyIndex !== -1) {
+                    const enemy = enemies[enemyIndex];
+                    const damage = player.isAiming ? 35 : 25;
+                    enemy.hp -= damage;
+
+                    // Hit particle effect
+                    createHitParticles(intersects[0].point);
+
+                    // Show Hitmarker
+                    hitMarker.classList.remove('active');
+                    void hitMarker.offsetWidth; // Trigger reflow
+                    hitMarker.classList.add('active');
+
+                    if (enemy.hp <= 0) {
+                        playSound('kill');
+                        scene.remove(enemy.mesh);
+                        enemies.splice(enemyIndex, 1);
+                        player.kills++;
+                    } else {
+                        playSound('hit');
+                    }
+
+                    updateWaveInfoUI();
+                }
+            }
+        }
+
+        function reloadWeapon() {
+            if (player.isReloading || player.ammo === player.maxAmmo) return;
+            player.isReloading = true;
+
+            setTimeout(() => {
+                player.ammo = player.maxAmmo;
+                player.isReloading = false;
+                updateAmmoUI();
+            }, 1200);
+        }
+
+        function takeDamage(amount) {
+            player.hp -= amount;
+            playSound('hurt');
+            updateHpUI();
+
+            damageFlash.style.opacity = '0.8';
+            setTimeout(() => {
+                damageFlash.style.opacity = '0';
+            }, 150);
+
+            if (player.hp <= 0) {
+                gameOver();
+            }
+        }
+
+        function createHitParticles(pos) {
+            for (let i = 0; i < 6; i++) {
+                const pGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+                const pMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+                const pMesh = new THREE.Mesh(pGeo, pMat);
+                pMesh.position.copy(pos);
+
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 8,
+                    Math.random() * 6,
+                    (Math.random() - 0.5) * 8
+                );
+
+                scene.add(pMesh);
+                particles.push({ mesh: pMesh, vel: vel, life: 0.25 });
+            }
+        }
+
+        // --- Game Main Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            if (isGameRunning) {
+                updatePlayerMovement(delta);
+                updateEnemies(delta);
+                updateGunSway(delta);
+                updateParticles(delta);
+
+                // Continuous Auto-Fire when holding down mouse
+                if (isMouseDown) {
+                    shootWeapon();
+                }
+
+                // Spawn enemies periodically if needed
+                const now = clock.getElapsedTime();
+                if (enemiesToSpawn > 0 && enemies.length < 12 && now - lastSpawnTime > 1.2) {
+                    spawnEnemy();
+                }
+
+                // Next Wave condition
+                if (enemies.length === 0 && enemiesToSpawn <= 0) {
+                    startWave(wave + 1);
+                }
+
+                renderMiniMap();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Game Audio Synthesizer (Tone.js) ---
+        let soundEnabled = false;
+        let gunSynth, explosionSynth, hitSynth, playerHurtSynth;
+
+        function initAudio() {
+            if (soundEnabled) return;
+            try {
+                Tone.start();
+                gunSynth = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0 }
+                }).toDestination();
+
+                hitSynth = new Tone.Synth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0 }
+                }).toDestination();
+
+                explosionSynth = new Tone.MembraneSynth().toDestination();
+                playerHurtSynth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0 }
+                }).toDestination();
+
+                soundEnabled = true;
+            } catch (e) {
+                console.log("Audio init error:", e);
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (type === 'gun') gunSynth.triggerAttackRelease('8n');
+                if (type === 'hit') hitSynth.triggerAttackRelease('C6', '16n');
+                if (type === 'kill') hitSynth.triggerAttackRelease('E6', '8n');
+                if (type === 'explosion') explosionSynth.triggerAttackRelease('C1', '8n');
+                if (type === 'hurt') playerHurtSynth.triggerAttackRelease('A2', '8n');
+            } catch(e) {}
+        }
+
+        function setupControls() {
+            const startBtn = document.getElementById('startBtn');
+            const restartBtn = document.getElementById('restartBtn');
+            const startMenu = document.getElementById('startMenu');
+            const gameOverMenu = document.getElementById('gameOverMenu');
+            const hudUI = document.getElementById('hudUI');
+
+            const enterGame = (e) => {
+                if (e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+                initAudio();
+                startMenu.classList.add('hidden');
+                gameOverMenu.classList.add('hidden');
+                hudUI.classList.remove('hidden');
+                
+                isGameRunning = true;
+                
+                // Request Pointer Lock safely
+                try {
+                    document.body.requestPointerLock();
+                } catch(e) {
+                    console.log("Pointer lock error:", e);
+                }
+                
+                resetGame();
+            };
+
+            startBtn.addEventListener('click', enterGame);
+            restartBtn.addEventListener('click', enterGame);
+
+            // Re-click screen to lock pointer if unlocked during game
+            window.addEventListener('click', (e) => {
+                if (isGameRunning && document.pointerLockElement !== document.body) {
+                    if (e.target.tagName !== 'BUTTON' && !startMenu.contains(e.target) && !gameOverMenu.contains(e.target)) {
+                        try {
+                            document.body.requestPointerLock();
+                        } catch(err) {}
+                    }
+                }
+            });
+
+            // Pointer Lock Event Handler
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement !== document.body && isGameRunning) {
+                    // Keep running or show menu on ESC
+                }
+            });
+
+            // Mouse Look Controls
+            window.addEventListener('mousemove', (e) => {
+                if (document.pointerLockElement === document.body && isGameRunning) {
+                    const movementX = e.movementX || 0;
+                    const movementY = e.movementY || 0;
+
+                    const sensitivity = player.isAiming ? 0.0012 : 0.0025;
+
+                    camera.rotation.y -= movementX * sensitivity;
+
+                    // Pitch limit
+                    const pitch = camera.rotation.x - movementY * sensitivity;
+                    camera.rotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, pitch));
+                }
+            });
+
+            // Mouse Shooting & Aiming
+            window.addEventListener('mousedown', (e) => {
+                if (!isGameRunning) return;
+                if (e.button === 0) { // Left Click - Fire
+                    isMouseDown = true;
+                    shootWeapon();
+                } else if (e.button === 2) { // Right Click - Aim Zoom
+                    e.preventDefault();
+                    player.isAiming = true;
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 0) {
+                    isMouseDown = false;
+                } else if (e.button === 2) {
+                    player.isAiming = false;
+                }
+            });
+
+            // Disable Context Menu on Right Click
+            window.addEventListener('contextmenu', e => e.preventDefault());
+
+            // Keyboard Movement & Actions
+            window.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'KeyW': keys.w = true; break;
+                    case 'KeyA': keys.a = true; break;
+                    case 'KeyS': keys.s = true; break;
+                    case 'KeyD': keys.d = true; break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight': keys.shift = true; break;
+                    case 'KeyE': player.isAiming = !player.isAiming; break; // E Key Zoom Toggle
+                    case 'Space': 
+                        if (player.isGrounded) {
+                            player.velocityY = 8.5; // Jump strength
+                            player.isGrounded = false;
+                        }
+                        break;
+                    case 'KeyR': reloadWeapon(); break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                switch (e.code) {
+                    case 'KeyW': keys.w = false; break;
+                    case 'KeyA': keys.a = false; break;
+                    case 'KeyS': keys.s = false; break;
+                    case 'KeyD': keys.d = false; break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight': keys.shift = false; break;
+                }
+            });
+        }
+<!-- ... existing code -->
+        function updatePlayerMovement(delta) {
+            // Apply Gravity & Jumping Physics
+            const gravity = 22.0;
+            if (!player.isGrounded) {
+                player.velocityY -= gravity * delta;
+                camera.position.y += player.velocityY * delta;
+
+                if (camera.position.y <= player.height) {
+                    camera.position.y = player.height;
+                    player.velocityY = 0;
+                    player.isGrounded = true;
+                }
+            }
+
+            // Zoom In / Aiming FOV & Gun Position Smooth Interpolation
+            const targetFOV = player.isAiming ? 40 : (keys.shift ? 80 : 75);
+            camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, delta * 12);
+            camera.updateProjectionMatrix();
+
+            // Calculate movement directional vectors relative to camera orientation
+            const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+            const side = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y);
+
+            const moveDir = new THREE.Vector3();
+
+            if (keys.w) moveDir.add(forward);
+            if (keys.s) moveDir.sub(forward);
+            if (keys.d) moveDir.add(side);
+            if (keys.a) moveDir.sub(side);
+
+            moveDir.normalize();
+
+            // Apply Speed & Move Player Position
+            let moveSpeed = player.speed;
+            if (keys.shift && !player.isAiming) {
+                moveSpeed = player.sprintSpeed; // Shift 키 누르는 동안 빠른 질주
+            } else if (player.isAiming) {
+                moveSpeed = player.speed * 0.6; // 조준 중 이동 감속
+            }
+
+            camera.position.x += moveDir.x * moveSpeed * delta;
+            camera.position.z += moveDir.z * moveSpeed * delta;
+
+            // Clamp Position within Arena Bounds (-38 to 38)
+            camera.position.x = Math.max(-38, Math.min(38, camera.position.x));
+            camera.position.z = Math.max(-38, Math.min(38, camera.position.z));
+        }
+
+        function updateEnemies(delta) {
+            const now = clock.getElapsedTime();
+
+            enemies.forEach(enemy => {
+                // Enemy Hover Movement & Face Player
+                enemy.mesh.rotation.y += delta * 2;
+                enemy.mesh.children[0].rotation.x += delta;
+
+                // Move Towards Player
+                const dir = new THREE.Vector3().subVectors(camera.position, enemy.mesh.position);
+                dir.y = 0; // maintain floor hover height
+                const dist = dir.length();
+                dir.normalize();
+
+                if (dist > 1.2) {
+                    enemy.mesh.position.addScaledVector(dir, enemy.speed * delta);
+                } else {
+                    // Attack Player inside range
+                    if (now - enemy.lastAttackTime > 1.0) {
+                        takeDamage(enemy.damage);
+                        enemy.lastAttackTime = now;
+                    }
+                }
+            });
+        }
+
+        function updateGunSway(delta) {
+            // Aiming position offset vs normal stance
+            const targetX = player.isAiming ? 0 : 0.25;
+            const targetY = player.isAiming ? -0.15 : -0.22;
+            const targetZ = player.isAiming ? -0.32 : -0.45;
+
+            gunMesh.position.x = THREE.MathUtils.lerp(gunMesh.position.x, targetX, delta * 12);
+            gunMesh.position.y = THREE.MathUtils.lerp(gunMesh.position.y, targetY, delta * 12);
+            gunMesh.position.z = THREE.MathUtils.lerp(gunMesh.position.z, targetZ, delta * 10);
+            gunMesh.rotation.x = THREE.MathUtils.lerp(gunMesh.rotation.x, 0, delta * 10);
+        }
+
+        function updateParticles(delta) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= delta;
+                p.mesh.position.addScaledVector(p.vel, delta);
+
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- Render Radar MiniMap ---
+        function renderMiniMap() {
+            minimapCtx.clearRect(0, 0, 110, 110);
+
+            const mapScale = 110 / 80; // 80m arena mapped to 110px canvas
+            const centerX = 55;
+            const centerY = 55;
+
+            // Draw Radar Grid Circle
+            minimapCtx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            minimapCtx.lineWidth = 1;
+            minimapCtx.beginPath();
+            minimapCtx.arc(centerX, centerY, 50, 0, Math.PI * 2);
+            minimapCtx.stroke();
+
+            // Draw Player Marker Center (Green Dot & Direction Line)
+            const playerPx = centerX + camera.position.x * mapScale;
+            const playerPy = centerY + camera.position.z * mapScale;
+
+            minimapCtx.fillStyle = '#38bdf8';
+            minimapCtx.beginPath();
+            minimapCtx.arc(playerPx, playerPy, 3, 0, Math.PI * 2);
+            minimapCtx.fill();
+
+            // Draw Enemies (Red Dots)
+            minimapCtx.fillStyle = '#f43f5e';
+            enemies.forEach(e => {
+                const ex = centerX + e.mesh.position.x * mapScale;
+                const ey = centerY + e.mesh.position.z * mapScale;
+
+                minimapCtx.beginPath();
+                minimapCtx.arc(ex, ey, 2.5, 0, Math.PI * 2);
+                minimapCtx.fill();
+            });
+        }
+
+        // --- UI Update Helpers ---
+        function updateHpUI() {
+            const pct = (player.hp / player.maxHp) * 100;
+            hpBar.style.width = `${pct}%`;
+            hpText.textContent = `${Math.ceil(player.hp)} HP`;
+
+            if (pct < 30) {
+                hpBar.className = "bg-rose-500 h-full w-full transition-all duration-200 animate-pulse";
+            } else {
+                hpBar.className = "bg-gradient-to-r from-emerald-500 to-sky-400 h-full w-full transition-all duration-200";
+            }
+        }
+
+        function updateAmmoUI() {
+            currentAmmoEl.textContent = player.ammo;
+            maxAmmoEl.textContent = player.maxAmmo;
+        }
+
+        function updateWaveInfoUI() {
+            waveNumEl.textContent = wave;
+            enemiesLeftEl.textContent = enemies.length + enemiesToSpawn;
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            document.exitPointerLock();
+
+            finalWaveEl.textContent = wave;
+            finalKillsEl.textContent = player.kills;
+
+            hudUI.classList.add('hidden');
+            gameOverMenu.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            // Reset States
+            player.hp = 100;
+            player.ammo = player.maxAmmo;
+            player.isReloading = false;
+            player.kills = 0;
+            camera.position.set(0, player.height, 0);
+
+            // Clear Scene Enemies & Particles
+            enemies.forEach(e => scene.remove(e.mesh));
+            enemies = [];
+            particles.forEach(p => scene.remove(p.mesh));
+            particles = [];
+
+            updateHpUI();
+            updateAmmoUI();
+
+            // Restart Wave 1
+            startWave(1);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Initialize Engine On Window Load ---
+        window.onload = function() {
+            initEngine();
+            setupControls();
+            // Ready game state and wave
+            resetGame();
+            animate();
+        };
+    </script>
+</body>
+</html>

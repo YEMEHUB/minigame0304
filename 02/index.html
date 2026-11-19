@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>평범한 격투 게임 - 리메이크</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0b0f19;
+            color: #ffffff;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+
+        .font-title {
+            font-family: 'Black Han Sans', sans-serif;
+        }
+
+        /* Custom crisp canvas rendering */
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Virtual Key Button Styling */
+        .v-btn {
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(4px);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .v-btn:active, .v-btn.active {
+            background: rgba(239, 68, 68, 0.6);
+            transform: scale(0.95);
+        }
+
+        /* Keycaps visual representation */
+        .keycap {
+            background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+            border: 1px solid #4b5563;
+            border-bottom: 3px solid #111827;
+            border-radius: 6px;
+            padding: 2px 7px;
+            font-family: monospace;
+            font-weight: bold;
+            color: #f3f4f6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            display: inline-block;
+        }
+
+        .char-card-selected {
+            border-color: #f59e0b !important;
+            background-color: rgba(245, 158, 11, 0.18) !important;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center p-2 md:p-4 bg-slate-950">
+
+    <!-- Header Navigation & Info -->
+    <header class="w-full max-w-5xl flex justify-between items-center bg-slate-900/90 px-4 py-2 rounded-xl border border-slate-800 backdrop-blur z-10 mb-2 shadow-lg">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid font-title text-amber-400 text-2xl tracking-wider">평범한 격투 게임 <span class="text-xs text-red-500 bg-red-950/60 border border-red-500/40 px-2 py-0.5 rounded-md ml-1">REMAKE</span></i>
+        </div>
+        <div class="flex gap-2">
+            <button id="btn-sound" onclick="toggleSound()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                <i class="fa-solid fa-volume-high mr-1" id="sound-icon"></i> <span id="sound-text">사운드 ON</span>
+            </button>
+            <button id="btn-help" onclick="toggleHelp(true)" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                <i class="fa-solid fa-gamepad mr-1"></i> 조작법
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="relative w-full max-w-5xl flex-1 flex flex-col justify-center items-center overflow-hidden rounded-2xl border-2 border-slate-800 bg-black shadow-2xl">
+        
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" class="w-full h-full block object-contain"></canvas>
+
+        <!-- UI Overlay Layer (Combos, Health, Stage Title) -->
+        <div id="game-ui" class="absolute inset-0 pointer-events-none p-4 flex flex-col justify-between hidden">
+            <!-- Top HUD: Player Status & Boss Health -->
+            <div class="flex justify-between items-start w-full gap-4">
+                <!-- Player Status -->
+                <div class="bg-slate-900/85 border border-slate-700 p-3 rounded-xl flex gap-3 items-center backdrop-blur w-72 shadow-lg">
+                    <div id="p1-avatar" class="w-12 h-12 rounded-lg bg-red-600 flex items-center justify-center font-title text-xl text-white border-2 border-red-400 shrink-0">
+                        P1
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between text-xs font-bold mb-1">
+                            <span id="player-hero-name" class="text-amber-400 font-title tracking-wide">HERO</span>
+                            <span id="player-hp-text" class="text-slate-300 font-mono">100/100</span>
+                        </div>
+                        <!-- Health Bar -->
+                        <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+                            <div id="player-hp-bar" class="h-full bg-gradient-to-r from-red-600 to-amber-400 w-full transition-all duration-100"></div>
+                        </div>
+                        <!-- SP / Skill Bar -->
+                        <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden mt-1.5 border border-slate-800">
+                            <div id="player-sp-bar" class="h-full bg-cyan-400 w-0 transition-all duration-100"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stage Info & Boss Bar -->
+                <div class="flex flex-col items-center flex-1 max-w-md">
+                    <div id="stage-badge" class="font-title text-amber-400 tracking-wider text-sm bg-slate-900/90 px-5 py-1 rounded-full border border-amber-500/30 shadow-md">
+                        WORLD 1 - STAGE 1
+                    </div>
+
+                    <!-- Boss / Mid-Boss Health Bar Container -->
+                    <div id="boss-hud" class="w-full mt-2 bg-slate-900/90 p-2.5 rounded-xl border border-purple-900/70 backdrop-blur opacity-0 transition-opacity duration-300 shadow-xl">
+                        <div class="flex justify-between text-xs font-bold mb-1">
+                            <span class="text-purple-300 font-title tracking-wider flex items-center gap-1.5" id="boss-name">
+                                <i class="fa-solid fa-skull text-red-500"></i> BIG BOSS
+                            </span>
+                            <span id="boss-hp-text" class="text-slate-300 font-mono">100%</span>
+                        </div>
+                        <div class="w-full h-3.5 bg-slate-950 rounded-full overflow-hidden border border-purple-900">
+                            <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 w-full transition-all duration-100"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Combo Counter HUD -->
+            <div id="combo-container" class="absolute left-6 top-28 opacity-0 transition-all transform -translate-x-4 duration-200">
+                <div class="flex items-baseline gap-1">
+                    <span id="combo-count" class="font-title text-5xl italic text-yellow-400 drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)]">0</span>
+                    <span class="font-title text-xl text-amber-500 italic">HITS!</span>
+                </div>
+                <div id="combo-rank" class="text-xs font-bold text-red-400 tracking-widest uppercase">GREAT!</div>
+            </div>
+
+            <!-- Stage Announcer Text Overlay -->
+            <div id="announcer-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none hidden">
+                <h1 id="announcer-text" class="font-title text-6xl md:text-8xl text-yellow-400 italic tracking-wider drop-shadow-[0_10px_15px_rgba(0,0,0,0.9)] transform -skew-x-12 animate-bounce">
+                    GO!
+                </h1>
+            </div>
+        </div>
+
+        <!-- MENU OVERLAY (Character Select / Stage Select / Start Screen) -->
+        <div id="menu-screen" class="absolute inset-0 bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-center p-4 z-20 overflow-y-auto">
+            <div class="text-center mb-2">
+                <h1 class="font-title text-3xl md:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300 drop-shadow-lg mb-1">
+                    평범한 격투 게임 <span class="text-lg md:text-xl text-red-400 italic">[대규모 밸런스 & 아키라 패치]</span>
+                </h1>
+                <p class="text-slate-400 text-xs md:text-sm">월드 1 전관 클리어 시 월드 2 해금 / 헤비 파이터 단일 묵직 한방 / 아키라 표창 3연사 / 보스 난이도 대폭 상향</p>
+            </div>
+
+            <!-- WORLD SELECT TABS -->
+            <div class="flex gap-3 mb-3">
+                <button id="tab-world-1" onclick="switchWorld(1)" class="font-title px-5 py-1.5 rounded-lg border-2 border-amber-500 bg-amber-500/20 text-amber-300 text-sm transition">
+                    <i class="fa-solid fa-city mr-1"></i> WORLD 1 (도시 거리)
+                </button>
+                <button id="tab-world-2" onclick="switchWorld(2)" class="font-title px-5 py-1.5 rounded-lg border-2 border-slate-700 bg-slate-900 text-slate-400 text-sm hover:border-cyan-500 transition">
+                    <i class="fa-solid fa-umbrella-beach mr-1"></i> WORLD 2 (네온 비치) <span id="w2-lock-tag" class="text-[10px] text-red-400 ml-1">(🔒 W1 클리어 필요)</span>
+                </button>
+            </div>
+
+            <!-- CHARACTER SELECTOR -->
+            <div class="w-full max-w-4xl mb-3">
+                <h2 class="text-xs font-bold text-amber-400 tracking-wider mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-user-ninja"></i> 캐릭터 선택 (CHARACTER SELECT)
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <!-- Hero 1: 헤비 파이터 -->
+                    <div id="char-card-1" onclick="selectCharacter(1)" class="cursor-pointer bg-slate-900 border-2 border-slate-800 hover:border-amber-500 p-3 rounded-xl flex gap-3 items-center transition transform hover:-translate-y-0.5 shadow-lg char-card-selected">
+                        <div class="w-12 h-12 rounded-xl bg-red-600 border-2 border-red-400 flex items-center justify-center text-xl font-title text-white shrink-0">
+                            P1
+                        </div>
+                        <div class="flex-1 text-left">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="font-title text-sm text-white">헤비 파이터</span>
+                                <span class="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-bold">초고데미지/저속</span>
+                            </div>
+                            <p class="text-slate-400 text-[11px] leading-tight mb-1">느린 공격 속도, 개체 집중 초강력 펀치(75 DMG).</p>
+                        </div>
+                    </div>
+
+                    <!-- Hero 2: 에너지 마스터 -->
+                    <div id="char-card-2" onclick="selectCharacter(2)" class="cursor-pointer bg-slate-900 border-2 border-slate-800 hover:border-amber-500 p-3 rounded-xl flex gap-3 items-center transition transform hover:-translate-y-0.5 shadow-lg">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-600 border-2 border-cyan-400 flex items-center justify-center text-xl font-title text-white shrink-0">
+                            P2
+                        </div>
+                        <div class="flex-1 text-left">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="font-title text-sm text-white">에너지 마스터</span>
+                                <span class="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded font-bold">마법봉 견제</span>
+                            </div>
+                            <p class="text-slate-400 text-[11px] leading-tight mb-1">신비로운 마법봉을 들고 원거리 플라즈마 공격.</p>
+                        </div>
+                    </div>
+
+                    <!-- Hero 3: 아키라 -->
+                    <div id="char-card-3" onclick="selectCharacter(3)" class="cursor-pointer bg-slate-900 border-2 border-slate-800 hover:border-amber-500 p-3 rounded-xl flex gap-3 items-center transition transform hover:-translate-y-0.5 shadow-lg">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-600 border-2 border-emerald-400 flex items-center justify-center text-xl font-title text-white shrink-0">
+                            P3
+                        </div>
+                        <div class="flex-1 text-left">
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="font-title text-sm text-emerald-300">아키라 (닌자)</span>
+                                <span class="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">표창 3연사</span>
+                            </div>
+                            <p class="text-slate-400 text-[11px] leading-tight mb-1">닌자 스킨 장착! 평타 시 표창 3개를 연사 투척.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STAGE SELECTOR CARDS -->
+            <div class="w-full max-w-4xl mb-4">
+                <h2 id="stage-select-title" class="text-xs font-bold text-amber-400 tracking-wider mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot"></i> WORLD 1 스테이지 선택
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2.5 w-full">
+                    <!-- Stage 1 -->
+                    <div id="stage-card-1" onclick="selectStage(1)" class="cursor-pointer bg-slate-900 border-2 border-amber-500 p-2.5 rounded-xl flex flex-col justify-between transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span id="stg-label-1" class="text-[9px] font-bold text-amber-400">1-1</span>
+                                <span id="stage-1-status" class="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 rounded">해금됨</span>
+                            </div>
+                            <h3 id="stg-name-1" class="font-title text-sm text-white mb-0.5">골목길</h3>
+                            <p id="stg-desc-1" class="text-slate-400 text-[10px] leading-tight">입문용 구역.</p>
+                        </div>
+                        <div class="mt-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-500">
+                            <span>★☆☆</span>
+                            <i id="stage-1-icon" class="fa-solid fa-play text-amber-400"></i>
+                        </div>
+                    </div>
+
+                    <!-- Stage 2 -->
+                    <div id="stage-card-2" onclick="selectStage(2)" class="cursor-not-allowed opacity-50 bg-slate-900 border-2 border-slate-800 p-2.5 rounded-xl flex flex-col justify-between transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span id="stg-label-2" class="text-[9px] font-bold text-slate-400">1-2</span>
+                                <span id="stage-2-status" class="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 rounded">잠김</span>
+                            </div>
+                            <h3 id="stg-name-2" class="font-title text-sm text-white mb-0.5">네온 거리</h3>
+                            <p id="stg-desc-2" class="text-slate-400 text-[10px] leading-tight">민첩한 자객 습격.</p>
+                        </div>
+                        <div class="mt-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-500">
+                            <span>★★☆</span>
+                            <i id="stage-2-icon" class="fa-solid fa-lock text-slate-500"></i>
+                        </div>
+                    </div>
+
+                    <!-- Stage 3 -->
+                    <div id="stage-card-3" onclick="selectStage(3)" class="cursor-not-allowed opacity-50 bg-slate-900 border-2 border-slate-800 p-2.5 rounded-xl flex flex-col justify-between transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span id="stg-label-3" class="text-[9px] font-bold text-slate-400">1-3</span>
+                                <span id="stage-3-status" class="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 rounded">잠김</span>
+                            </div>
+                            <h3 id="stg-name-3" class="font-title text-sm text-white mb-0.5">지하 격투장</h3>
+                            <p id="stg-desc-3" class="text-slate-400 text-[10px] leading-tight">중갑 투사 등장.</p>
+                        </div>
+                        <div class="mt-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-500">
+                            <span>★★★</span>
+                            <i id="stage-3-icon" class="fa-solid fa-lock text-slate-500"></i>
+                        </div>
+                    </div>
+
+                    <!-- Stage 4 -->
+                    <div id="stage-card-4" onclick="selectStage(4)" class="cursor-not-allowed opacity-50 bg-slate-900 border-2 border-slate-800 p-2.5 rounded-xl flex flex-col justify-between transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span id="stg-label-4" class="text-[9px] font-bold text-slate-400">1-4</span>
+                                <span id="stage-4-status" class="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 rounded">잠김</span>
+                            </div>
+                            <h3 id="stg-name-4" class="font-title text-sm text-white mb-0.5">빌딩 옥상</h3>
+                            <p id="stg-desc-4" class="text-slate-400 text-[10px] leading-tight">대규모 물량 난투전.</p>
+                        </div>
+                        <div class="mt-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-500">
+                            <span>★★★★</span>
+                            <i id="stage-4-icon" class="fa-solid fa-lock text-slate-500"></i>
+                        </div>
+                    </div>
+
+                    <!-- Stage 5 -->
+                    <div id="stage-card-5" onclick="selectStage(5)" class="cursor-not-allowed opacity-50 bg-slate-900 border-2 border-slate-800 p-2.5 rounded-xl flex flex-col justify-between transition shadow-lg">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span id="stg-label-5" class="text-[9px] font-bold text-slate-400">1-5</span>
+                                <span id="stage-5-status" class="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 rounded">잠김</span>
+                            </div>
+                            <h3 id="stg-name-5" class="font-title text-sm text-white mb-0.5">보스 요새</h3>
+                            <p id="stg-desc-5" class="text-slate-400 text-[10px] leading-tight">빅 보스 레이저 폭격.</p>
+                        </div>
+                        <div class="mt-2 pt-1 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-500">
+                            <span>★★★★★</span>
+                            <i id="stage-5-icon" class="fa-solid fa-lock text-slate-500"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Game Button -->
+            <button id="btn-start" onclick="startGame()" class="font-title text-lg bg-gradient-to-r from-red-600 via-amber-500 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-slate-950 px-9 py-2.5 rounded-xl shadow-xl transform active:scale-95 transition flex items-center gap-2 border border-yellow-300">
+                <i class="fa-solid fa-fist-raised"></i> 게임 시작하기
+            </button>
+        </div>
+
+        <!-- GAME OVER / CLEAR MODAL -->
+        <div id="result-modal" class="absolute inset-0 bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30 hidden">
+            <h2 id="result-title" class="font-title text-6xl text-amber-400 italic mb-2 tracking-wide drop-shadow-md">STAGE CLEAR!</h2>
+            <p id="result-desc" class="text-slate-300 mb-6 text-center max-w-md">축하합니다! 스테이지 구역을 완전히 소탕했습니다.</p>
+            
+            <div class="flex gap-4">
+                <button onclick="backToMenu()" class="font-title bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl border border-slate-700 transition">
+                    스테이지 선택
+                </button>
+                <button id="btn-next-stage" onclick="nextStage()" class="font-title bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 rounded-xl transition shadow-lg">
+                    다음 스테이지
+                </button>
+            </div>
+        </div>
+
+        <!-- CONTROLS GUIDE MODAL -->
+        <div id="help-modal" class="absolute inset-0 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 z-40 hidden">
+            <h3 class="font-title text-3xl text-white mb-6">게임 조작 가이드</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl w-full bg-slate-900 p-6 rounded-2xl border border-slate-800 mb-6">
+                <div>
+                    <h4 class="text-amber-400 font-bold mb-3 border-b border-slate-800 pb-1">이동 및 조작</h4>
+                    <ul class="space-y-2 text-sm text-slate-300">
+                        <li class="flex justify-between items-center">
+                            <span>8방향 이동</span>
+                            <div class="flex gap-1"><span class="keycap">W</span><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span></div>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>대시 (빠른 이동)</span>
+                            <span class="text-xs text-slate-400">좌/우 방향키 연타</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="text-red-400 font-bold mb-3 border-b border-slate-800 pb-1">공격 및 스킬</h4>
+                    <ul class="space-y-2 text-sm text-slate-300">
+                        <li class="flex justify-between items-center">
+                            <span>약공격 (기본 공격)</span>
+                            <span class="keycap">I</span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>강공격 (특수 스킬)</span>
+                            <span class="keycap">O</span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>필살기 (SP 100% 소모)</span>
+                            <span class="keycap">P</span>
+                        </li>
+                        <li class="flex justify-between items-center">
+                            <span>가드 (피해 감소)</span>
+                            <span class="keycap">J</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <button onclick="toggleHelp(false)" class="font-title bg-slate-800 hover:bg-slate-700 text-white px-8 py-2.5 rounded-xl border border-slate-700">
+                닫기
+            </button>
+        </div>
+    </main>
+
+    <!-- Mobile Virtual Controls -->
+    <footer class="w-full max-w-5xl mt-2 flex justify-between items-center px-2 md:hidden">
+        <!-- D-PAD / Joystick simulation -->
+        <div class="grid grid-cols-3 gap-1 w-32 h-32">
+            <div></div>
+            <button class="v-btn" id="v-up"><i class="fa-solid fa-arrow-up"></i></button>
+            <div></div>
+            <button class="v-btn" id="v-left"><i class="fa-solid fa-arrow-left"></i></button>
+            <div class="flex items-center justify-center text-xs text-slate-600 font-bold">DPAD</div>
+            <button class="v-btn" id="v-right"><i class="fa-solid fa-arrow-right"></i></button>
+            <div></div>
+            <button class="v-btn" id="v-down"><i class="fa-solid fa-arrow-down"></i></button>
+            <div></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-2 items-center">
+            <button class="v-btn w-12 h-12 bg-blue-600/30 text-blue-300 border-blue-500/50" id="v-guard">J</button>
+            <div class="grid grid-cols-2 gap-2">
+                <button class="v-btn w-14 h-14 bg-emerald-600/40 text-emerald-300 border-emerald-500" id="v-atk1">I</button>
+                <button class="v-btn w-14 h-14 bg-amber-600/40 text-amber-300 border-amber-500" id="v-atk2">O</button>
+                <div class="col-span-2 flex justify-center">
+                    <button class="v-btn w-16 h-12 bg-red-600/50 text-red-200 border-red-500" id="v-skill">P (SP)</button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Desktop Key Reference -->
+    <footer class="hidden md:flex w-full max-w-5xl justify-between items-center text-xs text-slate-500 px-4 py-1">
+        <div>이동: <span class="keycap">W</span><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span></div>
+        <div>공격: <span class="keycap">I</span> 약공격 | <span class="keycap">O</span> 강공격 | <span class="keycap">P</span> 필살기 | <span class="keycap">J</span> 방어</div>
+        <div>스테이지 및 캐릭터 해금 자동 저장</div>
+    </footer>
+
+    <!-- GAME ENGINE CODE -->
+    <script>
+        // --- SOUND SYNTHESIZER (Web Audio API) ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playHit(heavy = false) {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = heavy ? 'sawtooth' : 'triangle';
+                osc.frequency.setValueAtTime(heavy ? 110 : 230, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            playSlash() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.1);
+            }
+
+            playSpecial() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(250, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.35);
+
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.35);
+            }
+
+            playWarning() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(650, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(850, this.ctx.currentTime + 0.08);
+
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        function toggleSound() {
+            sound.muted = !sound.muted;
+            document.getElementById('sound-text').innerText = sound.muted ? '사운드 OFF' : '사운드 ON';
+            document.getElementById('sound-icon').className = sound.muted ? 'fa-solid fa-volume-xmark mr-1' : 'fa-solid fa-volume-high mr-1';
+        }
+
+        function toggleHelp(show) {
+            document.getElementById('help-modal').classList.toggle('hidden', !show);
+        }
+
+        // --- GAME GLOBAL STATE ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 450;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        let currentWorld = 1; // 1 or 2
+        let selectedStage = 1;
+        let selectedCharacterType = 1; // 1: Bruiser, 2: Energy Master, 3: Ninja Akira
+        let unlockedStagesWorld1 = [1];
+        let unlockedStagesWorld2 = []; // Unlocked after clearing World 1 Stage 5
+        let gameLoopId = null;
+        let isGameRunning = false;
+        let cameraX = 0;
+        let screenShake = 0;
+        let stageLength = 2200;
+        let comboCount = 0;
+        let comboTimer = 0;
+
+        let player = null;
+        let enemies = [];
+        let particles = [];
+        let projectiles = [];
+
+        // World stage definitions
+        const stageInfoWorld1 = [
+            { name: '골목길', desc: '입문용 구역.' },
+            { name: '네온 거리', desc: '민첩한 자객 습격.' },
+            { name: '지하 격투장', desc: '중갑 투사 등장.' },
+            { name: '빌딩 옥상', desc: '대규모 물량 난투전.' },
+            { name: '보스 요새', desc: '빅 보스 레이저 폭격.' }
+        ];
+
+        const stageInfoWorld2 = [
+            { name: '네온 해변가', desc: '해변 습격대의 야간 정습.' },
+            { name: '선착장 잔교', desc: '해양 특수 오니 자객 연타.' },
+            { name: '야자수 산책로', desc: '중갑 브루저 대거 기습.' },
+            { name: '해변 클럽', desc: '광범위 난투 및 중반 레이저.' },
+            { name: '해양 리조트 요새', desc: '월드 2 마린 빅보스 결전.' }
+        ];
+
+        try {
+            const savedW1 = localStorage.getItem('rage_streets_remake_w1');
+            if (savedW1) unlockedStagesWorld1 = JSON.parse(savedW1);
+            const savedW2 = localStorage.getItem('rage_streets_remake_w2');
+            if (savedW2) unlockedStagesWorld2 = JSON.parse(savedW2);
+        } catch(e) {}
+
+        function isWorld1Cleared() {
+            return unlockedStagesWorld1.includes(5) && localStorage.getItem('rage_streets_w1_cleared') === 'true';
+        }
+
+        function switchWorld(worldNum) {
+            if (worldNum === 2 && !isWorld1Cleared()) {
+                showAnnouncer("월드 1을 모두 클리어해야 해금됩니다!");
+                return;
+            }
+
+            currentWorld = worldNum;
+            selectedStage = 1;
+
+            const t1 = document.getElementById('tab-world-1');
+            const t2 = document.getElementById('tab-world-2');
+
+            if (worldNum === 1) {
+                t1.className = 'font-title px-5 py-1.5 rounded-lg border-2 border-amber-500 bg-amber-500/20 text-amber-300 text-sm transition';
+                t2.className = 'font-title px-5 py-1.5 rounded-lg border-2 border-slate-700 bg-slate-900 text-slate-400 text-sm hover:border-cyan-500 transition';
+            } else {
+                t2.className = 'font-title px-5 py-1.5 rounded-lg border-2 border-cyan-500 bg-cyan-500/20 text-cyan-300 text-sm transition';
+                t1.className = 'font-title px-5 py-1.5 rounded-lg border-2 border-slate-700 bg-slate-900 text-slate-400 text-sm hover:border-amber-500 transition';
+            }
+
+            document.getElementById('stage-select-title').innerHTML = `<i class="fa-solid fa-map-location-dot"></i> WORLD ${worldNum} 스테이지 선택`;
+            refreshStageSelectUI();
+        }
+
+        // Update unlock UI state
+        function refreshStageSelectUI() {
+            const w1Cleared = isWorld1Cleared();
+            const tag = document.getElementById('w2-lock-tag');
+            if (tag) {
+                tag.innerText = w1Cleared ? '(🔓 해금됨)' : '(🔒 W1 클리어 필요)';
+                tag.className = w1Cleared ? 'text-[10px] text-emerald-400 ml-1' : 'text-[10px] text-red-400 ml-1';
+            }
+
+            const unlockedList = currentWorld === 1 ? unlockedStagesWorld1 : unlockedStagesWorld2;
+            const stageInfoList = currentWorld === 1 ? stageInfoWorld1 : stageInfoWorld2;
+
+            for (let i = 1; i <= 5; i++) {
+                const card = document.getElementById(`stage-card-${i}`);
+                const status = document.getElementById(`stage-${i}-status`);
+                const icon = document.getElementById(`stage-${i}-icon`);
+                const label = document.getElementById(`stg-label-${i}`);
+                const name = document.getElementById(`stg-name-${i}`);
+                const desc = document.getElementById(`stg-desc-${i}`);
+
+                if (label) label.innerText = `${currentWorld}-${i}`;
+                if (name) name.innerText = stageInfoList[i - 1].name;
+                if (desc) desc.innerText = stageInfoList[i - 1].desc;
+
+                if (unlockedList.includes(i)) {
+                    card.classList.remove('opacity-50', 'cursor-not-allowed');
+                    card.classList.add('cursor-pointer');
+                    if (status) {
+                        status.className = 'text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 rounded';
+                        status.innerText = '해금됨';
+                    }
+                    if (icon) {
+                        icon.className = 'fa-solid fa-play text-amber-400';
+                    }
+                } else {
+                    card.classList.add('opacity-50', 'cursor-not-allowed');
+                    card.classList.remove('cursor-pointer');
+                    if (status) {
+                        status.className = 'text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 rounded';
+                        status.innerText = '잠김';
+                    }
+                    if (icon) {
+                        icon.className = 'fa-solid fa-lock text-slate-500';
+                    }
+                }
+
+                if (i === selectedStage) {
+                    card.classList.add(currentWorld === 1 ? 'border-amber-500' : 'border-cyan-400');
+                    card.classList.remove('border-slate-800');
+                } else {
+                    card.classList.remove('border-amber-500', 'border-cyan-400');
+                    card.classList.add('border-slate-800');
+                }
+            }
+        }
+        refreshStageSelectUI();
+
+        function selectCharacter(type) {
+            selectedCharacterType = type;
+            for (let i = 1; i <= 3; i++) {
+                const card = document.getElementById(`char-card-${i}`);
+                if (card) {
+                    if (i === type) {
+                        card.classList.add('char-card-selected');
+                    } else {
+                        card.classList.remove('char-card-selected');
+                    }
+                }
+            }
+        }
+
+        function selectStage(stageNum) {
+            const unlockedList = currentWorld === 1 ? unlockedStagesWorld1 : unlockedStagesWorld2;
+            if (!unlockedList.includes(stageNum)) return;
+            selectedStage = stageNum;
+            refreshStageSelectUI();
+        }
+
+        // --- INPUT HANDLING ---
+        const keys = {
+            w: false, a: false, s: false, d: false,
+            i: false, o: false, p: false, j: false
+        };
+
+        const keyLastPressed = { w: 0, a: 0, s: 0, d: 0 };
+        let dashDirection = null;
+        let dashTimer = 0;
+
+        window.addEventListener('keydown', (e) => {
+            sound.init();
+            const k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) {
+                if (!keys[k]) {
+                    const now = Date.now();
+                    if (['a', 'd'].includes(k)) {
+                        if (now - keyLastPressed[k] < 250) {
+                            dashDirection = k;
+                            dashTimer = 16;
+                        }
+                        keyLastPressed[k] = now;
+                    }
+                }
+                keys[k] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) {
+                keys[k] = false;
+            }
+        });
+
+        function setupVirtualButton(id, key) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const start = (e) => { e.preventDefault(); sound.init(); keys[key] = true; btn.classList.add('active'); };
+            const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('touchend', end);
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+        }
+
+        setupVirtualButton('v-up', 'w');
+        setupVirtualButton('v-left', 'a');
+        setupVirtualButton('v-down', 's');
+        setupVirtualButton('v-right', 'd');
+        setupVirtualButton('v-atk1', 'i');
+        setupVirtualButton('v-atk2', 'o');
+        setupVirtualButton('v-skill', 'p');
+        setupVirtualButton('v-guard', 'j');
+
+        // --- PARTICLE ENGINE ---
+        class Particle {
+            constructor(x, y, color, vx, vy, size, life) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.vx = vx;
+                this.vy = vy;
+                this.size = size;
+                this.life = life;
+                this.maxLife = life;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.12;
+                this.life--;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x - cameraX, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // --- PROJECTILE CLASS (NINJA SHURIKEN & MAGIC BALL SUPPORT) ---
+        class Projectile {
+            constructor(x, y, targetY, dir, speed, damage, isEnemy = true, isBossWave = false, isShuriken = false) {
+                this.x = x;
+                this.y = y;
+                this.targetY = targetY;
+                this.dir = dir; // 1: right, -1: left
+                this.speed = speed;
+                this.damage = damage;
+                this.isEnemy = isEnemy;
+                this.isBossWave = isBossWave;
+                this.isShuriken = isShuriken;
+                this.active = true;
+                
+                this.warningTime = isEnemy ? 18 : 0;
+                this.timer = 0;
+                this.rotation = 0;
+            }
+
+            update(player, enemies) {
+                this.timer++;
+                this.rotation += 0.4;
+
+                if (this.timer < this.warningTime) {
+                    if (this.timer % 6 === 0) sound.playWarning();
+                    return;
+                }
+
+                this.x += this.dir * this.speed;
+
+                if (this.isEnemy) {
+                    if (this.active && Math.abs(player.y - this.y) < 30) {
+                        if (Math.abs(player.x - this.x) < 32) {
+                            player.takeDamage(this.damage);
+                            this.active = false;
+                            createHitEffect(this.x, this.y, '#ef4444', 15);
+                        }
+                    }
+                } else {
+                    enemies.forEach(enemy => {
+                        if (this.active && enemy.state !== 'dead') {
+                            if (Math.abs(enemy.y - this.y) < 35 && Math.abs(enemy.x - this.x) < 35) {
+                                enemy.takeDamage(this.damage, 5, true); // single target hit
+                                this.active = false;
+                                registerHit();
+                                createHitEffect(this.x, this.y, this.isShuriken ? '#10b981' : '#22d3ee', 12);
+                            }
+                        }
+                    });
+                }
+
+                if (this.x < cameraX - 100 || this.x > cameraX + GAME_WIDTH + 100) {
+                    this.active = false;
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+
+                if (this.isEnemy && this.timer < this.warningTime) {
+                    const startX = this.x - cameraX;
+                    const endX = startX + (this.dir * 600);
+
+                    ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + Math.sin(this.timer * 0.5) * 0.4})`;
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+                    ctx.lineWidth = 14;
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, this.y - 10);
+                    ctx.lineTo(endX, this.y - 10);
+                    ctx.stroke();
+
+                    ctx.fillRect(Math.min(startX, endX), this.y - 15, 600, 10);
+
+                    ctx.fillStyle = '#f87171';
+                    ctx.font = 'bold 10px monospace';
+                    ctx.fillText('⚠ WARNING LASER!', startX + (this.dir * 40), this.y - 18);
+                    ctx.restore();
+                    return;
+                }
+
+                ctx.translate(this.x - cameraX, this.y - 10);
+                
+                if (this.isShuriken) {
+                    // Draw Ninja Shuriken
+                    ctx.rotate(this.rotation);
+                    ctx.fillStyle = '#34d399';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+
+                    for (let i = 0; i < 4; i++) {
+                        ctx.rotate(Math.PI / 2);
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(-4, -12);
+                        ctx.lineTo(0, -18);
+                        ctx.lineTo(4, -12);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                } else {
+                    if (this.isEnemy) {
+                        ctx.fillStyle = this.isBossWave ? '#dc2626' : '#f59e0b';
+                        ctx.strokeStyle = '#fef08a';
+                    } else {
+                        ctx.fillStyle = '#06b6d4';
+                        ctx.strokeStyle = '#67e8f9';
+                    }
+                    
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 18, 9, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        function createHitEffect(x, y, color = '#fef08a', count = 12) {
+            screenShake = 6;
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 6 + 2;
+                particles.push(new Particle(
+                    x, y,
+                    color,
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed - 2,
+                    Math.random() * 4 + 2,
+                    20 + Math.random() * 10
+                ));
+            }
+        }
+
+        function registerHit() {
+            comboCount++;
+            comboTimer = 120;
+            const comboEl = document.getElementById('combo-container');
+            const countEl = document.getElementById('combo-count');
+            const rankEl = document.getElementById('combo-rank');
+
+            countEl.innerText = comboCount;
+            if (comboCount > 20) rankEl.innerText = 'ULTRA FANTASTIC!!';
+            else if (comboCount > 10) rankEl.innerText = 'SUPER COMBO!!';
+            else rankEl.innerText = 'GREAT!';
+
+            comboEl.style.opacity = '1';
+            comboEl.style.transform = 'translateX(0)';
+        }
+
+        // --- PLAYER CLASS (SINGLE TARGET HEAVY & NINJA SHURIKEN ADAPTED) ---
+        class Player {
+            constructor(type = 1) {
+                this.x = 100;
+                this.y = 320;
+                this.type = type;
+                this.width = 40;
+                this.height = 75;
+                this.speed = type === 3 ? 4.8 : (type === 1 ? 3.2 : 3.8);
+                this.facing = 1;
+                this.hp = 100;
+                this.maxHp = 100;
+                this.sp = 0;
+                this.maxSp = 100;
+
+                this.state = 'idle';
+                this.animFrame = 0;
+                this.animTimer = 0;
+                this.attackCooldown = 0;
+                this.hitBox = null;
+                this.isInvulnerable = false;
+                this.invulnTimer = 0;
+            }
+
+            update() {
+                if (dashTimer > 0) dashTimer--;
+
+                if (this.invulnTimer > 0) {
+                    this.invulnTimer--;
+                    this.isInvulnerable = true;
+                } else {
+                    this.isInvulnerable = false;
+                }
+
+                if (this.state === 'hurt') {
+                    this.attackCooldown--;
+                    if (this.attackCooldown <= 0) this.state = 'idle';
+                    return;
+                }
+
+                if (this.state === 'attack' || this.state === 'special') {
+                    this.attackCooldown--;
+                    if (this.attackCooldown <= 0) {
+                        this.state = 'idle';
+                        this.hitBox = null;
+                    }
+                    return;
+                }
+
+                let dx = 0;
+                let dy = 0;
+
+                if (keys.a) { dx -= 1; this.facing = -1; }
+                if (keys.d) { dx += 1; this.facing = 1; }
+                if (keys.w) dy -= 0.7;
+                if (keys.s) dy += 0.7;
+
+                let currentSpeed = this.speed;
+                if (dashTimer > 0 && ((dashDirection === 'a' && dx < 0) || (dashDirection === 'd' && dx > 0))) {
+                    currentSpeed *= 1.85;
+                }
+
+                if (dx !== 0 || dy !== 0) {
+                    this.x += dx * currentSpeed;
+                    this.y += dy * currentSpeed;
+                    if (this.state !== 'guard') this.state = 'move';
+                } else if (this.state === 'move') {
+                    this.state = 'idle';
+                }
+
+                if (keys.j) {
+                    this.state = 'guard';
+                } else if (this.state === 'guard') {
+                    this.state = 'idle';
+                }
+
+                if (keys.i && this.attackCooldown <= 0) {
+                    this.performAttack('light');
+                } else if (keys.o && this.attackCooldown <= 0) {
+                    this.performAttack('heavy');
+                } else if (keys.p && this.attackCooldown <= 0 && this.sp >= 100) {
+                    this.performSpecial();
+                }
+
+                const minY = 260;
+                const maxY = 410;
+                this.y = Math.max(minY, Math.min(maxY, this.y));
+                this.x = Math.max(30, Math.min(stageLength - 50, this.x));
+
+                this.animTimer++;
+                if (this.animTimer > 5) {
+                    this.animFrame = (this.animFrame + 1) % 4;
+                    this.animTimer = 0;
+                }
+            }
+
+            performAttack(type) {
+                this.state = 'attack';
+
+                if (this.type === 1) { // Heavy Fighter
+                    sound.playHit(type === 'heavy');
+                    if (type === 'light') {
+                        this.attackCooldown = 22;
+                        this.hitBox = {
+                            x: this.x + (this.facing === 1 ? 15 : -55),
+                            y: this.y - 65,
+                            w: 45,
+                            h: 50,
+                            damage: 18,
+                            knockback: 6,
+                            singleTarget: false
+                        };
+                        this.sp = Math.min(this.maxSp, this.sp + 10);
+                    } else { // Single target mega punch (Low Attack Speed, High Damage)
+                        this.attackCooldown = 75; // reduced attack speed
+                        this.hitBox = {
+                            x: this.x + (this.facing === 1 ? 20 : -50),
+                            y: this.y - 65,
+                            w: 40, // narrow single target hitbox
+                            h: 40,
+                            damage: 75, // Massive single target damage!
+                            knockback: 18,
+                            singleTarget: true
+                        };
+                        createHitEffect(this.x + (this.facing * 35), this.y - 30, '#ef4444', 30);
+                        this.sp = Math.min(this.maxSp, this.sp + 25);
+                    }
+                } else if (this.type === 2) { // Energy Master
+                    sound.playHit(type === 'heavy');
+                    if (type === 'light') {
+                        this.attackCooldown = 20;
+                        projectiles.push(new Projectile(
+                            this.x + (this.facing * 30),
+                            this.y - 15,
+                            this.y,
+                            this.facing,
+                            13,
+                            14,
+                            false
+                        ));
+                        this.sp = Math.min(this.maxSp, this.sp + 9);
+                    } else {
+                        this.attackCooldown = 50;
+                        this.hitBox = {
+                            x: this.x + (this.facing === 1 ? -20 : -130),
+                            y: this.y - 80,
+                            w: 150,
+                            h: 80,
+                            damage: 36,
+                            knockback: 12,
+                            singleTarget: false
+                        };
+                        createHitEffect(this.x + (this.facing * 50), this.y - 30, '#06b6d4', 24);
+                        this.sp = Math.min(this.maxSp, this.sp + 18);
+                    }
+                } else { // Akira (Ninja - Throw 3 Shurikens on Light Attack)
+                    sound.playSlash();
+                    if (type === 'light') {
+                        this.attackCooldown = 26;
+                        for (let s = 0; s < 3; s++) {
+                            setTimeout(() => {
+                                if (this.state === 'attack' || this.state === 'idle') {
+                                    projectiles.push(new Projectile(
+                                        this.x + (this.facing * 25),
+                                        this.y - 20 + (s * 8 - 8),
+                                        this.y,
+                                        this.facing,
+                                        15,
+                                        12,
+                                        false,
+                                        false,
+                                        true // isShuriken
+                                    ));
+                                }
+                            }, s * 70);
+                        }
+                        this.sp = Math.min(this.maxSp, this.sp + 15);
+                    } else {
+                        this.attackCooldown = 32;
+                        this.x += this.facing * 90;
+                        this.hitBox = {
+                            x: this.x + (this.facing === 1 ? -80 : -60),
+                            y: this.y - 75,
+                            w: 140,
+                            h: 70,
+                            damage: 35,
+                            knockback: 10,
+                            singleTarget: false
+                        };
+                        createHitEffect(this.x, this.y - 30, '#34d399', 22);
+                        this.sp = Math.min(this.maxSp, this.sp + 22);
+                    }
+                }
+            }
+
+            performSpecial() {
+                this.state = 'special';
+                this.sp = 0;
+                this.attackCooldown = 50;
+                this.invulnTimer = 50;
+                sound.playSpecial();
+
+                if (this.type === 1) {
+                    this.hitBox = {
+                        x: this.x - 140,
+                        y: this.y - 100,
+                        w: 280,
+                        h: 120,
+                        damage: 90,
+                        knockback: 18,
+                        singleTarget: false
+                    };
+                    createHitEffect(this.x, this.y - 40, '#f59e0b', 35);
+                } else if (this.type === 2) {
+                    this.hitBox = {
+                        x: cameraX,
+                        y: 0,
+                        w: GAME_WIDTH,
+                        h: GAME_HEIGHT,
+                        damage: 65,
+                        knockback: 14,
+                        singleTarget: false
+                    };
+                    createHitEffect(this.x, this.y - 40, '#06b6d4', 45);
+                } else {
+                    this.hitBox = {
+                        x: this.x + (this.facing === 1 ? -30 : -250),
+                        y: this.y - 100,
+                        w: 280,
+                        h: 120,
+                        damage: 80,
+                        knockback: 14,
+                        singleTarget: false
+                    };
+                    createHitEffect(this.x + (this.facing * 80), this.y - 40, '#10b981', 45);
+                }
+            }
+
+            takeDamage(amount) {
+                if (this.isInvulnerable) return;
+
+                if (this.state === 'guard') {
+                    amount *= 0.2;
+                    createHitEffect(this.x, this.y - 40, '#93c5fd', 5);
+                } else {
+                    this.state = 'hurt';
+                    this.attackCooldown = 15;
+                    this.invulnTimer = 22;
+                    createHitEffect(this.x, this.y - 40, '#ef4444', 15);
+                }
+
+                this.hp = Math.max(0, this.hp - amount);
+                updateHUD();
+
+                if (this.hp <= 0) {
+                    gameOver(false);
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+
+                if (this.isInvulnerable && Math.floor(Date.now() / 50) % 2 === 0) {
+                    ctx.globalAlpha = 0.5;
+                }
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 25, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.scale(this.facing, 1);
+
+                if (this.type === 1) { // Heavy Fighter
+                    ctx.fillStyle = '#dc2626';
+                    ctx.fillRect(-16, -62, 32, 37);
+
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(-13, -25, 11, 25);
+                    ctx.fillRect(2, -25, 11, 25);
+
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.fillRect(-11, -82, 22, 20);
+
+                    ctx.fillStyle = '#eab308';
+                    ctx.fillRect(-13, -85, 26, 7);
+                } else if (this.type === 2) { // Energy Master (Wand/Staff)
+                    ctx.fillStyle = '#0891b2';
+                    ctx.fillRect(-14, -58, 28, 33);
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(-11, -25, 9, 25);
+                    ctx.fillRect(2, -25, 9, 25);
+
+                    ctx.fillStyle = '#fed7aa';
+                    ctx.fillRect(-10, -78, 20, 20);
+
+                    ctx.fillStyle = '#06b6d4';
+                    ctx.fillRect(-12, -82, 24, 6);
+
+                    // Draw Magic Staff/Wand
+                    ctx.strokeStyle = '#d97706';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(10, -10);
+                    ctx.lineTo(22, -65);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(22, -68, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                } else { // Akira (Full Ninja Skin)
+                    ctx.fillStyle = '#0f172a'; // Full dark ninja suit
+                    ctx.fillRect(-13, -62, 26, 37);
+
+                    ctx.fillStyle = '#0284c7'; // Blue sash
+                    ctx.fillRect(-13, -38, 26, 6);
+
+                    ctx.fillStyle = '#020617';
+                    ctx.fillRect(-11, -25, 9, 25);
+                    ctx.fillRect(2, -25, 9, 25);
+
+                    // Masked Face
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(-11, -82, 22, 20);
+                    ctx.fillStyle = '#fde047'; // Ninja Eye slit
+                    ctx.fillRect(0, -75, 9, 4);
+
+                    // Ninja Headband
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.fillRect(-12, -84, 24, 5);
+                }
+
+                if (this.state === 'attack') {
+                    ctx.fillStyle = this.type === 3 ? '#34d399' : (this.type === 1 ? '#f87171' : '#67e8f9');
+                    ctx.fillRect(5, -50, 36, 12);
+                } else if (this.state === 'special') {
+                    ctx.fillStyle = this.type === 3 ? '#10b981' : (this.type === 1 ? '#f59e0b' : '#22d3ee');
+                    ctx.beginPath();
+                    ctx.arc(0, -40, 75, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.state === 'guard') {
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fillRect(5, -60, 10, 30);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // --- ENEMY & BOSS CLASS (SUPER BUFFED BOSS HP & DAMAGE) ---
+        class Enemy {
+            constructor(x, y, type = 'punk', isMidBoss = false, isWorld2 = false) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.isMidBoss = isMidBoss;
+                this.isWorld2 = isWorld2;
+                this.facing = -1;
+                this.state = 'idle';
+
+                // --- BUFFED ENEMY HP & DAMAGE ---
+                if (type === 'boss') {
+                    this.maxHp = isWorld2 ? 2200 : 1600; // Super Buffed HP!
+                    this.speed = 3.0;
+                    this.width = 85;
+                    this.height = 115;
+                    this.damage = 18; // Super Buffed Boss Damage!
+                    this.color = isWorld2 ? '#0284c7' : '#7e22ce';
+                    this.name = isWorld2 ? 'MARINE OVERLORD (W2 BOSS)' : 'BIG BOSS (W1 BOSS)';
+                    this.skillCooldownMax = 35;
+                } else if (isMidBoss) {
+                    this.maxHp = isWorld2 ? 900 : 700; // Buffed Mid Boss HP!
+                    this.speed = 2.8;
+                    this.width = 68;
+                    this.height = 98;
+                    this.damage = 12; // Buffed Damage
+                    this.color = isWorld2 ? '#06b6d4' : '#c026d3';
+                    this.name = `MID BOSS (${type.toUpperCase()})`;
+                    this.skillCooldownMax = 45;
+                } else if (type === 'heavy') {
+                    this.maxHp = isWorld2 ? 350 : 280;
+                    this.speed = 1.8;
+                    this.width = 54;
+                    this.height = 88;
+                    this.damage = 8;
+                    this.color = isWorld2 ? '#d97706' : '#ea580c';
+                    this.name = 'HEAVY';
+                    this.skillCooldownMax = 70;
+                } else if (type === 'ninja') {
+                    this.maxHp = isWorld2 ? 220 : 180;
+                    this.speed = 4.0;
+                    this.width = 40;
+                    this.height = 72;
+                    this.damage = 6;
+                    this.color = isWorld2 ? '#0d9488' : '#0284c7';
+                    this.name = 'NINJA';
+                    this.skillCooldownMax = 60;
+                } else { // Punk
+                    this.maxHp = isWorld2 ? 180 : 140;
+                    this.speed = 2.6;
+                    this.width = 42;
+                    this.height = 75;
+                    this.damage = 5;
+                    this.color = isWorld2 ? '#16a34a' : '#15803d';
+                    this.name = 'PUNK';
+                    this.skillCooldownMax = 80;
+                }
+
+                this.hp = this.maxHp;
+                this.attackTimer = 0;
+                this.rangedCooldown = 20;
+                this.hurtTimer = 0;
+                this.hitBox = null;
+            }
+
+            update(player) {
+                if (this.state === 'dead') return;
+
+                if (this.state === 'hurt') {
+                    this.hurtTimer--;
+                    if (this.hurtTimer <= 0) this.state = 'idle';
+                    return;
+                }
+
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+                this.facing = player.x > this.x ? 1 : -1;
+
+                if (this.state === 'attack') {
+                    this.attackTimer--;
+                    if (this.attackTimer <= 0) {
+                        this.state = 'idle';
+                        this.hitBox = null;
+                    }
+                    return;
+                }
+
+                if (this.type === 'boss' || this.isMidBoss) {
+                    this.rangedCooldown--;
+                    if (this.rangedCooldown <= 0) {
+                        this.fireRangedAttack(player);
+                        this.rangedCooldown = this.skillCooldownMax;
+                        return;
+                    }
+                }
+
+                if (dist < 80) {
+                    if (this.attackTimer <= 0) {
+                        this.performAttack(player);
+                    } else {
+                        this.attackTimer--;
+                    }
+                } else if (dist < 650) {
+                    this.state = 'move';
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(angle) * this.speed;
+                    this.y += Math.sin(angle) * this.speed;
+                } else {
+                    this.state = 'idle';
+                }
+            }
+
+            fireRangedAttack(player) {
+                this.state = 'attack';
+                this.attackTimer = 22;
+
+                projectiles.push(new Projectile(
+                    this.x,
+                    this.y,
+                    player.y,
+                    this.facing,
+                    15,
+                    this.damage * 1.2,
+                    true,
+                    this.type === 'boss'
+                ));
+            }
+
+            performAttack(player) {
+                this.state = 'attack';
+                this.attackTimer = this.type === 'boss' ? 20 : 30;
+
+                this.hitBox = {
+                    x: this.x + (this.facing === 1 ? 10 : -45),
+                    y: this.y - 50,
+                    w: 45,
+                    h: 45,
+                    damage: this.damage
+                };
+
+                if (Math.abs(player.y - this.y) < 28) {
+                    if (
+                        (this.facing === 1 && player.x >= this.x && player.x <= this.x + 75) ||
+                        (this.facing === -1 && player.x <= this.x && player.x >= this.x - 75)
+                    ) {
+                        player.takeDamage(this.damage);
+                    }
+                }
+            }
+
+            takeDamage(amount, knockback = 5, singleHit = false) {
+                if (this.state === 'dead') return;
+
+                this.hp -= amount;
+                this.state = 'hurt';
+                this.hurtTimer = 14;
+                this.x += this.facing * -knockback;
+
+                createHitEffect(this.x, this.y - 40, '#fca5a5', 10);
+
+                if (this.type === 'boss' || this.isMidBoss) {
+                    updateBossHUD(this);
+                }
+
+                if (this.hp <= 0) {
+                    this.state = 'dead';
+                    createHitEffect(this.x, this.y - 40, '#ef4444', 30);
+
+                    setTimeout(() => {
+                        checkStageProgress();
+                    }, 300);
+                }
+            }
+
+            draw(ctx) {
+                if (this.state === 'dead') return;
+
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+
+                // Floor shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.width / 2, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Character Sprite
+                ctx.save();
+                ctx.scale(this.facing, 1);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.width / 2, -this.height + 20, this.width, this.height - 20);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(4, -this.height + 30, 8, 8);
+                ctx.restore();
+
+                // Floating HP Bar
+                const barWidth = Math.max(38, this.width);
+                const barHeight = 5;
+                const barX = -barWidth / 2;
+                const barY = -this.height - 8;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+
+                const hpRatio = Math.max(0, this.hp / this.maxHp);
+                ctx.fillStyle = hpRatio > 0.5 ? '#22c55e' : (hpRatio > 0.2 ? '#eab308' : '#ef4444');
+                ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+
+                ctx.restore();
+            }
+        }
+
+        // --- GAME CONTROLLER & STAGE SETUP ---
+        function initStage(stageNum) {
+            enemies = [];
+            particles = [];
+            projectiles = [];
+            cameraX = 0;
+            comboCount = 0;
+
+            player = new Player(selectedCharacterType);
+
+            const avatarEl = document.getElementById('p1-avatar');
+            const heroNameEl = document.getElementById('player-hero-name');
+
+            if (selectedCharacterType === 1) {
+                avatarEl.className = "w-12 h-12 rounded-lg bg-red-600 flex items-center justify-center font-title text-xl text-white border-2 border-red-400 shrink-0";
+                avatarEl.innerText = "P1";
+                heroNameEl.innerText = "헤비 파이터";
+            } else if (selectedCharacterType === 2) {
+                avatarEl.className = "w-12 h-12 rounded-lg bg-cyan-600 flex items-center justify-center font-title text-xl text-white border-2 border-cyan-400 shrink-0";
+                avatarEl.innerText = "P2";
+                heroNameEl.innerText = "에너지 마스터";
+            } else {
+                avatarEl.className = "w-12 h-12 rounded-lg bg-emerald-600 flex items-center justify-center font-title text-xl text-white border-2 border-emerald-400 shrink-0";
+                avatarEl.innerText = "P3";
+                heroNameEl.innerText = "아키라 (닌자)";
+            }
+
+            document.getElementById('boss-hud').style.opacity = '0';
+            document.getElementById('stage-badge').innerText = `WORLD ${currentWorld} - STAGE ${stageNum}`;
+
+            const isW2 = (currentWorld === 2);
+
+            // Spawn Enemies according to World & Stage Level
+            if (stageNum === 1) {
+                enemies.push(new Enemy(600, 320, 'punk', false, isW2));
+                enemies.push(new Enemy(900, 350, 'punk', false, isW2));
+                enemies.push(new Enemy(1400, 300, 'heavy', true, isW2));
+            } else if (stageNum === 2) {
+                enemies.push(new Enemy(500, 300, 'ninja', false, isW2));
+                enemies.push(new Enemy(800, 340, 'ninja', false, isW2));
+                enemies.push(new Enemy(1200, 310, 'punk', false, isW2));
+                enemies.push(new Enemy(1500, 330, 'ninja', true, isW2));
+            } else if (stageNum === 3) {
+                enemies.push(new Enemy(550, 320, 'heavy', false, isW2));
+                enemies.push(new Enemy(850, 300, 'heavy', false, isW2));
+                enemies.push(new Enemy(1300, 340, 'ninja', false, isW2));
+                enemies.push(new Enemy(1600, 320, 'heavy', true, isW2));
+            } else if (stageNum === 4) {
+                enemies.push(new Enemy(450, 300, 'punk', false, isW2));
+                enemies.push(new Enemy(700, 340, 'ninja', false, isW2));
+                enemies.push(new Enemy(950, 320, 'heavy', false, isW2));
+                enemies.push(new Enemy(1250, 310, 'punk', false, isW2));
+                enemies.push(new Enemy(1550, 330, 'ninja', true, isW2));
+            } else if (stageNum === 5) {
+                enemies.push(new Enemy(500, 320, 'heavy', false, isW2));
+                enemies.push(new Enemy(800, 300, 'ninja', false, isW2));
+                enemies.push(new Enemy(1500, 330, 'boss', false, isW2));
+            }
+
+            updateHUD();
+            showAnnouncer(`WORLD ${currentWorld}-${stageNum} START!`);
+        }
+
+        function updateHUD() {
+            if (!player) return;
+            const hpPct = Math.max(0, (player.hp / player.maxHp) * 100);
+            document.getElementById('player-hp-bar').style.width = `${hpPct}%`;
+            document.getElementById('player-hp-text').innerText = `${Math.ceil(player.hp)}/${player.maxHp}`;
+            document.getElementById('player-sp-bar').style.width = `${player.sp}%`;
+        }
+
+        function updateBossHUD(boss) {
+            const hud = document.getElementById('boss-hud');
+            const bar = document.getElementById('boss-hp-bar');
+            const text = document.getElementById('boss-hp-text');
+            const name = document.getElementById('boss-name');
+
+            hud.style.opacity = '1';
+            name.innerText = boss.name;
+            const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+            bar.style.width = `${pct}%`;
+            text.innerText = `${Math.ceil(pct)}%`;
+        }
+
+        function checkStageProgress() {
+            const remainingEnemies = enemies.filter(e => e.state !== 'dead');
+            if (remainingEnemies.length === 0) {
+                const unlockedList = currentWorld === 1 ? unlockedStagesWorld1 : unlockedStagesWorld2;
+
+                if (selectedStage < 5 && !unlockedList.includes(selectedStage + 1)) {
+                    unlockedList.push(selectedStage + 1);
+                    try {
+                        const key = currentWorld === 1 ? 'rage_streets_remake_w1' : 'rage_streets_remake_w2';
+                        localStorage.setItem(key, JSON.stringify(unlockedList));
+                    } catch(e) {}
+                }
+
+                // If World 1 Stage 5 cleared -> Unlock World 2 Completely!
+                if (currentWorld === 1 && selectedStage === 5) {
+                    try {
+                        localStorage.setItem('rage_streets_w1_cleared', 'true');
+                        if (!unlockedStagesWorld2.includes(1)) {
+                            unlockedStagesWorld2.push(1);
+                            localStorage.setItem('rage_streets_remake_w2', JSON.stringify(unlockedStagesWorld2));
+                        }
+                    } catch(e) {}
+                }
+
+                refreshStageSelectUI();
+
+                setTimeout(() => {
+                    gameOver(true);
+                }, 500);
+            }
+        }
+
+        function showAnnouncer(text) {
+            const overlay = document.getElementById('announcer-overlay');
+            const txt = document.getElementById('announcer-text');
+            txt.innerText = text;
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 1200);
+        }
+
+        function startGame() {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            initStage(selectedStage);
+            isGameRunning = true;
+
+            if (gameLoopId) cancelAnimationFrame(gameLoopId);
+            gameLoop();
+        }
+
+        function gameOver(isWin) {
+            isGameRunning = false;
+            const modal = document.getElementById('result-modal');
+            const title = document.getElementById('result-title');
+            const desc = document.getElementById('result-desc');
+            const btnNext = document.getElementById('btn-next-stage');
+
+            modal.classList.remove('hidden');
+
+            if (isWin) {
+                title.innerText = 'STAGE CLEAR!';
+                title.className = 'font-title text-6xl text-amber-400 italic mb-2 tracking-wide drop-shadow-md';
+                desc.innerText = `축하합니다! 월드 ${currentWorld} 스테이지 ${selectedStage} 구역을 완벽하게 제압하셨습니다!`;
+
+                if (currentWorld === 1 && selectedStage === 5) {
+                    desc.innerText = `🎉 월드 1 정복 완수! 신규 월드 2 [네온 비치] 구역이 해금되었습니다!`;
+                }
+
+                if (selectedStage < 5) {
+                    btnNext.style.display = 'block';
+                } else {
+                    btnNext.style.display = 'none';
+                }
+            } else {
+                title.innerText = 'GAME OVER';
+                title.className = 'font-title text-6xl text-red-600 italic mb-2 tracking-wide drop-shadow-md';
+                desc.innerText = '체력이 소진되었습니다. 보스의 강력한 공격 패턴을 정밀히 회피해보세요!';
+                btnNext.style.display = 'none';
+            }
+        }
+
+        function nextStage() {
+            if (selectedStage < 5) {
+                selectedStage++;
+                document.getElementById('result-modal').classList.add('hidden');
+                startGame();
+            }
+        }
+
+        function backToMenu() {
+            document.getElementById('result-modal').classList.add('hidden');
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            isGameRunning = false;
+        }
+
+        // --- MAIN GAME LOOP ---
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            // Clear & Background Render
+            if (currentWorld === 1) {
+                ctx.fillStyle = '#0f172a';
+            } else {
+                ctx.fillStyle = '#030712';
+            }
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            ctx.save();
+            if (screenShake > 0) {
+                const rx = (Math.random() - 0.5) * screenShake;
+                const ry = (Math.random() - 0.5) * screenShake;
+                ctx.translate(rx, ry);
+                screenShake--;
+            }
+
+            const targetCamX = player.x - GAME_WIDTH / 2.5;
+            cameraX += (targetCamX - cameraX) * 0.1;
+            cameraX = Math.max(0, Math.min(stageLength - GAME_WIDTH, cameraX));
+
+            // Background Floor / Environment Render
+            if (currentWorld === 1) {
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(0 - cameraX, 260, stageLength, 190);
+
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                for (let x = 0; x < stageLength; x += 80) {
+                    ctx.beginPath();
+                    ctx.moveTo(x - cameraX, 260);
+                    ctx.lineTo(x - cameraX, 450);
+                    ctx.stroke();
+                }
+            } else {
+                ctx.fillStyle = '#155e75';
+                ctx.fillRect(0 - cameraX, 260, stageLength, 190);
+
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 1.5;
+                for (let x = 0; x < stageLength; x += 90) {
+                    ctx.beginPath();
+                    ctx.moveTo(x - cameraX, 260);
+                    ctx.lineTo(x - cameraX + 30, 450);
+                    ctx.stroke();
+                }
+            }
+
+            if (comboTimer > 0) {
+                comboTimer--;
+                if (comboTimer <= 0) {
+                    comboCount = 0;
+                    document.getElementById('combo-container').style.opacity = '0';
+                }
+            }
+
+            player.update();
+            player.draw(ctx);
+
+            if (player.hitBox) {
+                let hitTargetCount = 0;
+
+                for (let enemy of enemies) {
+                    if (enemy.state !== 'dead') {
+                        if (
+                            player.hitBox.x < enemy.x + enemy.width / 2 &&
+                            player.hitBox.x + player.hitBox.w > enemy.x - enemy.width / 2 &&
+                            player.hitBox.y < enemy.y &&
+                            player.hitBox.y + player.hitBox.h > enemy.y - enemy.height
+                        ) {
+                            enemy.takeDamage(player.hitBox.damage, player.hitBox.knockback);
+                            registerHit();
+                            hitTargetCount++;
+
+                            // Single Target restriction for Heavy Fighter's Heavy Punch
+                            if (player.hitBox.singleTarget && hitTargetCount >= 1) {
+                                player.hitBox = null;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            enemies.forEach(enemy => {
+                enemy.update(player);
+                enemy.draw(ctx);
+            });
+
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const proj = projectiles[i];
+                proj.update(player, enemies);
+                proj.draw(ctx);
+                if (!proj.active) {
+                    projectiles.splice(i, 1);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw(ctx);
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            ctx.restore();
+
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>

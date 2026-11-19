@@ -1,0 +1,981 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스파이더 솔리테어 (Spider Solitaire)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+KR:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: radial-gradient(circle at center, #1a472a 0%, #0d2818 100%);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Felt table texture effect */
+        .felt-table {
+            background-color: #1b4d2e;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        /* Card styling */
+        .card {
+            aspect-ratio: 2.5 / 3.5;
+            transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease;
+            transform-origin: top center;
+            will-change: transform, left, top;
+        }
+
+        .card-inner {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+        }
+
+        .card.dragging {
+            opacity: 0.95;
+            z-index: 1000 !important;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        /* Card Back Pattern */
+        .card-back {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1d4ed8 100%);
+            border: 2px solid #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .card-back::after {
+            content: '';
+            position: absolute;
+            inset: 4px;
+            border: 1px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+        }
+
+        /* Custom Scrollbar for side panel if needed */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col felt-table text-white">
+
+    <!-- Header / Navbar -->
+    <header class="w-full bg-black/40 backdrop-blur-md px-4 py-2 flex items-center justify-between border-b border-white/10 z-20">
+        <div class="flex items-center gap-3">
+            <div class="bg-emerald-600/80 p-2 rounded-xl border border-emerald-400/30 text-amber-300">
+                <i class="fa-solid fa-spider text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg sm:text-xl tracking-wide bg-gradient-to-r from-amber-200 to-amber-400 bg-clip-text text-transparent">
+                    스파이더 솔리테어
+                </h1>
+                <p class="text-xs text-emerald-200/70 hidden sm:block">클래식 카드 게임</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Controls & Stats -->
+        <div class="flex items-center gap-4 sm:gap-6 text-sm">
+            <div class="flex items-center gap-4 bg-black/30 px-3 py-1.5 rounded-lg border border-white/10">
+                <div class="text-center">
+                    <div class="text-[10px] text-emerald-300/70 font-semibold uppercase">점수</div>
+                    <div id="score-display" class="font-bold text-amber-300 text-base">500</div>
+                </div>
+                <div class="w-px h-6 bg-white/10"></div>
+                <div class="text-center">
+                    <div class="text-[10px] text-emerald-300/70 font-semibold uppercase">이동</div>
+                    <div id="moves-display" class="font-bold text-white text-base">0</div>
+                </div>
+                <div class="w-px h-6 bg-white/10"></div>
+                <div class="text-center">
+                    <div class="text-[10px] text-emerald-300/70 font-semibold uppercase">시간</div>
+                    <div id="timer-display" class="font-bold text-white text-base">00:00</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button id="undo-btn" title="실행 취소" class="p-2.5 bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg transition border border-white/10 text-white flex items-center gap-1.5 text-xs font-semibold">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span class="hidden md:inline">취소</span>
+                </button>
+                <button id="hint-btn" title="힌트 보기" class="p-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 active:scale-95 rounded-lg transition border border-amber-500/30 flex items-center gap-1.5 text-xs font-semibold">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span class="hidden md:inline">힌트</span>
+                </button>
+                <button id="new-game-btn" class="px-3.5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 rounded-lg transition font-bold text-xs shadow-lg shadow-emerald-950/50 flex items-center gap-1.5">
+                    <i class="fa-solid fa-play"></i>
+                    <span>새 게임</span>
+                </button>
+                <button id="sound-btn" class="p-2.5 bg-white/10 hover:bg-white/20 rounded-lg transition text-white border border-white/10">
+                    <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="flex-1 relative p-2 sm:p-4 md:p-6 flex flex-col justify-between overflow-hidden max-w-7xl mx-auto w-full">
+        
+        <!-- Top Board Section: Completed Stacks & Stock Pile -->
+        <div class="flex justify-between items-center w-full mb-3 px-1">
+            
+            <!-- Completed Stacks (Foundations) -->
+            <div class="flex gap-1.5 sm:gap-2.5 items-center bg-black/20 p-2 rounded-2xl border border-white/5">
+                <span class="text-xs font-semibold text-emerald-200/50 mr-1 hidden lg:inline">완성:</span>
+                <div id="completed-foundations" class="flex gap-1.5 sm:gap-2">
+                    <!-- 8 Completed slots dynamically created -->
+                </div>
+            </div>
+
+            <!-- Stock Pile (Remaining Deck) -->
+            <div class="flex items-center gap-3">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs text-emerald-200/70">남은 덱</div>
+                    <div id="stock-count" class="text-sm font-bold text-amber-300">50 장</div>
+                </div>
+                <div id="stock-pile" class="relative cursor-pointer group active:scale-95 transition-transform" title="카드 더 보기">
+                    <div class="w-12 sm:w-16 md:w-20 aspect-[2.5/3.5] card-back rounded-lg shadow-md border-2 border-white/80 group-hover:border-amber-300 transition"></div>
+                    <div class="absolute -top-1 -right-1 bg-amber-400 text-black font-extrabold text-[10px] w-5 h-5 rounded-full flex items-center justify-center border border-white shadow">
+                        <span id="stock-deals-left">5</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Tableau Columns (10 Columns) -->
+        <div id="tableau-board" class="flex-1 grid grid-cols-10 gap-1 sm:gap-2 w-full h-full relative items-start">
+            <!-- 10 Tableau Columns rendered here dynamically -->
+        </div>
+
+    </main>
+
+    <!-- Game Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-zinc-900 border border-zinc-700 p-6 sm:p-8 rounded-2xl max-w-md w-full mx-4 shadow-2xl text-center transform scale-95 transition-transform duration-300 id-modal-content">
+            <div class="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-400 text-2xl">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-1">새 게임 시작</h2>
+            <p class="text-zinc-400 text-sm mb-6">난이도를 선택해 주세요.</p>
+
+            <div class="space-y-3 mb-6">
+                <button data-suits="1" class="suit-select-btn w-full p-4 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700/80 active:border-emerald-500 flex items-center justify-between transition group text-left">
+                    <div>
+                        <div class="font-bold text-white group-hover:text-emerald-400 transition">쉬움 (1개 슈트)</div>
+                        <div class="text-xs text-zinc-400">모두 ♠ 스페이드로만 진행합니다.</div>
+                    </div>
+                    <span class="text-2xl text-black select-none">♠</span>
+                </button>
+
+                <button data-suits="2" class="suit-select-btn w-full p-4 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700/80 active:border-amber-500 flex items-center justify-between transition group text-left">
+                    <div>
+                        <div class="font-bold text-white group-hover:text-amber-400 transition">보통 (2개 슈트)</div>
+                        <div class="text-xs text-zinc-400">♠ 스페이드와 ♥ 하트로 진행합니다.</div>
+                    </div>
+                    <div class="text-2xl space-x-1 select-none">
+                        <span class="text-black">♠</span>
+                        <span class="text-red-500">♥</span>
+                    </div>
+                </button>
+
+                <button data-suits="4" class="suit-select-btn w-full p-4 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700/80 active:border-rose-500 flex items-center justify-between transition group text-left">
+                    <div>
+                        <div class="font-bold text-white group-hover:text-rose-400 transition">어려움 (4개 슈트)</div>
+                        <div class="text-xs text-zinc-400">♠, ♥, ♦, ♣ 모든 문양을 사용합니다.</div>
+                    </div>
+                    <div class="text-xl space-x-1 select-none">
+                        <span class="text-black">♠</span>
+                        <span class="text-red-500">♥</span>
+                        <span class="text-red-500">♦</span>
+                        <span class="text-black">♣</span>
+                    </div>
+                </button>
+            </div>
+
+            <button id="close-modal-btn" class="text-xs text-zinc-500 hover:text-zinc-300 transition underline">
+                취소하고 계속하기
+            </button>
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victory-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-gradient-to-b from-zinc-900 to-black border border-amber-500/40 p-8 rounded-3xl max-w-md w-full mx-4 shadow-2xl text-center transform scale-95 transition-transform duration-300">
+            <div class="text-5xl mb-3">🏆</div>
+            <h2 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 mb-2">
+                축하합니다!
+            </h2>
+            <p class="text-zinc-300 text-sm mb-6">모든 카드 세트를 완성했습니다!</p>
+
+            <div class="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 grid grid-cols-3 gap-2 text-center">
+                <div>
+                    <div class="text-[11px] text-zinc-400">최종 점수</div>
+                    <div id="vic-score" class="text-lg font-bold text-amber-300">0</div>
+                </div>
+                <div>
+                    <div class="text-[11px] text-zinc-400">총 이동 횟수</div>
+                    <div id="vic-moves" class="text-lg font-bold text-white">0</div>
+                </div>
+                <div>
+                    <div class="text-[11px] text-zinc-400">소요 시간</div>
+                    <div id="vic-time" class="text-lg font-bold text-white">00:00</div>
+                </div>
+            </div>
+
+            <button id="victory-restart-btn" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold rounded-xl shadow-lg transition active:scale-95">
+                새 게임 시작하기
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification Message -->
+    <div id="toast-msg" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/90 border border-white/20 text-white text-xs px-4 py-2.5 rounded-full shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-amber-400"></i>
+        <span id="toast-text">알림 메세지</span>
+    </div>
+
+    <!-- Game Logic JavaScript -->
+    <script>
+        /**
+         * Spider Solitaire Game Engine
+         */
+
+        // Card Suits & Values
+        const SUITS = {
+            SPADES: { symbol: '♠', color: 'black' },
+            HEARTS: { symbol: '♥', color: 'red' },
+            DIAMONDS: { symbol: '♦', color: 'red' },
+            CLUBS: { symbol: '♣', color: 'black' }
+        };
+
+        const RANKS = [
+            { value: 1, name: 'A' },
+            { value: 2, name: '2' },
+            { value: 3, name: '3' },
+            { value: 4, name: '4' },
+            { value: 5, name: '5' },
+            { value: 6, name: '6' },
+            { value: 7, name: '7' },
+            { value: 8, name: '8' },
+            { value: 9, name: '9' },
+            { value: 10, name: '10' },
+            { value: 11, name: 'J' },
+            { value: 12, name: 'Q' },
+            { value: 13, name: 'K' }
+        ];
+
+        // Sound System (Tone.js wrapper)
+        class SoundManager {
+            constructor() {
+                this.enabled = true;
+                this.synth = null;
+                this.init();
+            }
+
+            init() {
+                try {
+                    this.synth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+                    }).toDestination();
+                    this.synth.volume.value = -12;
+                } catch (e) {
+                    console.log("Audio synth init defer error");
+                }
+            }
+
+            playCardPlace() {
+                if (!this.enabled || !this.synth) return;
+                try {
+                    Tone.start();
+                    this.synth.triggerAttackRelease("C4", "8n");
+                } catch (e) {}
+            }
+
+            playDeal() {
+                if (!this.enabled || !this.synth) return;
+                try {
+                    Tone.start();
+                    this.synth.triggerAttackRelease("G3", "16n");
+                } catch (e) {}
+            }
+
+            playComplete() {
+                if (!this.enabled || !this.synth) return;
+                try {
+                    Tone.start();
+                    const now = Tone.now();
+                    this.synth.triggerAttackRelease("C4", "8n", now);
+                    this.synth.triggerAttackRelease("E4", "8n", now + 0.1);
+                    this.synth.triggerAttackRelease("G4", "8n", now + 0.2);
+                    this.synth.triggerAttackRelease("C5", "4n", now + 0.3);
+                } catch (e) {}
+            }
+
+            playError() {
+                if (!this.enabled || !this.synth) return;
+                try {
+                    Tone.start();
+                    this.synth.triggerAttackRelease("A2", "16n");
+                } catch (e) {}
+            }
+        }
+
+        const sounds = new SoundManager();
+
+        // Game State Variables
+        let suitCount = 1; // 1, 2, or 4
+        let tableau = [[], [], [], [], [], [], [], [], [], []];
+        let stock = [];
+        let completedSets = [];
+        let score = 500;
+        let moves = 0;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let history = []; // Stack for undo functionality
+
+        // Drag and Drop state
+        let draggedCards = [];
+        let dragSourceCol = null;
+        let dragSourceCardIdx = null;
+
+        // DOM Element Cache
+        const tableauBoardEl = document.getElementById('tableau-board');
+        const completedFoundationsEl = document.getElementById('completed-foundations');
+        const stockPileEl = document.getElementById('stock-pile');
+        const stockCountEl = document.getElementById('stock-count');
+        const stockDealsLeftEl = document.getElementById('stock-deals-left');
+        const scoreEl = document.getElementById('score-display');
+        const movesEl = document.getElementById('moves-display');
+        const timerEl = document.getElementById('timer-display');
+        const settingsModal = document.getElementById('settings-modal');
+        const victoryModal = document.getElementById('victory-modal');
+
+        // Initialize Game Application
+        window.addEventListener('load', () => {
+            initFoundationsPlaceholder();
+            setupEventListeners();
+            showSettingsModal();
+        });
+
+        // Initialize 8 empty foundation slots at the top
+        function initFoundationsPlaceholder() {
+            completedFoundationsEl.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'w-8 sm:w-11 md:w-12 aspect-[2.5/3.5] rounded-md border-2 border-dashed border-white/20 flex items-center justify-center text-white/20 text-xs font-bold';
+                slot.id = `foundation-slot-${i}`;
+                slot.innerHTML = '♠';
+                completedFoundationsEl.appendChild(slot);
+            }
+        }
+
+        // Setup User Event Listeners
+        function setupEventListeners() {
+            document.getElementById('new-game-btn').addEventListener('click', showSettingsModal);
+            document.getElementById('close-modal-btn').addEventListener('click', hideSettingsModal);
+            document.getElementById('undo-btn').addEventListener('click', undoMove);
+            document.getElementById('hint-btn').addEventListener('click', showHint);
+
+            document.getElementById('sound-btn').addEventListener('click', () => {
+                sounds.enabled = !sounds.enabled;
+                const icon = document.getElementById('sound-icon');
+                icon.className = sounds.enabled ? "fa-solid fa-volume-high" : "fa-solid fa-volume-xmark text-red-400";
+                showToast(sounds.enabled ? "음향 효과 켜짐" : "음향 효과 꺼짐");
+            });
+
+            document.querySelectorAll('.suit-select-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const suits = parseInt(btn.getAttribute('data-suits'));
+                    startNewGame(suits);
+                    hideSettingsModal();
+                });
+            });
+
+            stockPileEl.addEventListener('click', dealFromStock);
+
+            document.getElementById('victory-restart-btn').addEventListener('click', () => {
+                victoryModal.classList.add('opacity-0', 'pointer-events-none');
+                showSettingsModal();
+            });
+        }
+
+        function startNewGame(selectedSuits = 1) {
+            suitCount = selectedSuits;
+            score = 500;
+            moves = 0;
+            timerSeconds = 0;
+            history = [];
+            completedSets = [];
+
+            updateStats();
+            startTimer();
+            initFoundationsPlaceholder();
+
+            // Build 104 Cards Deck
+            let deck = [];
+            let activeSuits = [];
+            if (suitCount === 1) {
+                activeSuits = [SUITS.SPADES, SUITS.SPADES, SUITS.SPADES, SUITS.SPADES];
+            } else if (suitCount === 2) {
+                activeSuits = [SUITS.SPADES, SUITS.SPADES, SUITS.HEARTS, SUITS.HEARTS];
+            } else {
+                activeSuits = [SUITS.SPADES, SUITS.HEARTS, SUITS.DIAMONDS, SUITS.CLUBS];
+            }
+
+            // 104 cards total = 8 full sets of 13 cards
+            for (let i = 0; i < 8; i++) {
+                const currentSuit = activeSuits[i % activeSuits.length];
+                RANKS.forEach(rank => {
+                    deck.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        suit: currentSuit,
+                        rank: rank.value,
+                        name: rank.name,
+                        faceUp: false
+                    });
+                });
+            }
+
+            // Shuffle Deck
+            deck = shuffleArray(deck);
+
+            // Deal cards to Tableau
+            // First 4 columns get 6 cards, next 6 columns get 5 cards = Total 54 cards
+            tableau = [[], [], [], [], [], [], [], [], [], []];
+            let cardIndex = 0;
+
+            for (let col = 0; col < 10; col++) {
+                const cardsCount = col < 4 ? 6 : 5;
+                for (let r = 0; r < cardsCount; r++) {
+                    const card = deck[cardIndex++];
+                    // Top card is face up
+                    if (r === cardsCount - 1) {
+                        card.faceUp = true;
+                    }
+                    tableau[col].push(card);
+                }
+            }
+
+            // Remaining 50 cards go to Stock
+            stock = deck.slice(cardIndex);
+
+            renderTableau();
+            updateStockUI();
+            sounds.playDeal();
+            showToast(`${suitCount}개 슈트 모드로 게임을 시작합니다!`);
+        }
+
+        // Shuffle utility
+        function shuffleArray(arr) {
+            const array = [...arr];
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Render Tableau Cards Board
+        function renderTableau() {
+            tableauBoardEl.innerHTML = '';
+
+            for (let col = 0; col < 10; col++) {
+                const columnEl = document.createElement('div');
+                columnEl.className = 'column relative h-full flex flex-col items-center min-h-[300px] rounded-xl transition-colors duration-200';
+                columnEl.dataset.col = col;
+
+                // Empty column slot background
+                const emptySlot = document.createElement('div');
+                emptySlot.className = 'absolute top-0 w-full aspect-[2.5/3.5] rounded-lg border-2 border-dashed border-white/10 bg-black/10 flex items-center justify-center text-white/10 text-xs font-bold pointer-events-none';
+                emptySlot.innerText = 'K';
+                columnEl.appendChild(emptySlot);
+
+                // Column Drag Events
+                columnEl.addEventListener('dragover', handleDragOver);
+                columnEl.addEventListener('drop', handleDrop);
+
+                const cards = tableau[col];
+                cards.forEach((card, index) => {
+                    const cardEl = createCardElement(card, col, index);
+                    
+                    // Card vertical offset positioning (Face up vs Face down spacing)
+                    let topOffset = 0;
+                    for (let k = 0; k < index; k++) {
+                        topOffset += tableau[col][k].faceUp ? 26 : 12; // Adjust vertical overlap spacing
+                    }
+                    cardEl.style.top = `${topOffset}px`;
+                    cardEl.style.zIndex = index + 1;
+
+                    columnEl.appendChild(cardEl);
+                });
+
+                tableauBoardEl.appendChild(columnEl);
+            }
+        }
+
+        // Create HTML Element for Individual Card
+        function createCardElement(card, colIndex, cardIndex) {
+            const cardEl = document.createElement('div');
+            cardEl.className = `card absolute w-full rounded-lg select-none cursor-pointer ${card.faceUp ? 'card-face-up' : ''}`;
+            cardEl.dataset.col = colIndex;
+            cardEl.dataset.idx = cardIndex;
+            cardEl.dataset.id = card.id;
+
+            if (!card.faceUp) {
+                // Card Back
+                cardEl.innerHTML = `
+                    <div class="card-inner w-full h-full card-back rounded-lg flex items-center justify-center">
+                        <div class="w-4 h-4 rounded-full border border-white/20"></div>
+                    </div>
+                `;
+            } else {
+                // Card Face Up
+                const isRed = card.suit.color === 'red';
+                const colorClass = isRed ? 'text-red-600' : 'text-zinc-900';
+
+                cardEl.draggable = true;
+                cardEl.innerHTML = `
+                    <div class="card-inner w-full h-full bg-white rounded-lg p-1 sm:p-1.5 flex flex-col justify-between border border-zinc-300 relative shadow-md overflow-hidden">
+                        <!-- Top Left Value & Suit -->
+                        <div class="flex flex-col items-center leading-none ${colorClass} font-extrabold">
+                            <span class="text-xs sm:text-sm md:text-base tracking-tighter">${card.name}</span>
+                            <span class="text-[10px] sm:text-xs">${card.suit.symbol}</span>
+                        </div>
+                        
+                        <!-- Center Large Suit Icon -->
+                        <div class="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none text-2xl sm:text-3xl ${colorClass}">
+                            ${card.suit.symbol}
+                        </div>
+
+                        <!-- Bottom Right Value & Suit (Inverted) -->
+                        <div class="flex flex-col items-center leading-none ${colorClass} font-extrabold rotate-180">
+                            <span class="text-xs sm:text-sm md:text-base tracking-tighter">${card.name}</span>
+                            <span class="text-[10px] sm:text-xs">${card.suit.symbol}</span>
+                        </div>
+                    </div>
+                `;
+
+                // Drag & Touch Event Listeners
+                cardEl.addEventListener('dragstart', handleDragStart);
+                cardEl.addEventListener('dragend', handleDragEnd);
+                
+                // Click for auto-move shortcut
+                cardEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tryAutoMove(colIndex, cardIndex);
+                });
+            }
+
+            return cardEl;
+        }
+
+        // Validate if a stack of cards from cardIndex down to bottom is valid to be moved
+        function isValidMoveSequence(colIndex, cardIndex) {
+            const col = tableau[colIndex];
+            if (!col[cardIndex].faceUp) return false;
+
+            for (let i = cardIndex; i < col.length - 1; i++) {
+                const current = col[i];
+                const next = col[i + 1];
+
+                // Cards must be same suit and descending order (e.g. 8 of spades -> 7 of spades)
+                if (current.suit.symbol !== next.suit.symbol || current.rank !== next.rank + 1) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Drag and Drop Logic
+        function handleDragStart(e) {
+            const colIdx = parseInt(this.dataset.col);
+            const cardIdx = parseInt(this.dataset.idx);
+
+            if (!isValidMoveSequence(colIdx, cardIdx)) {
+                e.preventDefault();
+                sounds.playError();
+                showToast("같은 문양의 연속된 카드만 이동할 수 있습니다.");
+                return;
+            }
+
+            dragSourceCol = colIdx;
+            dragSourceCardIdx = cardIdx;
+            draggedCards = tableau[colIdx].slice(cardIdx);
+
+            this.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', JSON.stringify({ colIdx, cardIdx }));
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedCards = [];
+            dragSourceCol = null;
+            dragSourceCardIdx = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const targetColIdx = parseInt(this.dataset.col);
+
+            if (dragSourceCol === null || targetColIdx === dragSourceCol) return;
+
+            executeMove(dragSourceCol, dragSourceCardIdx, targetColIdx);
+        }
+
+        // Try moving cards to target column with validity checks
+        function executeMove(fromCol, fromIdx, toCol) {
+            const sourceStack = tableau[fromCol].slice(fromIdx);
+            const targetColStack = tableau[toCol];
+
+            // Check move validity onto target column
+            if (targetColStack.length > 0) {
+                const topTargetCard = targetColStack[targetColStack.length - 1];
+                const movingBaseCard = sourceStack[0];
+
+                // Rule: Card rank must be 1 less than target card rank (Suit doesn't matter for placing, but matters for forming completed set)
+                if (movingBaseCard.rank !== topTargetCard.rank - 1) {
+                    sounds.playError();
+                    showToast("카드는 1 작은 숫자의 카드 위에만 놓을 수 있습니다.");
+                    return false;
+                }
+            }
+
+            // Record History for Undo
+            saveStateToHistory();
+
+            // Perform Move
+            const movedCards = tableau[fromCol].splice(fromIdx);
+            tableau[toCol].push(...movedCards);
+
+            // Flip top card of source column if face down
+            let flipped = false;
+            if (tableau[fromCol].length > 0) {
+                const topCard = tableau[fromCol][tableau[fromCol].length - 1];
+                if (!topCard.faceUp) {
+                    topCard.faceUp = true;
+                    flipped = true;
+                }
+            }
+
+            moves++;
+            score = Math.max(0, score - 1); // Deduct 1 point per move
+            sounds.playCardPlace();
+
+            // Check if completed K -> A sequence formed in destination column
+            checkAndClearCompletedSequence(toCol);
+
+            updateStats();
+            renderTableau();
+            return true;
+        }
+
+        // Auto Move Shortcut on Click
+        function tryAutoMove(fromCol, fromIdx) {
+            if (!isValidMoveSequence(fromCol, fromIdx)) {
+                sounds.playError();
+                return;
+            }
+
+            const movingCard = tableau[fromCol][fromIdx];
+
+            // Find best candidate column to move to
+            let bestCol = -1;
+            let fallbackCol = -1;
+
+            for (let c = 0; c < 10; c++) {
+                if (c === fromCol) continue;
+                const colStack = tableau[c];
+
+                if (colStack.length === 0) {
+                    if (fallbackCol === -1) fallbackCol = c;
+                } else {
+                    const topCard = colStack[colStack.length - 1];
+                    if (topCard.rank === movingCard.rank + 1) {
+                        // Prefer same suit match if possible
+                        if (topCard.suit.symbol === movingCard.suit.symbol) {
+                            bestCol = c;
+                            break;
+                        } else if (bestCol === -1) {
+                            bestCol = c;
+                        }
+                    }
+                }
+            }
+
+            const targetCol = bestCol !== -1 ? bestCol : fallbackCol;
+
+            if (targetCol !== -1) {
+                executeMove(fromCol, fromIdx, targetCol);
+            } else {
+                sounds.playError();
+                showToast("이동할 수 있는 적절한 위치가 없습니다.");
+            }
+        }
+
+        // Check if a sequence of K -> A of the SAME suit is completed
+        function checkAndClearCompletedSequence(colIndex) {
+            const col = tableau[colIndex];
+            if (col.length < 13) return;
+
+            // Check last 13 cards
+            const last13 = col.slice(col.length - 13);
+            
+            // Validate sequence K(13) down to A(1) and all same suit
+            const targetSuit = last13[0].suit.symbol;
+            if (last13[0].rank !== 13) return;
+
+            for (let i = 0; i < 13; i++) {
+                const card = last13[i];
+                if (!card.faceUp || card.suit.symbol !== targetSuit || card.rank !== 13 - i) {
+                    return; // Not a completed set
+                }
+            }
+
+            // Complete Set Formed!
+            saveStateToHistory();
+            col.splice(col.length - 13, 13);
+
+            // Flip next top card if face down
+            if (col.length > 0) {
+                col[col.length - 1].faceUp = true;
+            }
+
+            completedSets.push(targetSuit);
+            score += 100; // Reward 100 points
+            sounds.playComplete();
+            showToast("🎉 K부터 A까지 완성된 세트를 제거했습니다! (+100점)");
+
+            updateCompletedFoundationsUI();
+
+            // Check Win Condition (8 completed sets)
+            if (completedSets.length === 8) {
+                triggerVictory();
+            }
+        }
+
+        // Update Foundation slots at top left
+        function updateCompletedFoundationsUI() {
+            completedSets.forEach((suitSymbol, idx) => {
+                const slot = document.getElementById(`foundation-slot-${idx}`);
+                if (slot) {
+                    const isRed = suitSymbol === '♥' || suitSymbol === '♦';
+                    slot.className = 'w-8 sm:w-11 md:w-12 aspect-[2.5/3.5] rounded-md bg-white border border-amber-300 shadow flex items-center justify-center font-bold text-lg';
+                    slot.innerHTML = `<span class="${isRed ? 'text-red-600' : 'text-black'}">${suitSymbol}</span>`;
+                }
+            });
+        }
+
+        // Deal 10 cards from Stock (1 to each column)
+        function dealFromStock() {
+            if (stock.length === 0) {
+                showToast("더 이상 남은 카드가 없습니다.");
+                return;
+            }
+
+            // Rule: All columns must have at least 1 card to deal from stock
+            const hasEmptyCol = tableau.some(col => col.length === 0);
+            if (hasEmptyCol) {
+                sounds.playError();
+                showToast("비어 있는 컬럼이 있으면 카드를 나누어 줄 수 없습니다.");
+                return;
+            }
+
+            saveStateToHistory();
+
+            for (let col = 0; col < 10; col++) {
+                if (stock.length > 0) {
+                    const card = stock.pop();
+                    card.faceUp = true;
+                    tableau[col].push(card);
+                    checkAndClearCompletedSequence(col);
+                }
+            }
+
+            moves++;
+            sounds.playDeal();
+            updateStockUI();
+            updateStats();
+            renderTableau();
+        }
+
+        function updateStockUI() {
+            stockCountEl.innerText = `${stock.length} 장`;
+            const dealsLeft = Math.ceil(stock.length / 10);
+            stockDealsLeftEl.innerText = dealsLeft;
+
+            if (stock.length === 0) {
+                stockPileEl.classList.add('opacity-30', 'pointer-events-none');
+            } else {
+                stockPileEl.classList.remove('opacity-30', 'pointer-events-none');
+            }
+        }
+
+        // Undo Logic
+        function saveStateToHistory() {
+            // Keep deep clone snapshot of current state
+            const stateSnapshot = {
+                tableau: JSON.parse(JSON.stringify(tableau)),
+                stock: JSON.parse(JSON.stringify(stock)),
+                completedSets: [...completedSets],
+                score: score,
+                moves: moves
+            };
+            history.push(stateSnapshot);
+            if (history.length > 20) history.shift(); // Limit undo stack size
+        }
+
+        function undoMove() {
+            if (history.length === 0) {
+                showToast("취소할 수 있는 이전 동작이 없습니다.");
+                return;
+            }
+
+            const previousState = history.pop();
+            tableau = previousState.tableau;
+            stock = previousState.stock;
+            completedSets = previousState.completedSets;
+            score = previousState.score;
+            moves = previousState.moves;
+
+            updateStats();
+            updateStockUI();
+            updateCompletedFoundationsUI();
+            renderTableau();
+            showToast("이전 동작을 취소했습니다.");
+        }
+
+        // Hint System
+        function showHint() {
+            // Search valid moves in tableau
+            for (let fromCol = 0; fromCol < 10; fromCol++) {
+                const colStack = tableau[fromCol];
+                for (let cardIdx = 0; cardIdx < colStack.length; cardIdx++) {
+                    if (!colStack[cardIdx].faceUp) continue;
+
+                    if (isValidMoveSequence(fromCol, cardIdx)) {
+                        const movingCard = colStack[cardIdx];
+
+                        for (let toCol = 0; toCol < 10; toCol++) {
+                            if (fromCol === toCol) continue;
+                            const targetColStack = tableau[toCol];
+
+                            if (targetColStack.length > 0) {
+                                const topCard = targetColStack[targetColStack.length - 1];
+                                if (topCard.rank === movingCard.rank + 1) {
+                                    // Highlight suggested move
+                                    highlightHint(fromCol, cardIdx, toCol);
+                                    showToast(`${movingCard.name} 카드를 ${topCard.name} 카드 위로 이동해 보세요!`);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            showToast("현재 이동할 수 있는 조합이 없습니다. 남은 덱에서 카드를 받으세요!");
+        }
+
+        function highlightHint(fromCol, cardIdx, toCol) {
+            const sourceCardEl = document.querySelector(`.card[data-col="${fromCol}"][data-idx="${cardIdx}"]`);
+            if (sourceCardEl) {
+                sourceCardEl.classList.add('ring-4', 'ring-amber-400');
+                setTimeout(() => {
+                    sourceCardEl.classList.remove('ring-4', 'ring-amber-400');
+                }, 1800);
+            }
+        }
+
+        // Update Stats Bar
+        function updateStats() {
+            scoreEl.innerText = score;
+            movesEl.innerText = moves;
+        }
+
+        // Timer Logic
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerSeconds = 0;
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+                const secs = String(timerSeconds % 60).padStart(2, '0');
+                timerEl.innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        // Toast Notification System
+        let toastTimeout = null;
+        function showToast(msg) {
+            const toastEl = document.getElementById('toast-msg');
+            const toastText = document.getElementById('toast-text');
+            toastText.innerText = msg;
+
+            toastEl.classList.remove('opacity-0');
+            toastEl.classList.add('opacity-100');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.remove('opacity-100');
+                toastEl.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        // Victory Event Trigger
+        function triggerVictory() {
+            clearInterval(timerInterval);
+            sounds.playComplete();
+
+            document.getElementById('vic-score').innerText = score;
+            document.getElementById('vic-moves').innerText = moves;
+            document.getElementById('vic-time').innerText = timerEl.innerText;
+
+            victoryModal.classList.remove('opacity-0', 'pointer-events-none');
+
+            // Fire Confetti
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        // Modal Helpers
+        function showSettingsModal() {
+            settingsModal.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function hideSettingsModal() {
+            settingsModal.classList.add('opacity-0', 'pointer-events-none');
+        }
+    </script>
+</body>
+</html>

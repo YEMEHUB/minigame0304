@@ -1,0 +1,1032 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>총림고수 (Gun-Forest) - 무적 상점 에디션</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        .title-font {
+            font-family: 'Black Han Sans', sans-serif;
+        }
+        #gameCanvas {
+            background: radial-gradient(circle at center, #1b2838 0%, #0d131d 100%);
+            touch-action: none;
+        }
+        .glow-red {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+        .glow-gold {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5);
+        }
+        .glow-shield {
+            box-shadow: 0 0 25px rgba(234, 179, 8, 0.8);
+        }
+        .pulse-gold {
+            animation: pulseGold 1.5s infinite;
+        }
+        @keyframes pulseGold {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between items-center p-2 sm:p-4 overflow-hidden select-none">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-xl flex justify-between items-center py-2 px-3 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-2xl shadow-lg z-10">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-amber-500 to-red-600 text-white p-2.5 rounded-xl shadow">
+                <i class="fa-solid fa-person-running text-xl"></i>
+            </div>
+            <div>
+                <h1 class="title-font text-xl sm:text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-red-500">
+                    총림고수 <span class="text-xs text-slate-400 font-sans tracking-normal">GUN-FOREST</span>
+                </h1>
+                <p class="text-[10px] sm:text-xs text-slate-400">사방에서 빗발치는 총알을 피하라!</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+            <!-- Coin Display -->
+            <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+                <i class="fa-solid fa-coins text-amber-400 text-sm"></i>
+                <span id="coinDisplay" class="font-mono font-bold text-amber-300 text-sm">0</span>
+            </div>
+
+            <!-- Shop Button Header -->
+            <button id="openShopHeaderBtn" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-bold p-2 sm:px-3 rounded-xl shadow transition active:scale-95 flex items-center gap-1 text-xs">
+                <i class="fa-solid fa-store text-sm"></i>
+                <span class="hidden sm:inline">상점</span>
+            </button>
+
+            <button id="soundToggleBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl border border-slate-700 transition active:scale-95" title="음향 온/오프">
+                <i class="fa-solid fa-volume-high text-base" id="soundIcon"></i>
+            </button>
+            <button id="helpBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-xl border border-slate-700 transition active:scale-95" title="도움말">
+                <i class="fa-solid fa-circle-question text-base"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Area Container -->
+    <main class="relative w-full max-w-xl my-auto flex flex-col items-center justify-center">
+        <!-- Game HUD Overlay -->
+        <div class="w-full flex justify-between items-center px-4 py-2 bg-slate-900/90 rounded-t-2xl border-t border-x border-slate-800 font-mono">
+            <div class="flex items-center space-x-2">
+                <span class="text-xs text-slate-400 uppercase tracking-widest">생존 시간</span>
+                <span id="timeDisplay" class="text-2xl font-black text-amber-400">00:00.00</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <!-- Shield Inventory Indicator -->
+                <div class="flex items-center space-x-1 text-xs bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
+                    <i class="fa-solid fa-shield-halved text-yellow-400"></i>
+                    <span id="shieldCountDisplay" class="font-bold text-yellow-300">0</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                    <i class="fa-solid fa-trophy text-amber-500 text-xs"></i>
+                    <span id="bestTimeDisplay" class="text-xs font-bold text-slate-300">00:00.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative w-full aspect-square max-h-[58vh] bg-slate-900 border border-slate-800 rounded-b-2xl overflow-hidden shadow-2xl">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- Dash & Shield Status Bar inside canvas -->
+            <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center space-x-3 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-full backdrop-blur pointer-events-none">
+                <!-- Dash Gauge -->
+                <div class="flex items-center space-x-1.5 text-xs">
+                    <span class="text-cyan-400 font-bold text-[10px]">DASH</span>
+                    <div class="w-16 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="dashBar" class="h-full bg-cyan-400 transition-all duration-75" style="width: 100%;"></div>
+                    </div>
+                </div>
+                <div class="w-px h-3 bg-slate-700"></div>
+                <!-- Shield Active Gauge -->
+                <div class="flex items-center space-x-1.5 text-xs">
+                    <span class="text-yellow-400 font-bold text-[10px]">SHIELD</span>
+                    <div class="w-16 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="shieldActiveBar" class="h-full bg-yellow-400 transition-all duration-75" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start / Menu Overlay -->
+            <div id="startOverlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+                <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-3 border border-red-500/50 glow-red">
+                    <i class="fa-solid fa-crosshair text-3xl text-red-500"></i>
+                </div>
+                <h2 class="title-font text-3xl sm:text-4xl text-amber-400 mb-1">총림고수 (銃林高手)</h2>
+                <p class="text-xs text-slate-300 mb-5 max-w-xs leading-relaxed">
+                    추억의 죽림고수 컨트롤을 완벽 재현!<br>
+                    살아남을수록 <span class="text-amber-400 font-bold">포인트(골드)</span>가 적립됩니다.<br>
+                    상점에서 <span class="text-yellow-400 font-bold">3초 무적 방어막</span>을 구비해보세요!
+                </p>
+                <div class="flex flex-col gap-2.5 w-full max-w-xs">
+                    <button id="startBtn" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-lg shadow-lg glow-red active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> 게임 시작
+                    </button>
+                    <button id="openShopMenuBtn" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-base shadow-lg glow-gold active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-store"></i> 무적 아이템 상점
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Over Overlay -->
+            <div id="gameOverOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+                <div class="text-xs font-bold text-red-400 tracking-widest uppercase mb-1">GAME OVER</div>
+                <h2 class="title-font text-3xl sm:text-4xl text-white mb-2">전사하셨습니다!</h2>
+                
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 my-3 w-full max-w-xs space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">이번 생존시간:</span>
+                        <span id="finalTime" class="font-mono text-xl font-black text-amber-400">00:00.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">획득한 골드:</span>
+                        <span class="font-mono text-amber-300 font-bold flex items-center gap-1">
+                            +<span id="earnedCoins">0</span> <i class="fa-solid fa-coins text-amber-400"></i>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
+                        <span class="text-slate-500">최고 생존기록:</span>
+                        <span id="finalBest" class="font-mono text-slate-300">00:00.00</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 w-full max-w-xs mb-2">
+                    <button id="restartBtn" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-red-600 text-white font-black text-base shadow-lg glow-red active:scale-95 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-rotate-right"></i> 재도전
+                    </button>
+                    <button id="gameOverShopBtn" class="flex-1 py-3 rounded-xl bg-amber-500 text-slate-950 font-black text-base shadow-lg hover:bg-amber-400 active:scale-95 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-store"></i> 상점
+                    </button>
+                </div>
+                <button id="shareBtn" class="w-full max-w-xs py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 active:scale-95 transition flex items-center justify-center gap-1">
+                    <i class="fa-regular fa-copy"></i> 기록 결과 복사
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Controls Area -->
+        <div id="mobileControls" class="w-full flex justify-between items-center mt-3 px-2">
+            <!-- Virtual Joystick Zone -->
+            <div id="joystickZone" class="relative w-28 h-28 sm:w-32 sm:h-32 bg-slate-900/80 border border-slate-800 rounded-full flex items-center justify-center touch-none">
+                <div id="joystickKnob" class="w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/80 border border-amber-300 rounded-full shadow-lg absolute pointer-events-none transition-transform duration-75"></div>
+            </div>
+
+            <!-- Action Buttons Zone -->
+            <div class="flex items-center space-x-2">
+                <!-- Dash Button -->
+                <button id="dashBtn" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white font-black text-xs border-2 border-cyan-300 shadow-lg glow-cyan active:scale-90 transition flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-bolt text-lg"></i>
+                    <span>대시</span>
+                </button>
+                
+                <!-- Shield Button -->
+                <button id="shieldBtn" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-orange-500 text-slate-950 font-black text-xs border-2 border-yellow-200 shadow-lg glow-shield active:scale-90 transition flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                    <span>무적 (<span id="mobileShieldCount">0</span>)</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer Guide -->
+    <footer class="w-full max-w-xl text-center text-xs text-slate-500 my-2">
+        <p class="hidden sm:block">조작: <span class="text-amber-400 font-semibold">방향키/WASD</span> | <span class="text-cyan-400 font-semibold">Space</span> 대시 | <span class="text-yellow-400 font-semibold">Shift 또는 E</span> 3초 무적</p>
+        <p class="sm:hidden">조이스틱 이동 & 대시/무적 버튼을 이용하세요!</p>
+    </footer>
+
+    <!-- Shop Modal -->
+    <div id="shopModal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 text-slate-200 shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
+                <h3 class="title-font text-2xl text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-store text-amber-500"></i> 무적 아이템 상점
+                </h3>
+                <button id="closeShopBtn" class="text-slate-400 hover:text-white p-2 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Coin Status -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 mb-4 flex justify-between items-center">
+                <span class="text-xs text-slate-400">보유 골드:</span>
+                <div class="flex items-center space-x-1">
+                    <i class="fa-solid fa-coins text-amber-400"></i>
+                    <span id="shopCoinDisplay" class="font-mono font-bold text-amber-300 text-lg">0</span>
+                </div>
+            </div>
+
+            <!-- Shop Items List -->
+            <div class="space-y-3 mb-6">
+                <!-- Item 1: 3-Second Shield -->
+                <div class="bg-slate-800/80 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-yellow-500/20 border border-yellow-400/50 rounded-xl flex items-center justify-center text-yellow-400 text-2xl shadow">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm text-yellow-300">3초 무적 방어막</h4>
+                            <p class="text-[11px] text-slate-400 leading-tight">사용 시 3초 동안 모든 총알 무시 & 파괴</p>
+                            <p class="text-[10px] text-slate-500 mt-1">보유량: <span id="shopShieldInventory" class="font-bold text-yellow-400">0</span>개</p>
+                        </div>
+                    </div>
+                    <button id="buyShieldBtn" class="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs shadow glow-gold active:scale-95 transition flex items-center gap-1">
+                        <span>100</span>
+                        <i class="fa-solid fa-coins text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 bg-slate-950/50 p-2.5 rounded-lg border border-slate-800 mb-4">
+                💡 <span class="text-slate-300">Tip:</span> 생존 시간 1초당 <strong>10 골드</strong>가 적립됩니다! (10초 버틸 시 100골드)
+            </div>
+
+            <button id="closeShopBtn2" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm rounded-xl border border-slate-700">
+                게임으로 돌아가기
+            </button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 text-slate-200">
+            <h3 class="title-font text-xl text-amber-400 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-circle-info"></i> 게임 특징 & 조작
+            </h3>
+            <ul class="text-xs space-y-2.5 text-slate-300 mb-6 leading-relaxed">
+                <li class="flex items-start gap-2">
+                    <span class="text-amber-400 font-bold">•</span>
+                    <span><strong>이동:</strong> 방향키 / WASD / 모바일 터치 조이스틱</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-cyan-400 font-bold">•</span>
+                    <span><strong>대시 스킬(Space):</strong> 짧고 신속하게 이동 (쿨타임 1.5초)</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-yellow-400 font-bold">•</span>
+                    <span><strong>3초 무적 스킬(Shift / E):</strong> 상점에서 구매한 무적 방어막을 발동합니다. 3초간 모든 탄환을 소멸시킵니다.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-emerald-400 font-bold">•</span>
+                    <span><strong>골드 시스템:</strong> 버틴 시간만큼 쌓인 골드로 언제든지 무적 아이템을 추가 구매하세요!</span>
+                </li>
+            </ul>
+            <button id="closeHelpBtn" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-700 text-white px-4 py-2 rounded-full shadow-2xl text-xs opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-emerald-400" id="toastIcon"></i>
+        <span id="toastMsg">알림 메세지</span>
+    </div>
+
+    <!-- Game Logic Engine -->
+    <script>
+        // Web Audio Synthesizer
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) this.ctx = new AudioContextClass();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playShootSound() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.04);
+                    gain.gain.setValueAtTime(0.025, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.04);
+                } catch(e) {}
+            }
+
+            playHitSound() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.25);
+                } catch(e) {}
+            }
+
+            playDashSound() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(350, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(700, this.ctx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.07, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e) {}
+            }
+
+            playShieldSound() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.2);
+                } catch(e) {}
+            }
+
+            playBuySound() {
+                if (!this.enabled || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.08); // E5
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.2);
+                } catch(e) {}
+            }
+        }
+
+        const sounds = new SoundSystem();
+
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let isPlaying = false;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let animationFrameId = null;
+
+        // Save Data State
+        let bestScore = parseFloat(localStorage.getItem('gun_forest_best') || '0');
+        let coins = parseInt(localStorage.getItem('gun_forest_coins') || '0', 10);
+        let shieldInventory = parseInt(localStorage.getItem('gun_forest_shields') || '1', 10); // Start with 1 free shield
+
+        // Input Management
+        const keys = {};
+        let joystickVector = { x: 0, y: 0 };
+
+        // Player Parameters
+        const DASH_COOLDOWN_MAX = 90; // ~1.5s
+        const SHIELD_DURATION_MAX = 180; // 3 seconds at 60fps
+        const SHIELD_PRICE = 100;
+
+        const player = {
+            x: 0,
+            y: 0,
+            radius: 5,
+            speed: 3.8,
+            dashCooldown: 0,
+            isDashing: false,
+            dashTimer: 0,
+            isShieldActive: false,
+            shieldTimer: 0,
+            trail: []
+        };
+
+        let bullets = [];
+        let particles = [];
+
+        // DOM Elements
+        const timeDisplay = document.getElementById('timeDisplay');
+        const bestTimeDisplay = document.getElementById('bestTimeDisplay');
+        const coinDisplay = document.getElementById('coinDisplay');
+        const shieldCountDisplay = document.getElementById('shieldCountDisplay');
+        const mobileShieldCount = document.getElementById('mobileShieldCount');
+        const shopCoinDisplay = document.getElementById('shopCoinDisplay');
+        const shopShieldInventory = document.getElementById('shopShieldInventory');
+
+        const startOverlay = document.getElementById('startOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const finalTime = document.getElementById('finalTime');
+        const finalBest = document.getElementById('finalBest');
+        const earnedCoins = document.getElementById('earnedCoins');
+
+        const openShopHeaderBtn = document.getElementById('openShopHeaderBtn');
+        const openShopMenuBtn = document.getElementById('openShopMenuBtn');
+        const gameOverShopBtn = document.getElementById('gameOverShopBtn');
+        const shopModal = document.getElementById('shopModal');
+        const closeShopBtn = document.getElementById('closeShopBtn');
+        const closeShopBtn2 = document.getElementById('closeShopBtn2');
+        const buyShieldBtn = document.getElementById('buyShieldBtn');
+
+        const shareBtn = document.getElementById('shareBtn');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundIcon = document.getElementById('soundIcon');
+
+        const dashBtn = document.getElementById('dashBtn');
+        const shieldBtn = document.getElementById('shieldBtn');
+        const dashBar = document.getElementById('dashBar');
+        const shieldActiveBar = document.getElementById('shieldActiveBar');
+
+        const joystickZone = document.getElementById('joystickZone');
+        const joystickKnob = document.getElementById('joystickKnob');
+
+        // Sync Saved UI Data
+        function updateUI() {
+            bestTimeDisplay.textContent = formatTime(bestScore);
+            coinDisplay.textContent = coins.toLocaleString();
+            shopCoinDisplay.textContent = coins.toLocaleString();
+            shieldCountDisplay.textContent = shieldInventory;
+            mobileShieldCount.textContent = shieldInventory;
+            shopShieldInventory.textContent = shieldInventory;
+
+            localStorage.setItem('gun_forest_coins', coins.toString());
+            localStorage.setItem('gun_forest_shields', shieldInventory.toString());
+        }
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            if (!isPlaying) {
+                player.x = canvas.width / 2;
+                player.y = canvas.height / 2;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        updateUI();
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+
+        // Keyboard Handlers
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (isPlaying) {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    triggerDash();
+                } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyE') {
+                    e.preventDefault();
+                    triggerShield();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Touch Joystick Controls
+        let joystickActive = false;
+        let joystickCenter = { x: 0, y: 0 };
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            joystickActive = true;
+            const rect = joystickZone.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            handleJoystickMove(e.touches[0]);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (joystickActive) {
+                handleJoystickMove(e.touches[0]);
+            }
+        });
+
+        window.addEventListener('touchend', () => {
+            if (joystickActive) {
+                joystickActive = false;
+                joystickVector = { x: 0, y: 0 };
+                joystickKnob.style.transform = `translate(0px, 0px)`;
+            }
+        });
+
+        function handleJoystickMove(touch) {
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
+            const maxRadius = 38;
+            const distance = Math.hypot(dx, dy);
+            
+            const angle = Math.atan2(dy, dx);
+            const moveRadius = Math.min(distance, maxRadius);
+
+            const knobX = Math.cos(angle) * moveRadius;
+            const knobY = Math.sin(angle) * moveRadius;
+
+            joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+            joystickVector = {
+                x: knobX / maxRadius,
+                y: knobY / maxRadius
+            };
+        }
+
+        dashBtn.addEventListener('click', () => { if (isPlaying) triggerDash(); });
+        shieldBtn.addEventListener('click', () => { if (isPlaying) triggerShield(); });
+
+        function triggerDash() {
+            if (player.dashCooldown <= 0) {
+                sounds.init();
+                player.isDashing = true;
+                player.dashTimer = 8;
+                player.dashCooldown = DASH_COOLDOWN_MAX;
+                sounds.playDashSound();
+
+                for (let i = 0; i < 8; i++) {
+                    particles.push({
+                        x: player.x,
+                        y: player.y,
+                        vx: (Math.random() - 0.5) * 5,
+                        vy: (Math.random() - 0.5) * 5,
+                        radius: Math.random() * 3 + 1,
+                        color: '#06b6d4',
+                        life: 15
+                    });
+                }
+            }
+        }
+
+        function triggerShield() {
+            if (player.isShieldActive) {
+                showToast("이미 방어막이 활성화되어 있습니다!");
+                return;
+            }
+
+            if (shieldInventory > 0) {
+                sounds.init();
+                shieldInventory--;
+                player.isShieldActive = true;
+                player.shieldTimer = SHIELD_DURATION_MAX;
+                sounds.playShieldSound();
+                updateUI();
+                showToast("🛡️ 3초 무적 방어막 발동!");
+
+                // Shield Activation Burst
+                for (let i = 0; i < 20; i++) {
+                    const ang = (Math.PI * 2 / 20) * i;
+                    particles.push({
+                        x: player.x + Math.cos(ang) * 15,
+                        y: player.y + Math.sin(ang) * 15,
+                        vx: Math.cos(ang) * 3,
+                        vy: Math.sin(ang) * 3,
+                        radius: 3,
+                        color: '#eab308',
+                        life: 25
+                    });
+                }
+            } else {
+                showToast("보유한 무적 방어막이 없습니다! 상점에서 구매하세요.");
+            }
+        }
+
+        // Bullet Spawner
+        function spawnBullet() {
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+
+            if (side === 0) { x = Math.random() * canvas.width; y = -15; }
+            else if (side === 1) { x = canvas.width + 15; y = Math.random() * canvas.height; }
+            else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 15; }
+            else { x = -15; y = Math.random() * canvas.height; }
+
+            const speedScale = Math.min(elapsedTime * 0.02, 1.5);
+            const baseSpeed = Math.random() * 1.2 + 1.5 + speedScale;
+
+            const angle = Math.atan2(player.y - y, player.x - x) + (Math.random() - 0.5) * 0.65;
+
+            let type = 'normal';
+            let radius = 3;
+            let color = '#ef4444';
+
+            const rand = Math.random();
+            if (rand < 0.12 && elapsedTime > 10) {
+                type = 'heavy';
+                radius = 5.5;
+                color = '#a855f7';
+            } else if (rand < 0.22 && elapsedTime > 18) {
+                type = 'homing';
+                radius = 3;
+                color = '#f97316';
+            }
+
+            bullets.push({
+                x, y,
+                vx: Math.cos(angle) * baseSpeed,
+                vy: Math.sin(angle) * baseSpeed,
+                radius,
+                color,
+                type,
+                life: 0
+            });
+
+            if (Math.random() < 0.08) sounds.playShootSound();
+        }
+
+        // Game Initialization
+        function startGame() {
+            sounds.init();
+            isPlaying = true;
+            startTime = performance.now();
+            elapsedTime = 0;
+            bullets = [];
+            particles = [];
+            
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.dashCooldown = 0;
+            player.isDashing = false;
+            player.isShieldActive = false;
+            player.shieldTimer = 0;
+            player.trail = [];
+
+            startOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            shopModal.classList.add('hidden');
+
+            cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // Game Over Handler
+        function gameOver() {
+            isPlaying = false;
+            sounds.playHitSound();
+
+            const earned = Math.floor(elapsedTime * 10); // 10 Coins per second
+            coins += earned;
+
+            if (elapsedTime > bestScore) {
+                bestScore = elapsedTime;
+                localStorage.setItem('gun_forest_best', bestScore.toString());
+                showToast("🎉 최고 생존 기록 경신!");
+            }
+
+            updateUI();
+
+            finalTime.textContent = formatTime(elapsedTime);
+            earnedCoins.textContent = earned.toLocaleString();
+            finalBest.textContent = formatTime(bestScore);
+            gameOverOverlay.classList.remove('hidden');
+
+            // Death Particle Explosion
+            for (let i = 0; i < 25; i++) {
+                particles.push({
+                    x: player.x,
+                    y: player.y,
+                    vx: (Math.random() - 0.5) * 7,
+                    vy: (Math.random() - 0.5) * 7,
+                    radius: Math.random() * 4 + 2,
+                    color: i % 2 === 0 ? '#ef4444' : '#f59e0b',
+                    life: 35
+                });
+            }
+        }
+
+        // Main Loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (isPlaying) {
+                elapsedTime = (performance.now() - startTime) / 1000;
+                timeDisplay.textContent = formatTime(elapsedTime);
+
+                // Controlled Spawn Rate
+                const spawnRate = Math.min(0.18, 0.08 + elapsedTime * 0.002);
+                if (Math.random() < spawnRate) {
+                    spawnBullet();
+                }
+
+                // Player Movement Calculation
+                let moveX = 0;
+                let moveY = 0;
+
+                if (keys['ArrowLeft'] || keys['KeyA']) moveX -= 1;
+                if (keys['ArrowRight'] || keys['KeyD']) moveX += 1;
+                if (keys['ArrowUp'] || keys['KeyW']) moveY -= 1;
+                if (keys['ArrowDown'] || keys['KeyS']) moveY += 1;
+
+                if (joystickVector.x !== 0 || joystickVector.y !== 0) {
+                    moveX = joystickVector.x;
+                    moveY = joystickVector.y;
+                }
+
+                if (moveX !== 0 && moveY !== 0 && joystickVector.x === 0) {
+                    moveX *= 0.7071;
+                    moveY *= 0.7071;
+                }
+
+                let currentSpeed = player.speed;
+                if (player.isDashing) {
+                    currentSpeed *= 2.6;
+                    player.dashTimer--;
+                    if (player.dashTimer <= 0) player.isDashing = false;
+                }
+
+                if (player.dashCooldown > 0) player.dashCooldown--;
+
+                // Update Shield Active Duration
+                if (player.isShieldActive) {
+                    player.shieldTimer--;
+                    if (player.shieldTimer <= 0) {
+                        player.isShieldActive = false;
+                        showToast("방어막이 해제되었습니다.");
+                    }
+                }
+                
+                // HUD Gauges
+                const dashPercent = Math.max(0, 100 - (player.dashCooldown / DASH_COOLDOWN_MAX) * 100);
+                dashBar.style.width = `${dashPercent}%`;
+
+                const shieldPercent = (player.shieldTimer / SHIELD_DURATION_MAX) * 100;
+                shieldActiveBar.style.width = `${shieldPercent}%`;
+
+                player.x += moveX * currentSpeed;
+                player.y += moveY * currentSpeed;
+
+                player.x = Math.max(player.radius + 2, Math.min(canvas.width - player.radius - 2, player.x));
+                player.y = Math.max(player.radius + 2, Math.min(canvas.height - player.radius - 2, player.y));
+
+                player.trail.push({ x: player.x, y: player.y, alpha: 0.5 });
+                if (player.trail.length > (player.isDashing ? 8 : 4)) player.trail.shift();
+            }
+
+            // Draw Bamboo Background
+            drawBambooBackground();
+
+            // Render Player Trail
+            player.trail.forEach((t, i) => {
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, player.radius * (i / player.trail.length), 0, Math.PI * 2);
+                ctx.fillStyle = player.isShieldActive 
+                    ? `rgba(234, 179, 8, ${t.alpha})` 
+                    : (player.isDashing ? `rgba(6, 182, 212, ${t.alpha})` : `rgba(245, 158, 11, ${t.alpha})`);
+                ctx.fill();
+                t.alpha -= 0.04;
+            });
+
+            // Render Player Character & Shield Effect
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            // Active Invincibility Shield Ring
+            if (player.isShieldActive) {
+                const pulseRadius = player.radius + 12 + Math.sin(Date.now() * 0.01) * 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, pulseRadius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
+                ctx.fill();
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Gat (Hat)
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius + 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.strokeStyle = player.isShieldActive ? '#facc15' : (player.isDashing ? '#06b6d4' : '#f59e0b');
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Gat Inner Top
+            ctx.beginPath();
+            ctx.arc(0, 0, player.radius - 1, 0, Math.PI * 2);
+            ctx.fillStyle = '#0f172a';
+            ctx.fill();
+
+            ctx.restore();
+
+            // Bullets Logic & Render
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life++;
+
+                if (b.type === 'homing' && b.life < 65) {
+                    const angle = Math.atan2(player.y - b.y, player.x - b.x);
+                    b.vx += Math.cos(angle) * 0.04;
+                    b.vy += Math.sin(angle) * 0.04;
+                    const spd = Math.hypot(b.vx, b.vy);
+                    if (spd > 2.7) {
+                        b.vx = (b.vx / spd) * 2.7;
+                        b.vy = (b.vy / spd) * 2.7;
+                    }
+                }
+
+                // Bullet Trail
+                ctx.beginPath();
+                ctx.moveTo(b.x, b.y);
+                ctx.lineTo(b.x - b.vx * 2, b.y - b.vy * 2);
+                ctx.strokeStyle = b.color;
+                ctx.lineWidth = b.radius;
+                ctx.stroke();
+
+                // Bullet Head
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+                ctx.fillStyle = b.color;
+                ctx.fill();
+
+                // Collision Check
+                if (isPlaying) {
+                    const dist = Math.hypot(player.x - b.x, player.y - b.y);
+
+                    // Shield Collision (Destroys bullet)
+                    if (player.isShieldActive && dist < player.radius + b.radius + 12) {
+                        for (let p = 0; p < 6; p++) {
+                            particles.push({
+                                x: b.x,
+                                y: b.y,
+                                vx: (Math.random() - 0.5) * 4,
+                                vy: (Math.random() - 0.5) * 4,
+                                radius: Math.random() * 2 + 1,
+                                color: '#facc15',
+                                life: 12
+                            });
+                        }
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+
+                    // Normal Death Collision
+                    if (dist < player.radius + b.radius - 0.5) {
+                        gameOver();
+                    }
+                }
+
+                if (b.x < -30 || b.x > canvas.width + 30 || b.y < -30 || b.y > canvas.height + 30) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Particles Update & Render
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            if (isPlaying || particles.length > 0) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function drawBambooBackground() {
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.35)';
+            ctx.lineWidth = 10;
+            const step = canvas.width / 5;
+            for (let x = step / 2; x < canvas.width; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // Shop Modal Handlers
+        function openShop() {
+            shopModal.classList.remove('hidden');
+            updateUI();
+        }
+
+        function closeShop() {
+            shopModal.classList.add('hidden');
+        }
+
+        openShopHeaderBtn.addEventListener('click', openShop);
+        openShopMenuBtn.addEventListener('click', openShop);
+        gameOverShopBtn.addEventListener('click', openShop);
+        closeShopBtn.addEventListener('click', closeShop);
+        closeShopBtn2.addEventListener('click', closeShop);
+
+        buyShieldBtn.addEventListener('click', () => {
+            if (coins >= SHIELD_PRICE) {
+                coins -= SHIELD_PRICE;
+                shieldInventory++;
+                sounds.playBuySound();
+                updateUI();
+                showToast("🛡️ 3초 무적 방어막을 구매했습니다!");
+            } else {
+                showToast("골드가 부족합니다! (게임에서 더 살아남으세요)");
+            }
+        });
+
+        // Event Listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        soundToggleBtn.addEventListener('click', () => {
+            sounds.enabled = !sounds.enabled;
+            if (sounds.enabled) {
+                sounds.init();
+                soundIcon.className = 'fa-solid fa-volume-high text-base';
+                showToast("음향 효과가 켜졌습니다.");
+            } else {
+                soundIcon.className = 'fa-solid fa-volume-xmark text-base text-slate-500';
+                showToast("음향 효과가 꺼졌습니다.");
+            }
+        });
+
+        helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+        closeHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+
+        shareBtn.addEventListener('click', () => {
+            const textToCopy = `🔫 [총림고수 : Gun-Forest]\n생존 시간: ${finalTime.textContent}\n빗발치는 총알을 피하고 3초 무적으로 기록을 경신해보세요!`;
+            const dummy = document.createElement('textarea');
+            document.body.appendChild(dummy);
+            dummy.value = textToCopy;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast("결과가 클립보드에 복사되었습니다!");
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.textContent = msg;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2500);
+        }
+    </script>
+</body>
+</html>

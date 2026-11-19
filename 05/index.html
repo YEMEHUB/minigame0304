@@ -1,0 +1,1142 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카지노 로얄 - 랜덤 추첨기 & 슬롯머신</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gowun+Dodum&family=Inter:wght@400;700;900&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        gowun: ['Gowun Dodum', 'sans-serif'],
+                        casino: ['Black Han Sans', 'sans-serif'],
+                        digital: ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        casino: {
+                            gold: '#ffd700',
+                            goldDark: '#b8860b',
+                            red: '#dc2626',
+                            purple: '#2e1065',
+                            dark: '#090514'
+                        }
+                    },
+                    animation: {
+                        'bounce-short': 'bounce 0.6s ease-in-out 2',
+                        'spin-slow': 'spin 8s linear infinite',
+                        'pulse-gold': 'pulseGold 1.5s infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        pulseGold: {
+                            '0%, 100%': { boxShadow: '0 0 15px rgba(255, 215, 0, 0.4)' },
+                            '50%': { boxShadow: '0 0 35px rgba(255, 215, 0, 0.9)' },
+                        },
+                        glow: {
+                            'from': { textShadow: '0 0 5px #fff, 0 0 10px #ffd700, 0 0 20px #e65c00' },
+                            'to': { textShadow: '0 0 10px #fff, 0 0 20px #ff8c00, 0 0 30px #ff0055' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background: radial-gradient(circle at center, #1e0b36 0%, #090314 100%);
+        }
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #f59e0b, #d97706);
+            border-radius: 9999px;
+        }
+
+        /* Gold Neon Borders */
+        .gold-border-glow {
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4), inset 0 0 10px rgba(255, 215, 0, 0.2);
+        }
+
+        /* 3D Dice Styles */
+        .dice-container {
+            width: 110px;
+            height: 110px;
+            perspective: 600px;
+        }
+        .dice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+        }
+        .dice-face {
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            background: linear-gradient(135deg, #7e22ce, #3b0764);
+            border: 3px solid #ffd700;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 800;
+            color: #ffd700;
+            text-align: center;
+            padding: 8px;
+            word-break: break-all;
+            box-shadow: inset 0 0 20px rgba(255, 215, 0, 0.4);
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+        }
+        .face-front  { transform: rotateY(0deg) translateZ(55px); }
+        .face-back   { transform: rotateY(180deg) translateZ(55px); }
+        .face-right  { transform: rotateY(90deg) translateZ(55px); }
+        .face-left   { transform: rotateY(-90deg) translateZ(55px); }
+        .face-top    { transform: rotateX(90deg) translateZ(55px); }
+        .face-bottom { transform: rotateX(-90deg) translateZ(55px); }
+
+        /* Slot Machine Reels */
+        .slot-window {
+            height: 110px;
+            overflow: hidden;
+            position: relative;
+            background: #090314;
+            border: 3px solid #f59e0b;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
+        }
+        .slot-reel {
+            transition: transform 0.1s linear;
+        }
+        .slot-item {
+            height: 110px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 8px rgba(255,215,0,0.8);
+            padding: 0 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between items-center p-3 sm:p-5 font-sans overflow-x-hidden">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-xl flex justify-between items-center py-2.5 px-4 bg-slate-900/80 border border-amber-500/40 rounded-2xl backdrop-blur-md shadow-2xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-600 flex items-center justify-center font-black text-slate-950 shadow-lg text-xl border border-yellow-200 animate-pulse">
+                🎰
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-black tracking-wider font-casino bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-100 bg-clip-text text-transparent animate-glow">
+                    CASINO ROYALE
+                </h1>
+                <p class="text-[10px] sm:text-xs text-amber-400 font-bold tracking-widest uppercase">럭키 슬롯 · 핀볼 · 룰렛 · 카지노</p>
+            </div>
+        </div>
+
+        <!-- Coins Counter Display -->
+        <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/80 border border-amber-500/60 text-amber-300 font-digital font-bold text-sm shadow-inner">
+                <span class="text-base">🪙</span>
+                <span id="userCoins">1,000</span>
+            </div>
+            <button id="soundToggleBtn" class="w-9 h-9 rounded-xl bg-slate-900 border border-amber-500/40 flex items-center justify-center text-amber-400 hover:text-white transition-all active:scale-95 shadow" aria-label="음소거 토글">
+                <i class="fa-solid fa-volume-high text-base" id="soundIcon"></i>
+            </button>
+            <button id="openConfigModalBtn" class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition-all flex items-center gap-1 shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-gear"></i>
+                <span class="hidden sm:inline">설정</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Section -->
+    <main class="w-full max-w-xl flex-1 flex flex-col items-center justify-start my-3 gap-3">
+
+        <!-- Casino Mode Selector Tabs -->
+        <div class="w-full bg-purple-950/70 p-1.5 rounded-2xl border border-amber-500/40 flex gap-1 shadow-2xl text-xs sm:text-sm font-bold overflow-x-auto">
+            <button data-mode="slot" class="mode-tab flex-1 py-2.5 px-2 rounded-xl transition-all duration-200 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 shadow-lg font-black flex items-center justify-center gap-1.5 min-w-[75px]">
+                <span>🎰</span> 슬롯머신
+            </button>
+            <button data-mode="plinko" class="mode-tab flex-1 py-2.5 px-2 rounded-xl transition-all duration-200 text-amber-200/70 hover:text-amber-300 flex items-center justify-center gap-1.5 min-w-[75px]">
+                <span>📍</span> 핀볼
+            </button>
+            <button data-mode="roulette" class="mode-tab flex-1 py-2.5 px-2 rounded-xl transition-all duration-200 text-amber-200/70 hover:text-amber-300 flex items-center justify-center gap-1.5 min-w-[75px]">
+                <span>🎯</span> 룰렛
+            </button>
+            <button data-mode="dice" class="mode-tab flex-1 py-2.5 px-2 rounded-xl transition-all duration-200 text-amber-200/70 hover:text-amber-300 flex items-center justify-center gap-1.5 min-w-[75px]">
+                <span>🎲</span> 주사위
+            </button>
+            <button data-mode="card" class="mode-tab flex-1 py-2.5 px-2 rounded-xl transition-all duration-200 text-amber-200/70 hover:text-amber-300 flex items-center justify-center gap-1.5 min-w-[75px]">
+                <span>🎴</span> 카드
+            </button>
+        </div>
+
+        <!-- Quick Item Tags Bar -->
+        <div class="w-full bg-purple-950/40 border border-amber-500/30 rounded-xl p-2.5 flex items-center gap-2 overflow-x-auto text-xs" id="quickTagsContainer">
+            <span class="text-amber-400 font-bold shrink-0 text-[11px]"><i class="fa-solid fa-trophy"></i> 등록 상금 (<span id="itemCountTag">0</span>):</span>
+            <div id="quickTagsList" class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+                <!-- Dynamic tags inserted here -->
+            </div>
+        </div>
+
+        <!-- MODE 0: CASINO SLOT MACHINE (NEW!) -->
+        <section id="mode-slot" class="game-view w-full flex flex-col items-center gap-4 py-2">
+            <!-- Slot Machine Frame -->
+            <div class="w-full max-w-[360px] p-4 bg-gradient-to-b from-purple-900 via-purple-950 to-slate-950 rounded-3xl border-4 border-amber-400 shadow-2xl flex flex-col items-center gap-3 relative gold-border-glow">
+                <!-- Neon Banner Header -->
+                <div class="w-full bg-slate-950 py-1.5 px-3 rounded-xl border border-amber-500/50 text-center flex justify-between items-center">
+                    <span class="text-amber-400 text-xs font-black font-digital animate-pulse">JACKPOT!</span>
+                    <span class="text-yellow-300 text-xs font-bold font-digital">777 CASINO 777</span>
+                    <span class="text-amber-400 text-xs font-black font-digital animate-pulse">WINNER!</span>
+                </div>
+
+                <!-- Slot Machine Reels Container (3 Reels) -->
+                <div class="grid grid-cols-3 gap-2 w-full p-2 bg-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-inner">
+                    <div class="slot-window rounded-xl">
+                        <div id="reel1" class="slot-reel"></div>
+                    </div>
+                    <div class="slot-window rounded-xl">
+                        <div id="reel2" class="slot-reel"></div>
+                    </div>
+                    <div class="slot-window rounded-xl">
+                        <div id="reel3" class="slot-reel"></div>
+                    </div>
+                </div>
+
+                <!-- Payline Indicator -->
+                <div class="w-full flex items-center justify-between text-[11px] text-amber-300 font-bold px-1">
+                    <span>◀ WIN LINE ▶</span>
+                    <span class="text-emerald-400">3개 일치 시 잭팟!</span>
+                </div>
+            </div>
+
+            <button id="spinSlotBtn" class="w-full py-4 rounded-2xl font-casino text-xl tracking-wider text-slate-950 bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer gold-border-glow">
+                <i class="fa-solid fa-play text-xl"></i>
+                <span>슬롯 레버 당기기! (100 코인)</span>
+            </button>
+        </section>
+
+        <!-- MODE 1: PLINKO PINBALL DROPPER -->
+        <section id="mode-plinko" class="game-view w-full hidden flex-col items-center gap-3">
+            <div class="relative w-full max-w-[320px] aspect-[4/5] rounded-3xl bg-slate-950 border-4 border-amber-400 shadow-2xl overflow-hidden flex flex-col items-center p-2 gold-border-glow">
+                <canvas id="plinkoCanvas" class="w-full h-full rounded-2xl bg-purple-950/60"></canvas>
+            </div>
+
+            <button id="dropPlinkoBtn" class="w-full py-3.5 rounded-2xl font-casino text-lg tracking-wider text-slate-950 bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-circle-down text-xl"></i>
+                <span>골드 볼 투하!</span>
+            </button>
+        </section>
+
+        <!-- MODE 2: ROULETTE WHEEL -->
+        <section id="mode-roulette" class="game-view w-full hidden flex-col items-center gap-3">
+            <div class="relative w-full max-w-[310px] aspect-square my-2 flex items-center justify-center">
+                <!-- Pointer Arrow -->
+                <div class="absolute -top-3 z-20 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[24px] border-t-yellow-300 drop-shadow-[0_4px_10px_rgba(255,215,0,0.8)]"></div>
+                
+                <!-- Canvas Wheel -->
+                <canvas id="rouletteCanvas" class="w-full h-full rounded-full shadow-2xl border-4 border-amber-400 transition-transform duration-[4000ms] ease-out gold-border-glow"></canvas>
+
+                <!-- Center Knob -->
+                <div class="absolute w-12 h-12 rounded-full bg-gradient-to-tr from-purple-950 to-slate-900 border-2 border-yellow-400 shadow-xl flex items-center justify-center z-10">
+                    <span class="text-xl">👑</span>
+                </div>
+            </div>
+
+            <button id="spinRouletteBtn" class="w-full py-3.5 rounded-2xl font-casino text-lg tracking-wider text-slate-950 bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-arrows-spin text-xl"></i>
+                <span>룰렛 힘차게 돌리기!</span>
+            </button>
+        </section>
+
+        <!-- MODE 3: 3D DICE ROLLER -->
+        <section id="mode-dice" class="game-view w-full hidden flex-col items-center gap-6 py-4">
+            <div class="text-center space-y-1">
+                <p class="text-xs text-amber-300 font-bold">카지노 골드 주사위를 굴려 당첨 항목을 확정하세요!</p>
+            </div>
+
+            <!-- 3D Dice Display Box -->
+            <div class="dice-container my-4">
+                <div id="diceCube" class="dice">
+                    <div class="dice-face face-front" id="face1">1</div>
+                    <div class="dice-face face-back" id="face2">2</div>
+                    <div class="dice-face face-right" id="face3">3</div>
+                    <div class="dice-face face-left" id="face4">4</div>
+                    <div class="dice-face face-top" id="face5">5</div>
+                    <div class="dice-face face-bottom" id="face6">6</div>
+                </div>
+            </div>
+
+            <button id="rollDiceBtn" class="w-full py-3.5 rounded-2xl font-casino text-lg tracking-wider text-slate-950 bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 hover:brightness-110 shadow-xl shadow-amber-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-dice-d6 text-xl"></i>
+                <span>주사위 굴리기!</span>
+            </button>
+        </section>
+
+        <!-- MODE 4: CARD FLIP (제비뽑기) -->
+        <section id="mode-card" class="game-view w-full hidden flex-col items-center gap-3">
+            <div class="text-center space-y-1 my-1">
+                <p class="text-xs text-amber-300 font-bold">비밀의 로얄 카드를 선택해 당첨금을 확인하세요!</p>
+                <button id="shuffleCardsBtn" class="px-3 py-1 bg-purple-950 border border-amber-500/50 hover:border-amber-400 rounded-lg text-xs text-amber-300 font-bold transition-all">
+                    <i class="fa-solid fa-shuffle"></i> 카드 다시 섞기
+                </button>
+            </div>
+
+            <!-- Card Grid -->
+            <div id="cardGrid" class="w-full grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-[340px] overflow-y-auto p-1">
+                <!-- Dynamic cards generated here -->
+            </div>
+        </section>
+
+        <!-- Winner Result Card -->
+        <div id="resultModal" class="w-full bg-gradient-to-b from-purple-950 via-slate-900 to-purple-950 border-2 border-amber-400 rounded-3xl p-5 hidden flex-col items-center text-center space-y-3 shadow-2xl animate-bounce-short gold-border-glow">
+            <div class="flex items-center gap-2 px-4 py-1 bg-amber-500/20 rounded-full border border-amber-400/60">
+                <span class="text-base">🎉</span>
+                <span class="text-xs font-black uppercase tracking-widest text-amber-300 font-digital" id="resultHeaderTitle">
+                    WINNER WINNER!
+                </span>
+                <span class="text-base">🎉</span>
+            </div>
+            
+            <div id="winnerDisplay" class="text-3xl sm:text-4xl font-black text-yellow-300 font-casino py-1 break-all animate-glow">
+                --
+            </div>
+
+            <p id="resultSubText" class="text-xs text-amber-200/80 font-bold">축하합니다! 상금 및 이벤트 항목에 당첨되었습니다.</p>
+            
+            <div id="coinEarnedBadge" class="hidden px-3 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs">
+                +500 COINS 획득!
+            </div>
+        </div>
+
+        <!-- History Log Section -->
+        <div class="w-full bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 space-y-2">
+            <div class="flex justify-between items-center text-xs text-amber-400/80 border-b border-amber-500/20 pb-1.5">
+                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left"></i> 히스토리 (최근 당첨)</span>
+                <button id="clearHistoryBtn" class="text-[11px] text-slate-500 hover:text-rose-400 transition-colors">기록 삭제</button>
+            </div>
+            <div id="historyList" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto text-xs text-slate-300">
+                <span class="text-slate-600 text-xs py-1">추첨 기록이 없습니다.</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal for Items Configuration -->
+    <div id="configModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gradient-to-b from-purple-950 to-slate-900 border-2 border-amber-400 rounded-3xl w-full max-w-lg p-5 space-y-4 shadow-2xl gold-border-glow">
+            <div class="flex justify-between items-center border-b border-amber-500/30 pb-3">
+                <h3 class="text-base font-black text-amber-300 font-casino flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-400"></i> 카지노 상금 목록 편집
+                </h3>
+                <button id="closeConfigModalBtn" class="text-amber-400 hover:text-white p-1 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Preset Buttons -->
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-amber-400">카지노 테마 프리셋 불러오기:</label>
+                <div class="flex flex-wrap gap-1.5 text-xs">
+                    <button class="preset-btn px-2.5 py-1 bg-amber-500/20 border border-amber-400/60 hover:bg-amber-500/40 rounded-lg text-amber-300 font-bold" data-preset="money">💵 고액 용돈 (만원)</button>
+                    <button class="preset-btn px-2.5 py-1 bg-amber-500/20 border border-amber-400/60 hover:bg-amber-500/40 rounded-lg text-amber-300 font-bold" data-preset="pocket">🪙 소액 뽑기 (원)</button>
+                    <button class="preset-btn px-2.5 py-1 bg-purple-900/80 border border-purple-500/60 hover:bg-purple-800 rounded-lg text-amber-200" data-preset="lottery">💎 대박 잭팟 상금</button>
+                    <button class="preset-btn px-2.5 py-1 bg-purple-900/80 border border-purple-500/60 hover:bg-purple-800 rounded-lg text-amber-200" data-preset="duty">💸 벌칙 & 당번 몰빵</button>
+                </div>
+            </div>
+
+            <!-- Textarea Item Input -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center text-xs">
+                    <label class="font-bold text-amber-200">추첨 항목 (줄바꿈 구분):</label>
+                    <span class="text-amber-400/70" id="rawItemCountText">총 0개</span>
+                </div>
+                <textarea id="itemsTextarea" rows="6" class="w-full bg-slate-950 border border-amber-500/40 rounded-2xl p-3 text-sm text-yellow-100 focus:outline-none focus:border-amber-400 font-sans" placeholder="예시:&#10;100만원&#10;50만원&#10;10만원&#10;💥 꽝 (0원)"></textarea>
+            </div>
+
+            <!-- Save Action Button -->
+            <button id="saveItemsBtn" class="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:brightness-110 text-slate-950 font-black text-sm transition-all shadow-lg shadow-amber-500/30">
+                카지노 항목 적용하기
+            </button>
+        </div>
+    </div>
+
+    <!-- Sound Audio Synthesizer (Enhanced Casino Sound Effects) -->
+    <script>
+        class CasinoSoundFX {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playBeep(freq, duration = 0.08, type = 'sine', gainVal = 0.1) {
+                if (this.muted) return;
+                try {
+                    this.init();
+                    if (!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.error("Audio error:", e);
+                }
+            }
+
+            playSlotSpin() {
+                this.playBeep(400 + Math.random() * 200, 0.04, 'sawtooth', 0.05);
+            }
+
+            playSlotStop() {
+                this.playBeep(180, 0.12, 'square', 0.15);
+            }
+
+            playSpinClick() {
+                this.playBeep(900, 0.03, 'square', 0.08);
+            }
+
+            playPegHit() {
+                this.playBeep(1200 + Math.random() * 500, 0.02, 'triangle', 0.1);
+            }
+
+            playWin() {
+                if (this.muted) return;
+                this.init();
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => this.playBeep(freq, 0.22, 'triangle', 0.15), idx * 90);
+                });
+            }
+
+            playJackpot() {
+                if (this.muted) return;
+                this.init();
+                // Fast Arpeggio Jackpot sound
+                for (let i = 0; i < 15; i++) {
+                    setTimeout(() => {
+                        this.playBeep(600 + (i * 80), 0.1, 'sawtooth', 0.15);
+                    }, i * 50);
+                }
+            }
+
+            playFlip() {
+                this.playBeep(500, 0.05, 'sine', 0.1);
+            }
+        }
+
+        const sound = new CasinoSoundFX();
+    </script>
+
+    <!-- Main Casino App Logic Script -->
+    <script>
+        // Preset Data (Casino & Money Theme)
+        const PRESETS = {
+            money: ['💎 100만원', '💰 50만원', '💵 30만원', '💵 10만원', '🪙 1만원', '💥 꽝 (0원)'],
+            pocket: ['5,000원', '10,000원', '20,000원', '50,000원', '100,000원', '💥 꽝'],
+            lottery: ['👑 1,000만원 잭팟!', '🥇 500만원', '🥈 100만원', '🥉 50만원', '🎁 10만원', '💥 꽝!'],
+            duty: ['0원 (완전 면제)', '10,000원', '20,000원', '50,000원 몰빵!', '다시 뽑기']
+        };
+
+        // State Variables
+        let items = JSON.parse(localStorage.getItem('picker_items')) || [...PRESETS.money];
+        let history = JSON.parse(localStorage.getItem('picker_history')) || [];
+        let coins = parseInt(localStorage.getItem('picker_coins')) || 1000;
+        let currentMode = 'slot';
+        let isSpinning = false;
+
+        // Casino Palette
+        const COLOR_PALETTE = [
+            '#d97706', '#b91c1c', '#7e22ce', '#047857', '#1d4ed8', 
+            '#c026d3', '#0284c7', '#ea580c', '#4d7c0f', '#9333ea'
+        ];
+
+        // DOM Elements
+        const userCoinsDisplay = document.getElementById('userCoins');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundIcon = document.getElementById('soundIcon');
+        const openConfigModalBtn = document.getElementById('openConfigModalBtn');
+        const closeConfigModalBtn = document.getElementById('closeConfigModalBtn');
+        const configModal = document.getElementById('configModal');
+        const itemsTextarea = document.getElementById('itemsTextarea');
+        const saveItemsBtn = document.getElementById('saveItemsBtn');
+        const rawItemCountText = document.getElementById('rawItemCountText');
+        const quickTagsList = document.getElementById('quickTagsList');
+        const itemCountTag = document.getElementById('itemCountTag');
+        const resultModal = document.getElementById('resultModal');
+        const winnerDisplay = document.getElementById('winnerDisplay');
+        const resultHeaderTitle = document.getElementById('resultHeaderTitle');
+        const coinEarnedBadge = document.getElementById('coinEarnedBadge');
+        const historyList = document.getElementById('historyList');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const modeTabs = document.querySelectorAll('.mode-tab');
+        const gameViews = document.querySelectorAll('.game-view');
+
+        // Mode 0: Slot Machine Elements
+        const reel1 = document.getElementById('reel1');
+        const reel2 = document.getElementById('reel2');
+        const reel3 = document.getElementById('reel3');
+        const spinSlotBtn = document.getElementById('spinSlotBtn');
+
+        // Mode 1: Plinko Elements
+        const plinkoCanvas = document.getElementById('plinkoCanvas');
+        const dropPlinkoBtn = document.getElementById('dropPlinkoBtn');
+
+        // Mode 2: Dice Elements
+        const diceCube = document.getElementById('diceCube');
+        const rollDiceBtn = document.getElementById('rollDiceBtn');
+
+        // Mode 3: Roulette Elements
+        const rouletteCanvas = document.getElementById('rouletteCanvas');
+        const spinRouletteBtn = document.getElementById('spinRouletteBtn');
+        let currentRouletteAngle = 0;
+
+        // Mode 4: Card Elements
+        const cardGrid = document.getElementById('cardGrid');
+        const shuffleCardsBtn = document.getElementById('shuffleCardsBtn');
+
+        // Initial Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            updateCoinsDisplay();
+            updateItemTags();
+            renderHistory();
+            initSlotMachine();
+            initPlinko();
+            setupDiceFaces();
+            initRoulette();
+            initCards();
+        });
+
+        function updateCoinsDisplay() {
+            userCoinsDisplay.textContent = coins.toLocaleString();
+            localStorage.setItem('picker_coins', coins);
+        }
+
+        function addCoins(amount) {
+            coins += amount;
+            updateCoinsDisplay();
+        }
+
+        function deductCoins(amount) {
+            if (coins < amount) return false;
+            coins -= amount;
+            updateCoinsDisplay();
+            return true;
+        }
+
+        // Sound Toggle Button
+        soundToggleBtn.addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            soundIcon.className = sound.muted ? 'fa-solid fa-volume-xmark text-slate-600' : 'fa-solid fa-volume-high text-amber-400';
+            if (!sound.muted) sound.playBeep(800, 0.1);
+        });
+
+        // Mode Navigation
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (isSpinning) return;
+                const selectedMode = tab.dataset.mode;
+                currentMode = selectedMode;
+
+                modeTabs.forEach(t => {
+                    t.classList.remove('bg-gradient-to-r', 'from-amber-500', 'to-yellow-500', 'text-slate-950', 'shadow-lg');
+                    t.classList.add('text-amber-200/70');
+                });
+                tab.classList.add('bg-gradient-to-r', 'from-amber-500', 'to-yellow-500', 'text-slate-950', 'shadow-lg');
+                tab.classList.remove('text-amber-200/70');
+
+                gameViews.forEach(v => v.classList.add('hidden'));
+                document.getElementById(`mode-${selectedMode}`).classList.remove('hidden');
+
+                resultModal.classList.add('hidden');
+                sound.playBeep(600, 0.05);
+
+                if (selectedMode === 'slot') initSlotMachine();
+                if (selectedMode === 'plinko') initPlinko();
+                if (selectedMode === 'dice') setupDiceFaces();
+                if (selectedMode === 'roulette') drawRoulette();
+                if (selectedMode === 'card') initCards();
+            });
+        });
+
+        // Config Modal Handlers
+        openConfigModalBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            itemsTextarea.value = items.join('\n');
+            rawItemCountText.textContent = `총 ${items.length}개`;
+            configModal.classList.remove('hidden');
+        });
+
+        closeConfigModalBtn.addEventListener('click', () => {
+            configModal.classList.add('hidden');
+        });
+
+        itemsTextarea.addEventListener('input', () => {
+            const lines = itemsTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+            rawItemCountText.textContent = `총 ${lines.length}개`;
+        });
+
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const presetKey = btn.dataset.preset;
+                if (PRESETS[presetKey]) {
+                    itemsTextarea.value = PRESETS[presetKey].join('\n');
+                    rawItemCountText.textContent = `총 ${PRESETS[presetKey].length}개`;
+                }
+            });
+        });
+
+        saveItemsBtn.addEventListener('click', () => {
+            const lines = itemsTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+            if (lines.length < 2) {
+                alert('최소 2개 이상의 항목을 입력해 주세요.');
+                return;
+            }
+            items = lines;
+            localStorage.setItem('picker_items', JSON.stringify(items));
+            updateItemTags();
+            configModal.classList.add('hidden');
+
+            initSlotMachine();
+            initPlinko();
+            setupDiceFaces();
+            drawRoulette();
+            initCards();
+        });
+
+        function updateItemTags() {
+            quickTagsList.innerHTML = '';
+            itemCountTag.textContent = items.length;
+            items.forEach((item) => {
+                const tag = document.createElement('span');
+                tag.className = 'px-2 py-0.5 rounded-md bg-purple-900/80 text-amber-200 font-bold text-[11px] border border-amber-500/40';
+                tag.textContent = item;
+                quickTagsList.appendChild(tag);
+            });
+        }
+
+        function showWinner(winner, isJackpot = false, coinBonus = 200) {
+            winnerDisplay.textContent = winner;
+            resultModal.classList.remove('hidden');
+
+            if (isJackpot) {
+                resultHeaderTitle.textContent = "💥 MEGA JACKPOT!! 💥";
+                coinEarnedBadge.textContent = `+${coinBonus + 1000} COINS 잭팟!`;
+                addCoins(coinBonus + 1000);
+                sound.playJackpot();
+            } else {
+                resultHeaderTitle.textContent = "WINNER WINNER!";
+                coinEarnedBadge.textContent = `+${coinBonus} COINS 획득!`;
+                addCoins(coinBonus);
+                sound.playWin();
+            }
+            coinEarnedBadge.classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: isJackpot ? 150 : 80,
+                    spread: isJackpot ? 100 : 70,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            history.unshift({ time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), item: winner });
+            if (history.length > 20) history.pop();
+            localStorage.setItem('picker_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (history.length === 0) {
+                historyList.innerHTML = '<span class="text-slate-600 text-xs py-1">추첨 기록이 없습니다.</span>';
+                return;
+            }
+            historyList.innerHTML = '';
+            history.forEach(h => {
+                const badge = document.createElement('div');
+                badge.className = 'px-2 py-1 bg-slate-900 border border-amber-500/30 rounded-lg text-xs flex items-center gap-1.5';
+                badge.innerHTML = `<span class="text-amber-500/60 text-[10px]">${h.time}</span> <span class="text-amber-300 font-bold">${h.item}</span>`;
+                historyList.appendChild(badge);
+            });
+        }
+
+        clearHistoryBtn.addEventListener('click', () => {
+            history = [];
+            localStorage.removeItem('picker_history');
+            renderHistory();
+        });
+
+        // ----------------------------------------------------
+        // MODE 0: CASINO SLOT MACHINE LOGIC (3 REELS)
+        // ----------------------------------------------------
+        function initSlotMachine() {
+            [reel1, reel2, reel3].forEach(reel => {
+                reel.innerHTML = '';
+                // Create repeated list items for smooth infinite spin illusion
+                const expandedList = [...items, ...items, ...items, ...items];
+                expandedList.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'slot-item';
+                    div.textContent = item.length > 7 ? item.substring(0,6) + '..' : item;
+                    reel.appendChild(div);
+                });
+                reel.style.transform = `translateY(0px)`;
+            });
+        }
+
+        spinSlotBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            
+            // Deduct 100 bet coins
+            if (!deductCoins(100)) {
+                alert('코인이 부족합니다! (필요: 100 코인)');
+                return;
+            }
+
+            isSpinning = true;
+            resultModal.classList.add('hidden');
+
+            const itemHeight = 110;
+            const targetWinnerIndex = Math.floor(Math.random() * items.length);
+            const targetWinnerItem = items[targetWinnerIndex];
+
+            // Determine if 3 reel Jackpot occurs (20% chance)
+            const isJackpot = Math.random() < 0.2;
+
+            let reelIndices = [targetWinnerIndex, targetWinnerIndex, targetWinnerIndex];
+            if (!isJackpot) {
+                reelIndices[0] = Math.floor(Math.random() * items.length);
+                reelIndices[1] = Math.floor(Math.random() * items.length);
+                reelIndices[2] = targetWinnerIndex; // Right reel decides main item
+            }
+
+            const reels = [reel1, reel2, reel3];
+            const spinDurations = [1200, 1800, 2400];
+
+            let soundInterval = setInterval(() => {
+                sound.playSlotSpin();
+            }, 80);
+
+            reels.forEach((reel, i) => {
+                const targetOffset = -( (items.length * 2 + reelIndices[i]) * itemHeight );
+                reel.style.transition = `transform ${spinDurations[i]}ms cubic-bezier(0.15, 0.85, 0.35, 1.05)`;
+                reel.style.transform = `translateY(${targetOffset}px)`;
+
+                setTimeout(() => {
+                    sound.playSlotStop();
+                }, spinDurations[i]);
+            });
+
+            setTimeout(() => {
+                clearInterval(soundInterval);
+                isSpinning = false;
+                showWinner(items[reelIndices[2]], isJackpot, isJackpot ? 1000 : 300);
+            }, 2500);
+        });
+
+        // ----------------------------------------------------
+        // MODE 1: PLINKO PINBALL DROPPER LOGIC
+        // ----------------------------------------------------
+        let pegs = [];
+        let slots = [];
+        let chip = null;
+
+        function initPlinko() {
+            const w = 300;
+            const h = 370;
+            plinkoCanvas.width = w;
+            plinkoCanvas.height = h;
+
+            pegs = [];
+            slots = [];
+            chip = null;
+
+            const rows = 7;
+            const startY = 50;
+            const rowHeight = 35;
+
+            for (let r = 0; r < rows; r++) {
+                const countInRow = r + 3;
+                const spacing = w / (countInRow + 1);
+                for (let c = 0; c < countInRow; c++) {
+                    pegs.push({
+                        x: spacing * (c + 1),
+                        y: startY + r * rowHeight,
+                        r: 4
+                    });
+                }
+            }
+
+            const numSlots = items.length;
+            const slotWidth = w / numSlots;
+            for (let i = 0; i < numSlots; i++) {
+                slots.push({
+                    x: i * slotWidth,
+                    w: slotWidth,
+                    text: items[i],
+                    color: COLOR_PALETTE[i % COLOR_PALETTE.length]
+                });
+            }
+
+            drawPlinkoStatic();
+        }
+
+        function drawPlinkoStatic() {
+            const ctx = plinkoCanvas.getContext('2d');
+            const w = plinkoCanvas.width;
+            const h = plinkoCanvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw Pegs
+            pegs.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Draw Slots
+            const slotHeight = 45;
+            const slotY = h - slotHeight;
+
+            slots.forEach((s) => {
+                ctx.fillStyle = s.color;
+                ctx.fillRect(s.x + 1, slotY, s.w - 2, slotHeight);
+
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(s.x + 1, slotY, s.w - 2, slotHeight);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                let label = s.text.length > 5 ? s.text.substring(0, 4) + '..' : s.text;
+                ctx.fillText(label, s.x + s.w / 2, slotY + slotHeight / 2);
+            });
+        }
+
+        dropPlinkoBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            if (!deductCoins(50)) {
+                alert('코인이 부족합니다! (필요: 50 코인)');
+                return;
+            }
+
+            isSpinning = true;
+            resultModal.classList.add('hidden');
+
+            const w = plinkoCanvas.width;
+            chip = {
+                x: w / 2 + (Math.random() - 0.5) * 20,
+                y: 15,
+                vx: (Math.random() - 0.5) * 2,
+                vy: 0,
+                r: 9
+            };
+
+            const gravity = 0.22;
+            const bounce = 0.6;
+
+            function animatePlinko() {
+                const ctx = plinkoCanvas.getContext('2d');
+                drawPlinkoStatic();
+
+                if (!chip) return;
+
+                chip.vy += gravity;
+                chip.x += chip.vx;
+                chip.y += chip.vy;
+
+                if (chip.x - chip.r < 0) {
+                    chip.x = chip.r;
+                    chip.vx *= -bounce;
+                } else if (chip.x + chip.r > w) {
+                    chip.x = w - chip.r;
+                    chip.vx *= -bounce;
+                }
+
+                pegs.forEach(p => {
+                    const dx = chip.x - p.x;
+                    const dy = chip.y - p.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const minDist = chip.r + p.r;
+
+                    if (dist < minDist) {
+                        sound.playPegHit();
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        chip.x = p.x + nx * minDist;
+                        chip.y = p.y + ny * minDist;
+
+                        const dot = chip.vx * nx + chip.vy * ny;
+                        chip.vx = (chip.vx - 2 * dot * nx) * bounce + (Math.random() - 0.5) * 1.5;
+                        chip.vy = (chip.vy - 2 * dot * ny) * bounce;
+                    }
+                });
+
+                // Draw Gold Coin/Ball
+                ctx.beginPath();
+                ctx.arc(chip.x, chip.y, chip.r, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 12;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                const slotY = plinkoCanvas.height - 45;
+                if (chip.y + chip.r >= slotY) {
+                    isSpinning = false;
+                    let winningSlotIndex = Math.floor(chip.x / (w / slots.length));
+                    winningSlotIndex = Math.max(0, Math.min(slots.length - 1, winningSlotIndex));
+
+                    showWinner(slots[winningSlotIndex].text, false, 200);
+                    return;
+                }
+
+                requestAnimationFrame(animatePlinko);
+            }
+
+            animatePlinko();
+        });
+
+        // ----------------------------------------------------
+        // MODE 2: ROULETTE LOGIC
+        // ----------------------------------------------------
+        function initRoulette() {
+            rouletteCanvas.width = 300;
+            rouletteCanvas.height = 300;
+            drawRoulette();
+        }
+
+        function drawRoulette() {
+            const ctx = rouletteCanvas.getContext('2d');
+            const w = rouletteCanvas.width;
+            const h = rouletteCanvas.height;
+            const center = w / 2;
+            const radius = center - 8;
+            const numItems = items.length;
+            const sliceAngle = (Math.PI * 2) / numItems;
+
+            ctx.clearRect(0, 0, w, h);
+
+            items.forEach((item, i) => {
+                const angle = i * sliceAngle;
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius, angle, angle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = COLOR_PALETTE[i % COLOR_PALETTE.length];
+                ctx.fill();
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(angle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 4;
+                let text = item.length > 8 ? item.substring(0, 7) + '..' : item;
+                ctx.fillText(text, radius - 15, 4);
+                ctx.restore();
+            });
+        }
+
+        spinRouletteBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            if (!deductCoins(50)) {
+                alert('코인이 부족합니다! (필요: 50 코인)');
+                return;
+            }
+
+            isSpinning = true;
+            resultModal.classList.add('hidden');
+
+            const winnerIndex = Math.floor(Math.random() * items.length);
+            const extraRounds = 5 + Math.floor(Math.random() * 3);
+            const targetAngle = (extraRounds * 360) + (360 - (winnerIndex * (360 / items.length)) - ((360 / items.length) / 2)) - 90;
+
+            currentRouletteAngle += targetAngle;
+            rouletteCanvas.style.transform = `rotate(${currentRouletteAngle}deg)`;
+
+            let soundTicks = 0;
+            const interval = setInterval(() => {
+                sound.playSpinClick();
+                soundTicks++;
+                if (soundTicks >= 25) clearInterval(interval);
+            }, 150);
+
+            setTimeout(() => {
+                isSpinning = false;
+                showWinner(items[winnerIndex], false, 250);
+            }, 4000);
+        });
+
+        // ----------------------------------------------------
+        // MODE 3: 3D DICE LOGIC
+        // ----------------------------------------------------
+        function setupDiceFaces() {
+            for (let i = 1; i <= 6; i++) {
+                const face = document.getElementById(`face${i}`);
+                if (face) {
+                    const item = items[(i - 1) % items.length];
+                    face.textContent = item.length > 8 ? item.substring(0, 7) + '..' : item;
+                }
+            }
+        }
+
+        rollDiceBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            if (!deductCoins(50)) {
+                alert('코인이 부족합니다! (필요: 50 코인)');
+                return;
+            }
+
+            isSpinning = true;
+            resultModal.classList.add('hidden');
+            sound.playSpinClick();
+
+            const winningFaceIndex = Math.floor(Math.random() * Math.min(6, items.length));
+            const winningItem = items[winningFaceIndex % items.length];
+
+            const rotations = [
+                { x: 0, y: 0 },         // Face 1
+                { x: 0, y: 180 },       // Face 2
+                { x: 0, y: -90 },       // Face 3
+                { x: 0, y: 90 },        // Face 4
+                { x: -90, y: 0 },       // Face 5
+                { x: 90, y: 0 }         // Face 6
+            ];
+
+            const targetRot = rotations[winningFaceIndex];
+            const extraRoundsX = (3 + Math.floor(Math.random() * 2)) * 360;
+            const extraRoundsY = (3 + Math.floor(Math.random() * 2)) * 360;
+
+            diceCube.style.transform = `rotateX(${extraRoundsX + targetRot.x}deg) rotateY(${extraRoundsY + targetRot.y}deg)`;
+
+            setTimeout(() => {
+                isSpinning = false;
+                showWinner(winningItem, false, 200);
+            }, 1600);
+        });
+
+        // ----------------------------------------------------
+        // MODE 4: CARD FLIP LOGIC
+        // ----------------------------------------------------
+        function initCards() {
+            cardGrid.innerHTML = '';
+            const shuffled = [...items].sort(() => Math.random() - 0.5);
+
+            shuffled.forEach((item, idx) => {
+                const cardWrap = document.createElement('div');
+                cardWrap.className = 'perspective-1000 h-24 cursor-pointer group';
+
+                const cardInner = document.createElement('div');
+                cardInner.className = 'card-inner w-full h-full relative transform-style-3d transition-transform duration-500 rounded-xl shadow-lg border border-amber-500/50';
+
+                const cardFront = document.createElement('div');
+                cardFront.className = 'absolute inset-0 backface-hidden rounded-xl bg-gradient-to-br from-purple-900 to-slate-950 border border-amber-400/60 flex flex-col items-center justify-center text-amber-300 font-bold shadow-inner group-hover:border-amber-300';
+                cardFront.innerHTML = `<span class="text-xl">👑</span><span class="text-[10px] text-amber-400/80 mt-1">CARD #${idx+1}</span>`;
+
+                const cardBack = document.createElement('div');
+                cardBack.className = 'absolute inset-0 backface-hidden rotate-y-180 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black p-2 flex items-center justify-center text-center text-xs break-all font-casino shadow-xl border-2 border-yellow-200';
+                cardBack.textContent = item;
+
+                cardInner.appendChild(cardFront);
+                cardInner.appendChild(cardBack);
+                cardWrap.appendChild(cardInner);
+
+                cardWrap.addEventListener('click', () => {
+                    if (isSpinning || cardInner.classList.contains('rotate-y-180')) return;
+                    
+                    if (!deductCoins(50)) {
+                        alert('코인이 부족합니다! (필요: 50 코인)');
+                        return;
+                    }
+
+                    sound.playFlip();
+                    cardInner.classList.add('rotate-y-180');
+                    showWinner(item, false, 200);
+                });
+
+                cardGrid.appendChild(cardWrap);
+            });
+        }
+
+        shuffleCardsBtn.addEventListener('click', () => {
+            if (isSpinning) return;
+            sound.playFlip();
+            initCards();
+            resultModal.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>

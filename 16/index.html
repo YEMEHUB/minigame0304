@@ -1,0 +1,1063 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Neon Obstacle Runner - Hard Mode</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #game-canvas {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        /* Custom Glowing & Retro Effects */
+        .neon-text-red {
+            text-shadow: 0 0 10px #ff0055, 0 0 20px #ff0055, 0 0 40px #ff0055;
+        }
+        .neon-text-blue {
+            text-shadow: 0 0 10px #00f0ff, 0 0 20px #00f0ff;
+        }
+        .neon-box {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.2);
+            border: 1px solid #00f0ff;
+        }
+        .retro-btn {
+            background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.6);
+            transition: all 0.2s ease;
+        }
+        .retro-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.9);
+        }
+        .retro-btn:active {
+            transform: scale(0.95);
+        }
+        .character-card {
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+        .character-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+        }
+        .character-card.selected {
+            border-color: #00f0ff;
+            background: rgba(0, 240, 255, 0.15);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+        }
+        /* Laser Warning Effect */
+        @keyframes laserGlow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.9; }
+        }
+        .laser-warning {
+            animation: laserGlow 0.4s infinite;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none">
+
+    <!-- 3D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- UI Overlay: HUD -->
+    <div id="hud" class="absolute top-0 left-0 w-full p-4 flex justify-between items-start pointer-events-none z-10 hidden">
+        <div class="flex gap-3">
+            <div class="bg-black/60 backdrop-blur-md p-4 rounded-xl border border-cyan-500/30 text-white flex flex-col gap-1">
+                <div class="text-xs text-cyan-400 font-bold uppercase tracking-wider">SCORE</div>
+                <div id="score-text" class="text-3xl font-extrabold text-white neon-text-blue">0</div>
+            </div>
+            <div id="active-char-badge" class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-pink-500/30 text-pink-400 font-bold flex items-center self-center text-sm">
+                <!-- Selected character badge -->
+            </div>
+        </div>
+        
+        <div class="flex gap-3 pointer-events-auto">
+            <button id="audio-toggle-btn" class="bg-black/60 hover:bg-black/80 backdrop-blur-md p-3 rounded-xl border border-cyan-500/30 text-cyan-400 transition">
+                <i id="audio-icon" class="fas fa-volume-up text-xl"></i>
+            </button>
+            <div class="bg-red-500/20 backdrop-blur-md px-4 py-2 rounded-xl border border-red-500/50 flex items-center gap-2 text-red-400 font-bold">
+                <i class="fas fa-bolt"></i> HARD MODE
+            </div>
+        </div>
+    </div>
+
+    <!-- On-screen Controls Guide (In Game) -->
+    <div id="controls-hint" class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none z-10 hidden text-center">
+        <div class="bg-black/60 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white/70 text-sm flex gap-4 items-center">
+            <span><kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">A</kbd> / <kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">D</kbd> 이동</span>
+            <span class="text-white/30">|</span>
+            <span><kbd class="bg-white/20 px-2 py-0.5 rounded text-white font-mono">Space</kbd> 점프</span>
+        </div>
+    </div>
+
+    <!-- Start / Game Over Screen Overlay -->
+    <div id="menu-overlay" class="absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div class="max-w-xl w-full text-center flex flex-col items-center gap-5 p-6 sm:p-8 rounded-2xl neon-box bg-slate-950/90 my-auto">
+            
+            <div class="space-y-1">
+                <h1 class="text-4xl sm:text-5xl font-black italic tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-pink-500 to-red-500">
+                    CYBER RUNNER
+                </h1>
+                <p class="text-red-400 font-semibold tracking-widest text-xs sm:text-sm uppercase">Difficulty: Extreme Hard</p>
+            </div>
+
+            <!-- Game Over Details (Hidden initially) -->
+            <div id="game-over-info" class="hidden w-full bg-red-950/30 border border-red-500/30 rounded-xl p-3 my-1">
+                <p class="text-red-400 text-xs font-bold uppercase mb-1">GAME OVER</p>
+                <div class="text-gray-300 text-xs">최종 스코어</div>
+                <div id="final-score" class="text-3xl font-black text-white neon-text-red">0</div>
+            </div>
+
+            <!-- Character Selection -->
+            <div class="w-full space-y-2">
+                <div class="text-left text-xs text-cyan-400 font-bold uppercase tracking-wider flex justify-between items-center">
+                    <span><i class="fas fa-rocket mr-1"></i> 캐릭터 선택</span>
+                    <span id="char-desc-type" class="text-pink-400 font-normal">밸런스형</span>
+                </div>
+                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2" id="character-selector">
+                    <!-- Cards added via JS -->
+                </div>
+            </div>
+
+            <!-- Rules & Controls -->
+            <div class="w-full bg-slate-900/60 rounded-xl p-3 text-left text-xs text-gray-300 space-y-2 border border-slate-800">
+                <div class="font-bold text-cyan-400 text-sm pb-1 border-b border-slate-800 flex justify-between items-center">
+                    <span><i class="fas fa-gamepad mr-2"></i>조작 및 장애물 회피법</span>
+                    <span id="char-perk" class="text-amber-300 text-xs font-normal">특성: 없음</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-400">
+                    <div><span class="text-pink-400 font-bold">긴 바닥 벽:</span> SPACE 점프</div>
+                    <div><span class="text-cyan-400 font-bold">높은 기둥:</span> A/D 좌우 회피</div>
+                    <div><span class="text-amber-400 font-bold">공중 가로막:</span> 점프 금지 (지상 유지)</div>
+                    <div><span class="text-purple-400 font-bold">이동식 블록:</span> 타이밍 예측 회피</div>
+                </div>
+                <div class="flex justify-between items-center pt-1 border-t border-slate-800">
+                    <span>좌우 이동: <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">A</kbd> / <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">D</kbd></span>
+                    <span>점프: <kbd class="font-mono bg-cyan-950 border border-cyan-800 text-cyan-300 px-1.5 py-0.5 rounded">SPACE</kbd></span>
+                </div>
+            </div>
+
+            <button id="start-btn" class="w-full py-3.5 rounded-xl text-white font-extrabold text-lg retro-btn tracking-wider uppercase cursor-pointer">
+                게임 시작 (START)
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Touch Controls Overlay -->
+    <div id="touch-controls" class="absolute bottom-4 inset-x-4 z-10 flex justify-between pointer-events-none md:hidden hidden">
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-left" class="w-16 h-16 rounded-full bg-white/10 active:bg-cyan-500/40 backdrop-blur border border-white/20 text-white text-2xl flex items-center justify-center">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button id="btn-right" class="w-16 h-16 rounded-full bg-white/10 active:bg-cyan-500/40 backdrop-blur border border-white/20 text-white text-2xl flex items-center justify-center">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+        <button id="btn-jump" class="w-20 h-16 rounded-2xl bg-pink-500/30 active:bg-pink-500/60 backdrop-blur border border-pink-500/50 text-white font-bold text-lg flex items-center justify-center pointer-events-auto">
+            JUMP
+        </button>
+    </div>
+
+    <script>
+        // --- Web Audio API Synth Sound Generator ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+                this.bgmTimer = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                return this.isMuted;
+            }
+
+            // Jump Sound Effect
+            playJump() {
+                if (this.isMuted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+
+            // Crash Sound Effect
+            playCrash() {
+                if (this.isMuted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.4);
+                
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.4);
+            }
+
+            // Synthesized BGM Loop (Retro synthwave arpeggio)
+            startBGM() {
+                if (this.bgmTimer || !this.ctx) return;
+                
+                const notes = [130.81, 146.83, 164.81, 196.00, 220.00, 196.00, 164.81, 146.83]; // C3, D3, E3, G3, A3...
+                let noteIndex = 0;
+
+                this.bgmTimer = setInterval(() => {
+                    if (this.isMuted || !this.ctx) return;
+                    
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(notes[noteIndex], this.ctx.currentTime);
+                    
+                    // Lowpass filter for synthwave effect
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                    
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                    
+                    noteIndex = (noteIndex + 1) % notes.length;
+                }, 130); // BPM tempo
+            }
+
+            stopBGM() {
+                if (this.bgmTimer) {
+                    clearInterval(this.bgmTimer);
+                    this.bgmTimer = null;
+                }
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // --- Character Definitions ---
+        const CHARACTERS = [
+            {
+                id: 'neon-runner',
+                name: '네온 랜서',
+                icon: 'fa-shuttle-space',
+                color: 0x00f0ff,
+                emissive: 0x004466,
+                accentColor: '#00f0ff',
+                desc: '밸런스형 표준 기체',
+                speedMultiplier: 1.0,
+                jumpForce: 0.48,
+                scoreMultiplier: 1.0,
+                perkText: '특성: 올라운더 표준 스펙'
+            },
+            {
+                id: 'speed-phantom',
+                name: '팬텀 블레이드',
+                icon: 'fa-bolt',
+                color: 0xff0055,
+                emissive: 0x660022,
+                accentColor: '#ff0055',
+                desc: '초고속 & 고득점 기체',
+                speedMultiplier: 1.2,
+                jumpForce: 0.46,
+                scoreMultiplier: 1.5,
+                perkText: '특성: 속도 +20%, 스코어 +50%'
+            },
+            {
+                id: 'gravity-hopper',
+                name: '그라비티 호퍼',
+                icon: 'fa-angles-up',
+                color: 0x00ff88,
+                emissive: 0x004422,
+                accentColor: '#00ff88',
+                desc: '고점프 & 하이테크 기체',
+                speedMultiplier: 0.95,
+                jumpForce: 0.58,
+                scoreMultiplier: 1.0,
+                perkText: '특성: 높은 점프 및 체공시간'
+            },
+            {
+                id: 'heavy-titan',
+                name: '타이탄 아머',
+                icon: 'fa-shield-halved',
+                color: 0xffaa00,
+                emissive: 0x664400,
+                accentColor: '#ffaa00',
+                desc: '중장갑 & 보너스 기체',
+                speedMultiplier: 0.9,
+                jumpForce: 0.45,
+                scoreMultiplier: 1.25,
+                perkText: '특성: 안정적 조작감 & 스코어 +25%'
+            },
+            {
+                id: 'quantum-glider',
+                name: '퀀텀 글라이더',
+                icon: 'fa-paper-plane',
+                color: 0xcc00ff,
+                emissive: 0x550066,
+                accentColor: '#cc00ff',
+                desc: '경량형 곡예 기체',
+                speedMultiplier: 1.1,
+                jumpForce: 0.52,
+                scoreMultiplier: 1.2,
+                perkText: '특성: 빠른 반응속도 & 유연한 점프'
+            },
+            {
+                id: 'solar-phoenix',
+                name: '솔라 피닉스',
+                icon: 'fa-fire-flame-curved',
+                color: 0xff5500,
+                emissive: 0x662200,
+                accentColor: '#ff5500',
+                desc: '에너지 차장 기체',
+                speedMultiplier: 1.05,
+                jumpForce: 0.50,
+                scoreMultiplier: 1.3,
+                perkText: '특성: 화려한 광원 & 스코어 +30%'
+            },
+            {
+                id: 'cyber-plasma',
+                name: '플라즈마 드론',
+                icon: 'fa-atom',
+                color: 0xffff00,
+                emissive: 0x666600,
+                accentColor: '#ffff00',
+                desc: '에너지 테크 기체',
+                speedMultiplier: 1.02,
+                jumpForce: 0.49,
+                scoreMultiplier: 1.15,
+                perkText: '특성: 높은 가시성 & 제어력'
+            },
+            {
+                id: 'vortex-striker',
+                name: '볼텍스 스트라이커',
+                icon: 'fa-meteor',
+                color: 0x00ffff,
+                emissive: 0x006666,
+                accentColor: '#00ffff',
+                desc: '공격형 추진 기체',
+                speedMultiplier: 1.15,
+                jumpForce: 0.47,
+                scoreMultiplier: 1.35,
+                perkText: '특성: 고속 비행 & 높은 점수율'
+            }
+        ];
+
+        let selectedCharIndex = 0;
+
+        // --- Game Logic & 3D Variables ---
+        let scene, camera, renderer;
+        let player, playerBox;
+        let obstacles = [];
+        let particles = [];
+        let roadGrid;
+
+        // Config & State
+        const LANE_WIDTH = 3.2; // Width of movement range
+        const MAX_X = LANE_WIDTH * 1.5;
+        
+        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'GAMEOVER'
+        let score = 0;
+        let speed = 0.8; // Hard mode initial speed
+        const maxSpeed = 1.6;
+        
+        // Player Physics
+        let playerPos = { x: 0, y: 0, z: 0 };
+        let playerVelY = 0;
+        const GRAVITY = -0.022;
+        let currentJumpForce = 0.48;
+        let isGrounded = true;
+
+        // Keys state
+        const keys = { a: false, d: false, left: false, right: false, space: false };
+
+        // Obstacle Spawn Timers
+        let lastSpawnZ = -50;
+        const SPAWN_INTERVAL_Z = 22; // Harder mode: obstacles closer together
+
+        // --- Character UI Setup ---
+        function setupCharacterSelector() {
+            const container = document.getElementById('character-selector');
+            container.innerHTML = '';
+
+            CHARACTERS.forEach((char, idx) => {
+                const card = document.createElement('div');
+                card.className = `character-card p-3 rounded-xl border border-slate-700 bg-slate-900/80 flex flex-col items-center gap-1.5 text-center ${idx === selectedCharIndex ? 'selected' : ''}`;
+                card.onclick = () => selectCharacter(idx);
+
+                card.innerHTML = `
+                    <div class="text-2xl my-1" style="color: ${char.accentColor};">
+                        <i class="fas ${char.icon}"></i>
+                    </div>
+                    <div class="font-bold text-xs text-white">${char.name}</div>
+                    <div class="text-[10px] text-gray-400 line-clamp-1">${char.desc}</div>
+                `;
+                container.appendChild(card);
+            });
+
+            updateCharInfo();
+        }
+
+        function selectCharacter(index) {
+            selectedCharIndex = index;
+            const cards = document.querySelectorAll('.character-card');
+            cards.forEach((card, idx) => {
+                if (idx === index) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
+            updateCharInfo();
+            createPlayer(); // Re-create player preview
+        }
+
+        function updateCharInfo() {
+            const currentChar = CHARACTERS[selectedCharIndex];
+            document.getElementById('char-desc-type').innerText = currentChar.desc;
+            document.getElementById('char-perk').innerText = currentChar.perkText;
+            document.getElementById('active-char-badge').innerHTML = `<i class="fas ${currentChar.icon} mr-2" style="color: ${currentChar.accentColor}"></i> ${currentChar.name}`;
+        }
+
+        // --- Initialization ---
+        function initThree() {
+            const container = document.getElementById('game-canvas');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.018);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 4, 9);
+            camera.lookAt(0, 1.5, -5);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ canvas: container, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xff007f, 0.8);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x00f0ff, 1.5, 30);
+            pointLight.position.set(0, 5, 0);
+            scene.add(pointLight);
+
+            // Environment: Infinite Road Grid
+            createRoad();
+
+            // Player Creation
+            createPlayer();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // Road & Cyber Grid
+        function createRoad() {
+            const roadGeo = new THREE.PlaneGeometry(12, 300);
+            const roadMat = new THREE.MeshStandardMaterial({ 
+                color: 0x0a0a16, 
+                roughness: 0.2, 
+                metalness: 0.8 
+            });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.z = -100;
+            scene.add(road);
+
+            // Side Glowing Rails
+            const railGeo = new THREE.BoxGeometry(0.3, 0.3, 300);
+            const railMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+            
+            const leftRail = new THREE.Mesh(railGeo, railMat);
+            leftRail.position.set(-6, 0.15, -100);
+            scene.add(leftRail);
+
+            const rightRail = new THREE.Mesh(railGeo, railMat);
+            rightRail.position.set(6, 0.15, -100);
+            scene.add(rightRail);
+
+            // Grid Lines texture simulation
+            roadGrid = new THREE.GridHelper(300, 60, 0xff0055, 0x1a1a3a);
+            roadGrid.position.set(0, 0.01, -100);
+            scene.add(roadGrid);
+        }
+
+        // Distinct Player Models based on selected Character
+        function createPlayer() {
+            if (player) {
+                scene.remove(player);
+            }
+
+            player = new THREE.Group();
+            const char = CHARACTERS[selectedCharIndex];
+
+            if (char.id === 'neon-runner') {
+                // Sleek jet shape
+                const bodyGeo = new THREE.ConeGeometry(0.7, 2, 4);
+                const bodyMat = new THREE.MeshStandardMaterial({ 
+                    color: char.color, roughness: 0.1, metalness: 0.9, emissive: char.emissive 
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.rotation.x = Math.PI / 2;
+                body.rotation.z = Math.PI;
+                player.add(body);
+
+                const wingGeo = new THREE.BoxGeometry(1.8, 0.1, 0.8);
+                const wingMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+                const wings = new THREE.Mesh(wingGeo, wingMat);
+                wings.position.set(0, 0, 0.2);
+                player.add(wings);
+
+            } else if (char.id === 'speed-phantom') {
+                // Sharp Needle shape
+                const bodyGeo = new THREE.ConeGeometry(0.4, 2.6, 3);
+                const bodyMat = new THREE.MeshStandardMaterial({ 
+                    color: char.color, roughness: 0.1, metalness: 0.9, emissive: char.emissive 
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.rotation.x = Math.PI / 2;
+                player.add(body);
+
+                const ringGeo = new THREE.TorusGeometry(0.8, 0.05, 8, 16);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.set(0, 0, 0.3);
+                player.add(ring);
+
+            } else if (char.id === 'gravity-hopper') {
+                // UFO / Disk like shape
+                const discGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.3, 8);
+                const discMat = new THREE.MeshStandardMaterial({ 
+                    color: char.color, roughness: 0.2, metalness: 0.8, emissive: char.emissive 
+                });
+                const disc = new THREE.Mesh(discGeo, discMat);
+                player.add(disc);
+
+                const topGeo = new THREE.SphereGeometry(0.5, 8, 8);
+                const topMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                const topDome = new THREE.Mesh(topGeo, topMat);
+                topDome.position.set(0, 0.2, 0);
+                player.add(topDome);
+
+            } else if (char.id === 'heavy-titan') {
+                // Bulky Blocky Mecha shape
+                const coreGeo = new THREE.BoxGeometry(1.4, 0.8, 1.8);
+                const coreMat = new THREE.MeshStandardMaterial({ 
+                    color: char.color, roughness: 0.3, metalness: 0.7, emissive: char.emissive 
+                });
+                const core = new THREE.Mesh(coreGeo, coreMat);
+                player.add(core);
+
+                const sideGeo = new THREE.BoxGeometry(0.4, 0.9, 2.2);
+                const sideMat = new THREE.MeshStandardMaterial({ color: 0x333344 });
+                const leftSide = new THREE.Mesh(sideGeo, sideMat);
+                leftSide.position.set(-0.9, 0, 0);
+                const rightSide = leftSide.clone();
+                rightSide.position.set(0.9, 0, 0);
+                player.add(leftSide);
+                player.add(rightSide);
+
+            } else if (char.id === 'quantum-glider') {
+                // Tri-wing glider shape
+                const bodyGeo = new THREE.ConeGeometry(0.6, 2.2, 3);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, roughness: 0.2 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.rotation.x = Math.PI / 2;
+                player.add(body);
+
+                const ringGeo = new THREE.TorusGeometry(0.9, 0.04, 8, 16);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.position.set(0, 0, -0.2);
+                player.add(ring);
+
+            } else if (char.id === 'solar-phoenix') {
+                // Diamond Arrow Fighter
+                const bodyGeo = new THREE.OctahedronGeometry(0.9);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, metalness: 0.8 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.scale.set(0.7, 0.4, 1.8);
+                player.add(body);
+
+                const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 4);
+                const flameMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const flame = new THREE.Mesh(flameGeo, flameMat);
+                flame.rotation.x = -Math.PI / 2;
+                flame.position.set(0, 0, 1.2);
+                player.add(flame);
+
+            } else if (char.id === 'cyber-plasma') {
+                // Spherical Orb Carrier
+                const orbGeo = new THREE.SphereGeometry(0.8, 16, 16);
+                const orbMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive, roughness: 0.1 });
+                const orb = new THREE.Mesh(orbGeo, orbMat);
+                player.add(orb);
+
+                const ringGeo = new THREE.TorusGeometry(1.2, 0.08, 8, 24);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 3;
+                player.add(ring);
+
+            } else if (char.id === 'vortex-striker') {
+                // Twin-engine Jet
+                const bodyGeo = new THREE.BoxGeometry(0.6, 0.5, 2.0);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, emissive: char.emissive });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                player.add(body);
+
+                const engGeo = new THREE.CylinderGeometry(0.25, 0.25, 1.8, 8);
+                const engMat = new THREE.MeshStandardMaterial({ color: 0x111122, metalness: 0.9 });
+                const leftEng = new THREE.Mesh(engGeo, engMat);
+                leftEng.rotation.x = Math.PI / 2;
+                leftEng.position.set(-0.6, 0, 0);
+                const rightEng = leftEng.clone();
+                rightEng.position.set(0.6, 0, 0);
+                player.add(leftEng);
+                player.add(rightEng);
+            }
+
+            // Thruster Light
+            const light = new THREE.PointLight(char.color, 2, 5);
+            light.position.set(0, 0, 1);
+            player.add(light);
+
+            player.position.set(playerPos.x, playerPos.y || 0.8, playerPos.z);
+            scene.add(player);
+
+            // Bounding Box for Collision
+            playerBox = new THREE.Box3();
+        }
+
+        // --- Expanded Obstacle Spawner (New Obstacle Types Added) ---
+        // Types:
+        // 1. 'LONG_WALL': Wide and low wall (Must Jump OVER)
+        // 2. 'HIGH_WALL': Tall narrow pillar (Must Dodge Left/Right)
+        // 3. 'HIGH_GATE': Suspended Overhead Gate (Must stay low / Cannot jump into)
+        // 4. 'MOVING_BLOCK': Block moving horizontally back and forth
+        // 5. 'LASER_GRID': High-contrast neon double barrier
+        // 6. 'PYRAMID_BLOCK': Sharp geometric spike block
+        function spawnObstacle(zPos) {
+            const typeRandom = Math.random();
+            let obstacle, type;
+
+            if (typeRandom < 0.22) {
+                // TYPE 1: LONG LOW WALL (Spans horizontally - Requires JUMP)
+                type = 'LONG_WALL';
+                const geo = new THREE.BoxGeometry(10.5, 1.2, 0.8);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0xff0055, 
+                    emissive: 0x660022, 
+                    roughness: 0.3 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+                obstacle.position.set(0, 0.6, zPos);
+
+                // Top Glowing Neon Trim
+                const edgeGeo = new THREE.BoxGeometry(10.6, 0.12, 0.9);
+                const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const edge = new THREE.Mesh(edgeGeo, edgeMat);
+                edge.position.set(0, 0.6, 0);
+                obstacle.add(edge);
+
+            } else if (typeRandom < 0.42) {
+                // TYPE 2: TALL NARROW WALL (Dodge Left or Right)
+                type = 'HIGH_WALL';
+                const geo = new THREE.BoxGeometry(3.4, 6.5, 0.8);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0x00f0ff, 
+                    emissive: 0x004466, 
+                    roughness: 0.2 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+        // --- Balanced Obstacle Spawner ---
+        // Spawn distance interval tuned for fair, moderate difficulty
+        const SPAWN_INTERVAL_Z = 28; // Increased gap so players have time to react
+
+        function spawnObstacle(zPos) {
+            const typeRandom = Math.random();
+            let obstacle, type;
+
+            if (typeRandom < 0.35) {
+                // TYPE 1: LONG LOW WALL (Spans horizontally - Requires JUMP)
+                type = 'LONG_WALL';
+                const geo = new THREE.BoxGeometry(10.5, 1.2, 0.8);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0xff0055, 
+                    emissive: 0x660022, 
+                    roughness: 0.3 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+                obstacle.position.set(0, 0.6, zPos);
+
+                // Top Glowing Neon Trim
+                const edgeGeo = new THREE.BoxGeometry(10.6, 0.12, 0.9);
+                const edgeMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const edge = new THREE.Mesh(edgeGeo, edgeMat);
+                edge.position.set(0, 0.6, 0);
+                obstacle.add(edge);
+
+            } else if (typeRandom < 0.65) {
+                // TYPE 2: TALL NARROW WALL (Dodge Left or Right)
+                type = 'HIGH_WALL';
+                const geo = new THREE.BoxGeometry(3.2, 6.5, 0.8);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0x00f0ff, 
+                    emissive: 0x004466, 
+                    roughness: 0.2 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+                
+                const lanes = [-LANE_WIDTH, 0, LANE_WIDTH];
+                const xPos = lanes[Math.floor(Math.random() * lanes.length)];
+                obstacle.position.set(xPos, 3.25, zPos);
+
+            } else if (typeRandom < 0.82) {
+                // TYPE 3: HIGH OVERHEAD GATE (Do NOT Jump / Stay Grounded)
+                type = 'HIGH_GATE';
+                const geo = new THREE.BoxGeometry(11, 3.5, 0.8);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0xffaa00, 
+                    emissive: 0x664400, 
+                    roughness: 0.3 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+                obstacle.position.set(0, 3.8, zPos);
+
+                const stripeGeo = new THREE.BoxGeometry(11.1, 0.15, 0.9);
+                const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+                const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+                stripe.position.set(0, -1.6, 0);
+                obstacle.add(stripe);
+
+            } else {
+                // TYPE 4: HORIZONTALLY MOVING BLOCK (Predictable moderate speed)
+                type = 'MOVING_BLOCK';
+                const geo = new THREE.BoxGeometry(3.0, 2.2, 1.2);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0xaa00ff, 
+                    emissive: 0x440066 
+                });
+                obstacle = new THREE.Mesh(geo, mat);
+                obstacle.position.set(0, 1.1, zPos);
+                obstacle.userData.moveDirection = Math.random() > 0.5 ? 1 : -1;
+                obstacle.userData.moveSpeed = 0.05; // Moderate movement speed
+            }
+
+            obstacle.userData = Object.assign(obstacle.userData || {}, { type: type, box: new THREE.Box3() });
+            scene.add(obstacle);
+            obstacles.push(obstacle);
+        }
+
+        // Spawns explosion particles on collision
+        function createExplosion(pos) {
+            for (let i = 0; i < 30; i++) {
+                const pGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+                const pMat = new THREE.MeshBasicMaterial({ 
+                    color: Math.random() > 0.5 ? 0xff0055 : 0x00f0ff 
+                });
+                const particle = new THREE.Mesh(pGeo, pMat);
+                particle.position.copy(pos);
+                
+                particle.userData = {
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.8,
+                        (Math.random() - 0.5) * 0.8 + 0.3,
+                        (Math.random() - 0.5) * 0.8
+                    )
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        // --- Controls Handlers ---
+        function setupControls() {
+            setupCharacterSelector();
+
+            // Keyboard
+            window.addEventListener('keydown', (e) => {
+                if (gameState !== 'PLAYING') return;
+                const code = e.code;
+                if (code === 'KeyA' || code === 'ArrowLeft') keys.a = true;
+                if (code === 'KeyD' || code === 'ArrowRight') keys.d = true;
+                if (code === 'Space') {
+                    e.preventDefault();
+                    triggerJump();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const code = e.code;
+                if (code === 'KeyA' || code === 'ArrowLeft') keys.a = false;
+                if (code === 'KeyD' || code === 'ArrowRight') keys.d = false;
+            });
+
+            // Touch UI Buttons
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+            const btnJump = document.getElementById('btn-jump');
+
+            const bindTouch = (elem, keyName) => {
+                elem.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+                elem.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+            };
+
+            bindTouch(btnLeft, 'left');
+            bindTouch(btnRight, 'right');
+            
+            btnJump.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState === 'PLAYING') triggerJump();
+            });
+
+            // UI Buttons
+            document.getElementById('start-btn').addEventListener('click', startGame);
+            
+            document.getElementById('audio-toggle-btn').addEventListener('click', () => {
+                const muted = audio.toggleMute();
+                document.getElementById('audio-icon').className = muted ? 'fas fa-volume-mute text-red-400' : 'fas fa-volume-up text-cyan-400';
+            });
+        }
+
+        function triggerJump() {
+            if (isGrounded) {
+                playerVelY = currentJumpForce;
+                isGrounded = false;
+                audio.playJump();
+            }
+        }
+
+        // --- Game Loop & Logic ---
+        function startGame() {
+            audio.init();
+            audio.startBGM();
+
+            // Clear Existing Obstacles
+            obstacles.forEach(obs => scene.remove(obs));
+            obstacles = [];
+            particles.forEach(p => scene.remove(p));
+            particles = [];
+
+            // Apply selected character stats
+            const char = CHARACTERS[selectedCharIndex];
+            speed = 0.85 * char.speedMultiplier; 
+            currentJumpForce = char.jumpForce;
+
+            // Reset Stats
+            score = 0;
+            playerPos = { x: 0, y: 0.8, z: 0 };
+            playerVelY = 0;
+            isGrounded = true;
+            lastSpawnZ = -30;
+
+            // Re-create player model for selected character
+            createPlayer();
+
+            // Pre-spawn initial obstacles ahead
+            for (let z = -40; z > -150; z -= SPAWN_INTERVAL_Z) {
+                spawnObstacle(z);
+                lastSpawnZ = z;
+            }
+
+            // Update UI
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('controls-hint').classList.remove('hidden');
+            document.getElementById('touch-controls').classList.remove('hidden');
+
+            gameState = 'PLAYING';
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            audio.stopBGM();
+            audio.playCrash();
+
+            createExplosion(player.position);
+
+            // Update Overlay UI
+            document.getElementById('final-score').innerText = Math.floor(score);
+            document.getElementById('game-over-info').classList.remove('hidden');
+            document.getElementById('start-btn').innerText = '다시 시도 (RETRY)';
+            document.getElementById('menu-overlay').classList.remove('hidden');
+            document.getElementById('controls-hint').classList.add('hidden');
+            document.getElementById('touch-controls').classList.add('hidden');
+        }
+
+        function update() {
+            if (gameState === 'PLAYING') {
+                const char = CHARACTERS[selectedCharIndex];
+                
+                // 1. Score & Speed Progression
+                score += speed * 0.5 * char.scoreMultiplier;
+                document.getElementById('score-text').innerText = Math.floor(score);
+                
+                // Hard mode gets progressively faster up to maxSpeed
+                if (speed < maxSpeed * char.speedMultiplier) speed += 0.0003;
+
+                // 2. Horizontal Movement Logic (A/D or Touch)
+                const moveSpeed = 0.22;
+                if ((keys.a || keys.left) && playerPos.x > -MAX_X) {
+                    playerPos.x -= moveSpeed;
+                }
+                if ((keys.d || keys.right) && playerPos.x < MAX_X) {
+                    playerPos.x += moveSpeed;
+                }
+
+                // Smooth Bank/Tilt Angle when turning
+                const targetTilt = (keys.a || keys.left) ? 0.4 : ((keys.d || keys.right) ? -0.4 : 0);
+                player.rotation.z += (targetTilt - player.rotation.z) * 0.15;
+
+                // 3. Jump Physics
+                playerPos.y += playerVelY;
+                playerVelY += GRAVITY;
+
+                if (playerPos.y <= 0.8) {
+                    playerPos.y = 0.8;
+                    playerVelY = 0;
+                    isGrounded = true;
+                }
+
+                // Update Player Model Position
+                player.position.set(playerPos.x, playerPos.y, playerPos.z);
+                
+                // Update Player Collision Box (Slightly smaller than mesh for forgiving gameplay)
+                playerBox.setFromObject(player);
+                playerBox.expandByScalar(-0.15); 
+
+                // 4. Move Road Grid to give illusion of speed
+                roadGrid.position.z += speed;
+                if (roadGrid.position.z > 5) roadGrid.position.z = 0;
+
+                // 5. Update & Spawn Obstacles
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const obs = obstacles[i];
+                    obs.position.z += speed;
+
+                    // Moving obstacle special logic
+                    if (obs.userData.type === 'MOVING_BLOCK') {
+                        obs.position.x += obs.userData.moveDirection * obs.userData.moveSpeed;
+                        if (obs.position.x > MAX_X) {
+                            obs.position.x = MAX_X;
+                            obs.userData.moveDirection = -1;
+                        } else if (obs.position.x < -MAX_X) {
+                            obs.position.x = -MAX_X;
+                            obs.userData.moveDirection = 1;
+                        }
+                    }
+
+                    // Collision Detection
+                    obs.userData.box.setFromObject(obs);
+                    if (playerBox.intersectsBox(obs.userData.box)) {
+                        gameOver();
+                        return;
+                    }
+
+                    // Remove off-screen obstacles
+                    if (obs.position.z > 10) {
+                        scene.remove(obs);
+                        obstacles.splice(i, 1);
+                    }
+                }
+
+                // Spawn New Obstacles ahead (Fair progression rate)
+                const currentSpawnInterval = Math.max(20, SPAWN_INTERVAL_Z - Math.floor(score / 600));
+                if (lastSpawnZ + speed > -160) {
+                    lastSpawnZ -= currentSpawnInterval;
+                    spawnObstacle(lastSpawnZ);
+                }
+            }
+
+            // Update Explosion Particle FX
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.position.add(p.userData.vel);
+                p.scale.multiplyScalar(0.95); // shrink
+                if (p.scale.x < 0.01) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function render() {
+            requestAnimationFrame(render);
+            update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Start Application ---
+        window.onload = () => {
+            initThree();
+            setupControls();
+            render();
+        };
+    </script>
+</body>
+</html>

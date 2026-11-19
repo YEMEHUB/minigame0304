@@ -1,0 +1,1051 @@
+
+<!DOCTYPE html>
+<html lang="ko" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 카지노: 포커 & 훌라</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', 'sans-serif'],
+                    },
+                    colors: {
+                        poker: {
+                            green: '#0f5233',
+                            felt: '#1b6942',
+                            border: '#3e2723',
+                            gold: '#fbbf24'
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-short': 'bounce 0.5s ease-in-out 1',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        
+        /* 3D Felt Table Surface Effect */
+        .table-felt {
+            background: radial-gradient(circle at center, #1e7549 0%, #0d4228 70%, #062215 100%);
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.9);
+            border: 14px solid #3d2314;
+        }
+
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.18);
+            transition: all 0.25s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-12px) scale(1.03);
+            box-shadow: 0 12px 20px -2px rgba(0, 0, 0, 0.4);
+        }
+
+        .selected-card {
+            transform: translateY(-16px) !important;
+            border: 2px solid #fbbf24 !important;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.6) !important;
+        }
+
+        /* Custom Scrollbar for Logs */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.4);
+        }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col justify-between select-none">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-3 flex justify-between items-center z-50">
+        <div class="flex items-center space-x-3">
+            <div class="bg-amber-500 text-slate-950 p-2 rounded-xl font-black text-xl flex items-center justify-center w-10 h-10 shadow-lg shadow-amber-500/20">
+                <i class="fa-solid fa-spade"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-none tracking-wide text-amber-400">AI Casino Royale</h1>
+                <span class="text-xs text-slate-400 font-medium">3명의 AI와의 실시간 대전</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <!-- Game Selector Menu -->
+            <div class="bg-slate-900 border border-slate-700 rounded-xl p-1 flex">
+                <button id="nav-poker-btn" onclick="switchGameMode('poker')" class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md">
+                    <i class="fa-solid fa-poker-chip mr-1.5"></i>텍사스 홀덤
+                </button>
+                <button id="nav-hula-btn" onclick="switchGameMode('hula')" class="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition-all duration-200">
+                    <i class="fa-solid fa-layer-group mr-1.5"></i>훌라 (Hula)
+                </button>
+            </div>
+
+            <!-- Sound Toggle -->
+            <button id="sound-btn" onclick="toggleSound()" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">
+                <i class="fa-solid fa-volume-high text-amber-400"></i>
+            </button>
+            
+            <!-- Rules Help -->
+            <button onclick="toggleModal('rules-modal')" class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition">
+                <i class="fa-solid fa-circle-question"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Arena -->
+    <main class="flex-1 relative flex items-center justify-center p-4 md:p-8 overflow-hidden">
+        
+        <!-- Game Table Felt -->
+        <div class="relative w-full max-w-6xl h-[620px] rounded-[100px] table-felt flex flex-col justify-between p-6 md:p-10 border-amber-900/50 shadow-2xl">
+            
+            <!-- Top AI Player (AI 2) -->
+            <div class="absolute -top-6 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
+                <div id="player-2-card" class="bg-slate-900/90 border-2 border-slate-700 rounded-2xl p-3 shadow-xl flex items-center space-x-3 transition-all duration-300 min-w-[200px]">
+                    <div class="relative">
+                        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Alpha" class="w-12 h-12 rounded-full bg-slate-800 border border-slate-600">
+                        <span id="p2-status" class="absolute -bottom-1 -right-1 text-[10px] bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded-full font-bold">대기</span>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 flex items-center justify-between">
+                            <span>알파 (AI 2)</span>
+                            <span class="text-xs text-amber-400 font-mono ml-2" id="p2-chips">₩1,000,000</span>
+                        </div>
+                        <div class="text-xs text-slate-400 mt-0.5" id="p2-action">준비 완료</div>
+                    </div>
+                </div>
+                <!-- AI 2 Hand Slot -->
+                <div id="p2-hand" class="flex -space-x-4 mt-2"></div>
+            </div>
+
+            <!-- Left AI Player (AI 1) -->
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center z-20">
+                <div id="player-1-card" class="bg-slate-900/90 border-2 border-slate-700 rounded-2xl p-3 shadow-xl flex items-center space-x-3 transition-all duration-300 min-w-[180px]">
+                    <div class="relative">
+                        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Beta" class="w-12 h-12 rounded-full bg-slate-800 border border-slate-600">
+                        <span id="p1-status" class="absolute -bottom-1 -right-1 text-[10px] bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded-full font-bold">대기</span>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">베타 (AI 1)</div>
+                        <div class="text-xs text-amber-400 font-mono mt-0.5" id="p1-chips">₩1,000,000</div>
+                        <div class="text-xs text-slate-400 mt-0.5" id="p1-action">준비 완료</div>
+                    </div>
+                </div>
+                <!-- AI 1 Hand Slot -->
+                <div id="p1-hand" class="flex -space-x-6 mt-3"></div>
+            </div>
+
+            <!-- Right AI Player (AI 3) -->
+            <div class="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col items-center z-20">
+                <div id="player-3-card" class="bg-slate-900/90 border-2 border-slate-700 rounded-2xl p-3 shadow-xl flex items-center space-x-3 transition-all duration-300 min-w-[180px]">
+                    <div class="relative">
+                        <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Gamma" class="w-12 h-12 rounded-full bg-slate-800 border border-slate-600">
+                        <span id="p3-status" class="absolute -bottom-1 -right-1 text-[10px] bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded-full font-bold">대기</span>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">감마 (AI 3)</div>
+                        <div class="text-xs text-amber-400 font-mono mt-0.5" id="p3-chips">₩1,000,000</div>
+                        <div class="text-xs text-slate-400 mt-0.5" id="p3-action">준비 완료</div>
+                    </div>
+                </div>
+                <!-- AI 3 Hand Slot -->
+                <div id="p3-hand" class="flex -space-x-6 mt-3"></div>
+            </div>
+
+            <!-- Center Table Area (Pot / Community Cards / Discard Pile) -->
+            <div class="my-auto mx-auto flex flex-col items-center justify-center z-10 w-full max-w-xl">
+                <!-- Game Info Badge -->
+                <div class="mb-3 bg-slate-950/70 border border-amber-500/30 px-4 py-1.5 rounded-full flex items-center space-x-3 shadow-inner">
+                    <span id="game-phase-badge" class="text-xs font-extrabold uppercase tracking-widest text-amber-400">게임을 시작하세요</span>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-xs font-bold text-slate-300">총 베팅 팟: <span id="pot-amount" class="text-amber-300 font-mono font-extrabold">₩0</span></span>
+                </div>
+
+                <!-- Community Cards (Poker) OR Discard & Deck Pile (Hula) -->
+                <div id="center-board" class="flex items-center justify-center space-x-3 min-h-[120px] p-3 rounded-2xl bg-black/20 border border-white/5 w-full">
+                    <!-- Cards are dynamically injected here -->
+                </div>
+
+                <!-- Game System Message Banner -->
+                <div id="system-msg" class="mt-3 text-center text-sm font-semibold text-amber-200 bg-slate-900/80 px-4 py-1.5 rounded-lg border border-amber-500/20 shadow-md">
+                    '게임 시작' 버튼을 눌러 플레이를 시작하세요!
+                </div>
+            </div>
+
+            <!-- Bottom Player (User) -->
+            <div class="relative flex flex-col items-center z-20 mt-auto">
+                <!-- User Hand Display -->
+                <div id="p0-hand" class="flex -space-x-4 mb-3 transition-all"></div>
+
+                <!-- User Info Bar -->
+                <div id="player-0-card" class="bg-slate-900/95 border-2 border-amber-500/60 rounded-2xl px-6 py-2.5 shadow-2xl flex items-center justify-between w-full max-w-md">
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=UserPlayer" class="w-11 h-11 rounded-full bg-amber-500/10 border-2 border-amber-400">
+                            <span class="absolute -bottom-1 -right-1 text-[10px] bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded-full font-black">YOU</span>
+                        </div>
+                        <div>
+                            <div class="font-extrabold text-slate-100 text-sm">나 (Player)</div>
+                            <div class="text-xs text-amber-400 font-mono font-bold" id="p0-chips">₩1,000,000</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="p0-hand-rank" class="text-xs font-bold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-2.5 py-1 rounded-md">족보 분석 중</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Side Panel: Live Action Logs -->
+        <aside class="hidden lg:flex flex-col absolute right-6 top-24 bottom-24 w-72 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 shadow-2xl backdrop-blur-md z-30">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="font-bold text-sm text-slate-300 flex items-center">
+                    <i class="fa-solid fa-list-ul text-amber-400 mr-2"></i>게임 진행 로그
+                </h3>
+                <span class="flex h-2 w-2 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+            </div>
+            <div id="action-logs" class="flex-1 overflow-y-auto my-3 space-y-2 text-xs font-mono pr-1">
+                <div class="text-slate-500 italic">게임이 시작되면 플레이어 액션이 기록됩니다.</div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Controls Bar -->
+    <footer class="bg-slate-950 border-t border-slate-800 px-6 py-4 z-40">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            
+            <!-- Game Start / Reset -->
+            <button id="start-game-btn" onclick="startNewGame()" class="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-500/20 transform active:scale-95 transition-all text-sm flex items-center">
+                <i class="fa-solid fa-play mr-2"></i>새 게임 시작
+            </button>
+
+            <!-- Poker Control Group -->
+            <div id="poker-controls" class="hidden flex-1 flex items-center justify-center gap-2">
+                <button id="btn-fold" onclick="handlePokerAction('fold')" class="flex-1 max-w-[120px] py-2.5 bg-rose-600/20 border border-rose-500/50 hover:bg-rose-600/40 text-rose-300 font-bold rounded-xl transition active:scale-95 text-xs">
+                    폴드 (Fold)
+                </button>
+                <button id="btn-check" onclick="handlePokerAction('check')" class="flex-1 max-w-[120px] py-2.5 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition active:scale-95 text-xs">
+                    체크 (Check)
+                </button>
+                <button id="btn-call" onclick="handlePokerAction('call')" class="flex-1 max-w-[120px] py-2.5 bg-emerald-600/30 border border-emerald-500 hover:bg-emerald-600/50 text-emerald-200 font-bold rounded-xl transition active:scale-95 text-xs">
+                    콜 (Call)
+                </button>
+                <button id="btn-raise" onclick="handlePokerAction('raise')" class="flex-1 max-w-[140px] py-2.5 bg-amber-500 border border-amber-400 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl transition active:scale-95 text-xs shadow-md">
+                    레이즈 (+₩50,000)
+                </button>
+            </div>
+
+            <!-- Hula Control Group -->
+            <div id="hula-controls" class="hidden flex-1 flex items-center justify-center gap-2">
+                <button id="btn-hula-draw" onclick="handleHulaDraw()" class="px-4 py-2.5 bg-indigo-600/30 border border-indigo-500 hover:bg-indigo-600/50 text-indigo-200 font-bold rounded-xl transition active:scale-95 text-xs">
+                    <i class="fa-solid fa-download mr-1.5"></i>덱에서 가져오기
+                </button>
+                <button id="btn-hula-meld" onclick="handleHulaMeld()" class="px-4 py-2.5 bg-amber-500 border border-amber-400 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl transition active:scale-95 text-xs">
+                    <i class="fa-solid fa-object-group mr-1.5"></i>선택한 카드 등록 (등록)
+                </button>
+                <button id="btn-hula-discard" onclick="handleHulaDiscard()" class="px-4 py-2.5 bg-rose-600/30 border border-rose-500 hover:bg-rose-600/50 text-rose-200 font-bold rounded-xl transition active:scale-95 text-xs">
+                    <i class="fa-solid fa-trash-can mr-1.5"></i>선택한 카드 버리기
+                </button>
+                <button id="btn-hula-stop" onclick="handleHulaStop()" class="px-4 py-2.5 bg-emerald-600 border border-emerald-400 hover:bg-emerald-500 text-slate-950 font-black rounded-xl transition active:scale-95 text-xs shadow-md">
+                    <i class="fa-solid fa-hand-paper mr-1.5"></i>스톱 (Stop)
+                </button>
+            </div>
+
+            <!-- AI Speed Multiplier -->
+            <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-400">
+                <span>AI 속도:</span>
+                <select id="ai-speed" class="bg-transparent text-amber-400 font-bold focus:outline-none">
+                    <option value="1000" class="bg-slate-900">보통 (1초)</option>
+                    <option value="500" class="bg-slate-900" selected>빠름 (0.5초)</option>
+                    <option value="200" class="bg-slate-900">매우 빠름</option>
+                </select>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Rules Modal -->
+    <div id="rules-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+            <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-amber-400 flex items-center">
+                    <i class="fa-solid fa-book-open mr-2"></i>게임 규칙 안내
+                </h2>
+                <button onclick="toggleModal('rules-modal')" class="text-slate-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
+                <section>
+                    <h3 class="font-bold text-amber-300 text-base mb-2">♦️ 텍사스 홀덤 (Texas Hold'em)</h3>
+                    <p class="leading-relaxed">
+                        각 플레이어는 2장의 핸드 카드를 받고, 중앙에 공개되는 5장의 커뮤니티 카드와 조합하여 **최고의 5장 족보**를 완성합니다.
+                        베팅 라운드(프리플랍, 플랍, 턴, 리버)마다 콜, 체크, 레이즈, 폴드를 선택할 수 있으며 마지막까지 남은 플레이어 중 가장 높은 족보를 가진 사람이 팟을 모두 차지합니다.
+                    </p>
+                </section>
+                <hr class="border-slate-800">
+                <section>
+                    <h3 class="font-bold text-emerald-400 text-base mb-2">♠️ 한국식 훌라 (Hula)</h3>
+                    <p class="leading-relaxed">
+                        각 플레이어는 7장의 카드를 받고 시작합니다. 차례마다 덱에서 카드를 가져오거나 버린 카드를 가져올 수 있으며, 
+                        3장 이상의 연속된 같은 모양 숫자 세트(예: ♠7-♠8-♠9) 또는 숫자가 같은 카드 세트(예: 7-7-7)를 **등록(Meld)**할 수 있습니다.<br>
+                        손에 든 카드를 모두 내려놓거나, 남은 카드 점수의 합이 가장 낮다고 판단될 때 '스톱'을 선언하여 승리할 수 있습니다.
+                    </p>
+                </section>
+            </div>
+            <div class="p-4 border-t border-slate-800 text-right">
+                <button onclick="toggleModal('rules-modal')" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC SCRIPT -->
+    <script>
+        /* ===================================================================
+           1. GAME GLOBAL STATE & CONFIGURATION
+           =================================================================== */
+        const SUITS = ['♠', '◆', '♥', '♣'];
+        const suitColors = { '♠': 'text-slate-900', '◆': 'text-rose-600', '♥': 'text-rose-600', '♣': 'text-slate-900' };
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+        let currentGameMode = 'poker'; // 'poker' or 'hula'
+        let soundEnabled = true;
+
+        // Players: Index 0 = User, Index 1, 2, 3 = AIs
+        let players = [
+            { id: 0, name: "나 (You)", chips: 1000000, hand: [], melded: [], fold: false, currentBet: 0, status: "대기" },
+            { id: 1, name: "베타 (AI 1)", chips: 1000000, hand: [], melded: [], fold: false, currentBet: 0, status: "대기" },
+            { id: 2, name: "알파 (AI 2)", chips: 1000000, hand: [], melded: [], fold: false, currentBet: 0, status: "대기" },
+            { id: 3, name: "감마 (AI 3)", chips: 1000000, hand: [], melded: [], fold: false, currentBet: 0, status: "대기" }
+        ];
+
+        let deck = [];
+        let communityCards = []; // For Poker
+        let hulaDiscardPile = []; // For Hula
+        let pot = 0;
+        let currentBetAmount = 0;
+        let activeTurnIndex = 0;
+        let gamePhase = 'IDLE'; // 'IDLE', 'PREFLOP', 'FLOP', 'TURN', 'RIVER', 'HULA_MAIN', 'ENDED'
+        let selectedCardsIdx = new Set(); // For Hula selection
+        let hasDrawnThisTurn = false; // For Hula mechanics
+
+        /* ===================================================================
+           2. SOUND ENGINE (Tone.js)
+           =================================================================== */
+        const synth = new Tone.Synth().toDestination();
+        
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (type === 'card') {
+                    synth.triggerAttackRelease("C5", "8n");
+                } else if (type === 'chip') {
+                    synth.triggerAttackRelease("G5", "16n");
+                } else if (type === 'win') {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("C4", "8n", now);
+                    synth.triggerAttackRelease("E4", "8n", now + 0.1);
+                    synth.triggerAttackRelease("G4", "8n", now + 0.2);
+                    synth.triggerAttackRelease("C5", "4n", now + 0.3);
+                }
+            } catch (e) {
+                // Audio Context fallback handling
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-btn');
+            btn.innerHTML = soundEnabled 
+                ? '<i class="fa-solid fa-volume-high text-amber-400"></i>' 
+                : '<i class="fa-solid fa-volume-xmark text-slate-500"></i>';
+        }
+
+        /* ===================================================================
+           3. CARD & DECK UTILITIES
+           =================================================================== */
+        function createDeck() {
+            let d = [];
+            for (let suit of SUITS) {
+                for (let i = 0; i < RANKS.length; i++) {
+                    d.push({ suit: suit, rank: RANKS[i], value: i + 2 });
+                }
+            }
+            return shuffle(d);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        /* ===================================================================
+           4. GAME CONTROL & INITIALIZATION
+           =================================================================== */
+        function switchGameMode(mode) {
+            if (gamePhase !== 'IDLE' && gamePhase !== 'ENDED') {
+                if (!confirm("진행 중인 게임이 있습니다. 모드를 변경하시겠습니까?")) return;
+            }
+            currentGameMode = mode;
+            
+            // Tab highlight
+            document.getElementById('nav-poker-btn').className = mode === 'poker' 
+                ? "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md"
+                : "px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition-all duration-200";
+            document.getElementById('nav-hula-btn').className = mode === 'hula' 
+                ? "px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md"
+                : "px-4 py-1.5 rounded-lg text-sm font-bold text-slate-400 hover:text-white transition-all duration-200";
+
+            resetGameState();
+            logAction(`[시스템] ${mode === 'poker' ? '텍사스 홀덤' : '훌라'} 모드로 전환되었습니다.`);
+        }
+
+        function resetGameState() {
+            deck = createDeck();
+            communityCards = [];
+            hulaDiscardPile = [];
+            pot = 0;
+            currentBetAmount = 0;
+            activeTurnIndex = 0;
+            gamePhase = 'IDLE';
+            selectedCardsIdx.clear();
+            hasDrawnThisTurn = false;
+
+            players.forEach(p => {
+                p.hand = [];
+                p.melded = [];
+                p.fold = false;
+                p.currentBet = 0;
+                p.status = "대기";
+            });
+
+            updateUI();
+            document.getElementById('system-msg').innerText = "'새 게임 시작' 버튼을 눌러 플레이를 시작하세요!";
+            document.getElementById('poker-controls').classList.add('hidden');
+            document.getElementById('hula-controls').classList.add('hidden');
+        }
+
+        function startNewGame() {
+            Tone.start();
+            resetGameState();
+
+            if (currentGameMode === 'poker') {
+                startPokerGame();
+            } else {
+                startHulaGame();
+            }
+        }
+
+        function logAction(msg) {
+            const logBox = document.getElementById('action-logs');
+            const item = document.createElement('div');
+            item.className = "text-slate-300 border-l-2 border-amber-500/50 pl-2 py-0.5 text-[11px]";
+            item.innerText = msg;
+            logBox.appendChild(item);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        /* ===================================================================
+           5. POKER (TEXAS HOLD'EM) LOGIC
+           =================================================================== */
+        function startPokerGame() {
+            gamePhase = 'PREFLOP';
+            logAction("=== 텍사스 홀덤 게임 시작 ===");
+
+            // Ante (기본 베팅 ₩10,000)
+            const ante = 10000;
+            players.forEach(p => {
+                p.chips -= ante;
+                p.currentBet = ante;
+                pot += ante;
+                p.hand = [deck.pop(), deck.pop()];
+            });
+            currentBetAmount = ante;
+
+            playSound('card');
+            logAction(`모든 플레이어가 앤티(₩10,000)를 냈습니다.`);
+            
+            document.getElementById('game-phase-badge').innerText = "프리플랍 (Pre-Flop)";
+            document.getElementById('poker-controls').classList.remove('hidden');
+
+            activeTurnIndex = 0; // User starts
+            updateUI();
+            checkTurn();
+        }
+
+        function handlePokerAction(action) {
+            if (activeTurnIndex !== 0 || gamePhase === 'ENDED') return;
+
+            const user = players[0];
+            if (action === 'fold') {
+                user.fold = true;
+                user.status = "폴드";
+                logAction(`[나] 폴드하였습니다.`);
+            } else if (action === 'check') {
+                if (user.currentBet < currentBetAmount) {
+                    alert("콜 금액이 부족합니다. '콜'을 눌러주세요.");
+                    return;
+                }
+                user.status = "체크";
+                logAction(`[나] 체크`);
+            } else if (action === 'call') {
+                const diff = currentBetAmount - user.currentBet;
+                user.chips -= diff;
+                user.currentBet = currentBetAmount;
+                pot += diff;
+                user.status = "콜";
+                playSound('chip');
+                logAction(`[나] 콜 (₩${diff.toLocaleString()})`);
+            } else if (action === 'raise') {
+                const raiseAmount = 50000;
+                const totalTarget = currentBetAmount + raiseAmount;
+                const diff = totalTarget - user.currentBet;
+                user.chips -= diff;
+                user.currentBet = totalTarget;
+                currentBetAmount = totalTarget;
+                pot += diff;
+                user.status = "레이즈";
+                playSound('chip');
+                logAction(`[나] ₩${raiseAmount.toLocaleString()} 레이즈!`);
+            }
+
+            advancePokerTurn();
+        }
+
+        function advancePokerTurn() {
+            activeTurnIndex = (activeTurnIndex + 1) % 4;
+            updateUI();
+
+            // Check if betting round is completed
+            const activePlayers = players.filter(p => !p.fold);
+            if (activePlayers.length === 1) {
+                // Everyone else folded
+                endPokerGame(activePlayers[0]);
+                return;
+            }
+
+            // Check if round should advance
+            const allMatched = activePlayers.every(p => p.currentBet === currentBetAmount || p.chips === 0);
+            if (activeTurnIndex === 0 && allMatched) {
+                advancePokerPhase();
+            } else {
+                checkTurn();
+            }
+        }
+
+        function checkTurn() {
+            if (players[activeTurnIndex].fold) {
+                advancePokerTurn();
+                return;
+            }
+
+            if (activeTurnIndex !== 0) {
+                // AI Turn
+                const delay = parseInt(document.getElementById('ai-speed').value);
+                setTimeout(() => runAIPokerLogic(players[activeTurnIndex]), delay);
+            } else {
+                document.getElementById('system-msg').innerText = "당신의 차례입니다. 행동을 선택하세요.";
+            }
+        }
+
+        function runAIPokerLogic(ai) {
+            // Simple heuristic AI decision
+            const diff = currentBetAmount - ai.currentBet;
+            const rand = Math.random();
+
+            if (diff === 0) {
+                if (rand > 0.8) {
+                    // Raise
+                    const raiseAmt = 50000;
+                    ai.chips -= raiseAmt;
+                    ai.currentBet += raiseAmt;
+                    currentBetAmount = ai.currentBet;
+                    pot += raiseAmt;
+                    ai.status = "레이즈";
+                    playSound('chip');
+                    logAction(`[${ai.name}] 레이즈 (+₩50,000)`);
+                } else {
+                    ai.status = "체크";
+                    logAction(`[${ai.name}] 체크`);
+                }
+            } else {
+                if (rand < 0.15 && diff > 100000) {
+                    ai.fold = true;
+                    ai.status = "폴드";
+                    logAction(`[${ai.name}] 폴드`);
+                } else if (rand > 0.85) {
+                    // Raise back
+                    const raiseAmt = 50000;
+                    const totalTarget = currentBetAmount + raiseAmt;
+                    const needed = totalTarget - ai.currentBet;
+                    ai.chips -= needed;
+                    ai.currentBet = totalTarget;
+                    currentBetAmount = totalTarget;
+                    pot += needed;
+                    ai.status = "레이즈";
+                    playSound('chip');
+                    logAction(`[${ai.name}] ₩${raiseAmt.toLocaleString()} 추가 레이즈!`);
+                } else {
+                    // Call
+                    ai.chips -= diff;
+                    ai.currentBet = currentBetAmount;
+                    pot += diff;
+                    ai.status = "콜";
+                    playSound('chip');
+                    logAction(`[${ai.name}] 콜 (₩${diff.toLocaleString()})`);
+                }
+            }
+
+            advancePokerTurn();
+        }
+
+        function advancePokerPhase() {
+            // Reset bets for next round
+            players.forEach(p => p.currentBet = 0);
+            currentBetAmount = 0;
+
+            if (gamePhase === 'PREFLOP') {
+                gamePhase = 'FLOP';
+                communityCards.push(deck.pop(), deck.pop(), deck.pop());
+                document.getElementById('game-phase-badge').innerText = "플랍 (Flop)";
+                logAction("--- 플랍 카드 3장 공개 ---");
+            } else if (gamePhase === 'FLOP') {
+                gamePhase = 'TURN';
+                communityCards.push(deck.pop());
+                document.getElementById('game-phase-badge').innerText = "턴 (Turn)";
+                logAction("--- 턴 카드 공개 ---");
+            } else if (gamePhase === 'TURN') {
+                gamePhase = 'RIVER';
+                communityCards.push(deck.pop());
+                document.getElementById('game-phase-badge').innerText = "리버 (River)";
+                logAction("--- 리버 카드 공개 ---");
+            } else if (gamePhase === 'RIVER') {
+                // Showdown
+                evaluatePokerShowdown();
+                return;
+            }
+
+            playSound('card');
+            activeTurnIndex = 0;
+            updateUI();
+            checkTurn();
+        }
+
+        function evaluatePokerShowdown() {
+            gamePhase = 'ENDED';
+            document.getElementById('game-phase-badge').innerText = "쇼다운 (Showdown)";
+            logAction("=== 쇼다운 카드 공개 ===");
+
+            const activePlayers = players.filter(p => !p.fold);
+            let winner = activePlayers[0];
+            let maxScore = -1;
+
+            activePlayers.forEach(p => {
+                const evalResult = evaluateHand([...p.hand, ...communityCards]);
+                p.handRankText = evalResult.name;
+                logAction(`[${p.name}] 족보: ${evalResult.name}`);
+                if (evalResult.score > maxScore) {
+                    maxScore = evalResult.score;
+                    winner = p;
+                }
+            });
+
+            endPokerGame(winner);
+        }
+
+        function endPokerGame(winner) {
+            gamePhase = 'ENDED';
+            winner.chips += pot;
+            playSound('win');
+            logAction(`🎉 승자: [${winner.name}]! 상금 ₩${pot.toLocaleString()} 획득!`);
+            document.getElementById('system-msg').innerHTML = `<span class="text-amber-400 font-extrabold">${winner.name}</span> 님이 팟 <span class="text-amber-300">₩${pot.toLocaleString()}</span>을 차지했습니다!`;
+            pot = 0;
+            updateUI();
+        }
+
+        // Basic Poker Hand Evaluator
+        function evaluateHand(cards) {
+            // Evaluator simplifies score calculation
+            const ranksCount = {};
+            const suitCount = {};
+            cards.forEach(c => {
+                ranksCount[c.value] = (ranksCount[c.value] || 0) + 1;
+                suitCount[c.suit] = (suitCount[c.suit] || 0) + 1;
+            });
+
+            const counts = Object.values(ranksCount).sort((a,b) => b - a);
+            const isFlush = Object.values(suitCount).some(cnt => cnt >= 5);
+
+            let score = 0;
+            let name = "하이 카드";
+
+            if (counts[0] === 4) { name = "포카드"; score = 800; }
+            else if (counts[0] === 3 && counts[1] >= 2) { name = "풀하우스"; score = 700; }
+            else if (isFlush) { name = "플러시"; score = 600; }
+            else if (counts[0] === 3) { name = "트리플"; score = 400; }
+            else if (counts[0] === 2 && counts[1] === 2) { name = "투 페어"; score = 300; }
+            else if (counts[0] === 2) { name = "원 페어"; score = 200; }
+            else {
+                const maxVal = Math.max(...cards.map(c => c.value));
+                score = maxVal;
+                name = `하이 카드 (${RANKS[maxVal - 2] || maxVal})`;
+            }
+
+            return { score, name };
+        }
+
+        /* ===================================================================
+           6. HULA GAME LOGIC
+           =================================================================== */
+        function startHulaGame() {
+            gamePhase = 'HULA_MAIN';
+            logAction("=== 훌라 게임 시작 ===");
+
+            // Deal 7 cards each
+            players.forEach(p => {
+                p.hand = [];
+                for (let i = 0; i < 7; i++) {
+                    p.hand.push(deck.pop());
+                }
+                sortCards(p.hand);
+            });
+
+            // Put 1 card on discard pile
+            hulaDiscardPile.push(deck.pop());
+
+            document.getElementById('game-phase-badge').innerText = "훌라 진행 중";
+            document.getElementById('hula-controls').classList.remove('hidden');
+
+            activeTurnIndex = 0;
+            hasDrawnThisTurn = false;
+            playSound('card');
+            updateUI();
+            logAction("당신의 차례입니다. 덱에서 카드를 뽑으세요.");
+        }
+
+        function sortCards(cards) {
+            cards.sort((a, b) => a.value - b.value);
+        }
+
+        function toggleCardSelect(idx) {
+            if (currentGameMode !== 'hula' || activeTurnIndex !== 0) return;
+
+            if (selectedCardsIdx.has(idx)) {
+                selectedCardsIdx.delete(idx);
+            } else {
+                selectedCardsIdx.add(idx);
+            }
+            updateUI();
+        }
+
+        function handleHulaDraw() {
+            if (activeTurnIndex !== 0 || hasDrawnThisTurn) {
+                alert("이미 이번 턴에 카드를 가져왔습니다.");
+                return;
+            }
+
+            const card = deck.pop();
+            players[0].hand.push(card);
+            sortCards(players[0].hand);
+            hasDrawnThisTurn = true;
+            playSound('card');
+            logAction(`[나] 덱에서 카드 1장을 뽑았습니다.`);
+            updateUI();
+        }
+
+        function handleHulaMeld() {
+            if (activeTurnIndex !== 0) return;
+            if (selectedCardsIdx.size < 3) {
+                alert("등록하려면 최소 3장의 카드를 선택해야 합니다.");
+                return;
+            }
+
+            const selectedArray = Array.from(selectedCardsIdx).map(i => players[0].hand[i]);
+            if (isValidHulaSet(selectedArray)) {
+                // Valid Meld
+                players[0].melded.push(selectedArray);
+                // Remove from hand
+                players[0].hand = players[0].hand.filter((_, idx) => !selectedCardsIdx.has(idx));
+                selectedCardsIdx.clear();
+                playSound('win');
+                logAction(`[나] ${selectedArray.length}장 카드를 테이블에 등록하였습니다!`);
+
+                if (players[0].hand.length === 0) {
+                    endHulaGame(players[0], "완전 등록 승리");
+                    return;
+                }
+                updateUI();
+            } else {
+                alert("올바른 훌라 족보 세트가 아닙니다.\n(같은 숫자의 카드 3장 이상 또는 같은 모양의 연속된 숫자 3장 이상)");
+            }
+        }
+
+        function isValidHulaSet(cards) {
+            if (cards.length < 3) return false;
+
+            // Type 1: Same Value (e.g., 7-7-7)
+            const sameRank = cards.every(c => c.value === cards[0].value);
+            if (sameRank) return true;
+
+            // Type 2: Same Suit & Consecutive Ranks (e.g., ♠7-♠8-♠9)
+            const sameSuit = cards.every(c => c.suit === cards[0].suit);
+            if (sameSuit) {
+                const sorted = [...cards].sort((a,b) => a.value - b.value);
+                for (let i = 0; i < sorted.length - 1; i++) {
+                    if (sorted[i+1].value !== sorted[i].value + 1) return false;
+                }
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleHulaDiscard() {
+            if (activeTurnIndex !== 0) return;
+            if (!hasDrawnThisTurn) {
+                alert("카드를 먼저 덱에서 가져온 후 버릴 수 있습니다.");
+                return;
+            }
+            if (selectedCardsIdx.size !== 1) {
+                alert("버릴 카드 1장만 선택하세요.");
+                return;
+            }
+
+            const cardIdx = Array.from(selectedCardsIdx)[0];
+            const discarded = players[0].hand.splice(cardIdx, 1)[0];
+            hulaDiscardPile.push(discarded);
+            selectedCardsIdx.clear();
+            playSound('card');
+            logAction(`[나] ${discarded.suit}${discarded.rank} 카드를 버렸습니다.`);
+
+            advanceHulaTurn();
+        }
+
+        function handleHulaStop() {
+            if (activeTurnIndex !== 0) return;
+            logAction(`[나] '스톱(Stop)' 선언! Hand 카드 점수를 비교합니다.`);
+            evaluateHulaStopWinner();
+        }
+
+        function advanceHulaTurn() {
+            activeTurnIndex = (activeTurnIndex + 1) % 4;
+            hasDrawnThisTurn = false;
+            updateUI();
+
+            if (activeTurnIndex !== 0) {
+                const delay = parseInt(document.getElementById('ai-speed').value);
+                setTimeout(() => runAIHulaLogic(players[activeTurnIndex]), delay);
+            } else {
+                document.getElementById('system-msg').innerText = "당신의 차례입니다. 카드를 뽑으세요.";
+            }
+        }
+
+        function runAIHulaLogic(ai) {
+            // AI Draw
+            if (deck.length > 0) {
+                ai.hand.push(deck.pop());
+                sortCards(ai.hand);
+            }
+
+            // AI Discard (Discards largest un-melded value card)
+            if (ai.hand.length > 0) {
+                const discarded = ai.hand.pop();
+                hulaDiscardPile.push(discarded);
+                logAction(`[${ai.name}] 카드 1장을 버렸습니다.`);
+            }
+
+            // AI Check if hand empty
+            if (ai.hand.length === 0) {
+                endHulaGame(ai, "카드 모두 소비 승리");
+                return;
+            }
+
+            advanceHulaTurn();
+        }
+
+        function evaluateHulaStopWinner() {
+            let minScore = 999;
+            let winner = players[0];
+
+            players.forEach(p => {
+                const score = p.hand.reduce((acc, c) => acc + c.value, 0);
+                logAction(`[${p.name}] 남은 카드 점수 합: ${score}점`);
+                if (score < minScore) {
+                    minScore = score;
+                    winner = p;
+                }
+            });
+
+            endHulaGame(winner, `최저 점수 (${minScore}점) 승리`);
+        }
+
+        function endHulaGame(winner, reason) {
+            gamePhase = 'ENDED';
+            const prize = 400000;
+            winner.chips += prize;
+            playSound('win');
+            logAction(`🎉 [${winner.name}] 훌라 승리! (${reason}) - 상금 ₩${prize.toLocaleString()}`);
+            document.getElementById('system-msg').innerHTML = `<span class="text-emerald-400 font-extrabold">${winner.name}</span> 님이 승리하였습니다! (${reason})`;
+            updateUI();
+        }
+
+        /* ===================================================================
+           7. UI RENDERER & CARD COMPONENTS
+           =================================================================== */
+        function createCardElement(card, isHidden = false, isSelected = false, onClickHandler = null) {
+            const div = document.createElement('div');
+            
+            if (isHidden) {
+                div.className = "w-14 h-20 md:w-16 md:h-24 bg-gradient-to-br from-blue-900 to-indigo-950 border-2 border-slate-600 rounded-xl card-shadow flex items-center justify-center";
+                div.innerHTML = `<i class="fa-solid fa-shield-halved text-indigo-400/50 text-xl"></i>`;
+                return div;
+            }
+
+            const colorClass = suitColors[card.suit] || 'text-slate-900';
+            const selectedStyle = isSelected ? 'selected-card' : '';
+
+            div.className = `w-14 h-20 md:w-16 md:h-24 bg-slate-100 border border-slate-300 rounded-xl card-shadow card-hover p-1.5 flex flex-col justify-between cursor-pointer transition-all ${selectedStyle}`;
+            if (onClickHandler) div.onclick = onClickHandler;
+
+            div.innerHTML = `
+                <div class="flex justify-between items-center leading-none">
+                    <span class="font-extrabold text-xs md:text-sm text-slate-900">${card.rank}</span>
+                    <span class="text-xs ${colorClass}">${card.suit}</span>
+                </div>
+                <div class="text-center text-lg md:text-2xl ${colorClass}">${card.suit}</div>
+                <div class="flex justify-between items-center leading-none rotate-180">
+                    <span class="font-extrabold text-xs md:text-sm text-slate-900">${card.rank}</span>
+                    <span class="text-xs ${colorClass}">${card.suit}</span>
+                </div>
+            `;
+            return div;
+        }
+
+        function updateUI() {
+            // Update Pot & Chips
+            document.getElementById('pot-amount').innerText = `₩${pot.toLocaleString()}`;
+            players.forEach(p => {
+                document.getElementById(`p${p.id}-chips`).innerText = `₩${p.chips.toLocaleString()}`;
+                
+                // Active Turn Highlight
+                const cardEl = document.getElementById(`player-${p.id}-card`);
+                if (activeTurnIndex === p.id && gamePhase !== 'IDLE' && gamePhase !== 'ENDED') {
+                    cardEl.classList.add('border-amber-400', 'ring-2', 'ring-amber-400/50');
+                } else {
+                    cardEl.classList.remove('border-amber-400', 'ring-2', 'ring-amber-400/50');
+                }
+
+                // Action Status Badge
+                const statusEl = document.getElementById(`p${p.id}-status`);
+                if (statusEl) statusEl.innerText = p.status || "대기";
+            });
+
+            // Render Center Board
+            const boardContainer = document.getElementById('center-board');
+            boardContainer.innerHTML = '';
+
+            if (currentGameMode === 'poker') {
+                if (communityCards.length === 0) {
+                    boardContainer.innerHTML = `<span class="text-slate-500 text-xs italic">커뮤니티 카드가 여기에 표시됩니다</span>`;
+                } else {
+                    communityCards.forEach(c => {
+                        boardContainer.appendChild(createCardElement(c));
+                    });
+                }
+            } else {
+                // Hula: Draw Deck & Discard Pile
+                const deckPile = document.createElement('div');
+                deckPile.className = "flex items-center space-x-4";
+                deckPile.innerHTML = `
+                    <div class="text-center">
+                        <div class="w-14 h-20 md:w-16 md:h-24 bg-gradient-to-br from-indigo-800 to-slate-900 border-2 border-indigo-400 rounded-xl card-shadow flex items-center justify-center cursor-pointer hover:scale-105 transition" onclick="handleHulaDraw()">
+                            <i class="fa-solid fa-layer-group text-indigo-300 text-xl"></i>
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 block">남은 덱 (${deck.length})</span>
+                    </div>
+                `;
+                boardContainer.appendChild(deckPile);
+
+                if (hulaDiscardPile.length > 0) {
+                    const topDiscard = hulaDiscardPile[hulaDiscardPile.length - 1];
+                    const discardBox = document.createElement('div');
+                    discardBox.className = "text-center";
+                    discardBox.appendChild(createCardElement(topDiscard));
+                    discardBox.innerHTML += `<span class="text-[10px] text-slate-400 mt-1 block">버린 카드 더미</span>`;
+                    boardContainer.appendChild(discardBox);
+                }
+            }
+
+            // Render AI Hands
+            for (let i = 1; i <= 3; i++) {
+                const handBox = document.getElementById(`p${i}-hand`);
+                handBox.innerHTML = '';
+                players[i].hand.forEach(card => {
+                    const isHidden = (gamePhase !== 'ENDED');
+                    handBox.appendChild(createCardElement(card, isHidden));
+                });
+            }
+
+            // Render User Hand
+            const userHandBox = document.getElementById('p0-hand');
+            userHandBox.innerHTML = '';
+            players[0].hand.forEach((card, idx) => {
+                const isSelected = selectedCardsIdx.has(idx);
+                userHandBox.appendChild(createCardElement(card, false, isSelected, () => toggleCardSelect(idx)));
+            });
+
+            // Hand Rank Preview (Poker)
+            if (currentGameMode === 'poker' && players[0].hand.length > 0) {
+                const evalRes = evaluateHand([...players[0].hand, ...communityCards]);
+                document.getElementById('p0-hand-rank').innerText = evalRes.name;
+            } else if (currentGameMode === 'hula') {
+                document.getElementById('p0-hand-rank').innerText = `카드 ${players[0].hand.length}장 보유`;
+            }
+        }
+
+        function toggleModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.toggle('hidden');
+        }
+
+        // Initialize Screen
+        window.onload = function() {
+            resetGameState();
+        };
+    </script>
+</body>
+</html>

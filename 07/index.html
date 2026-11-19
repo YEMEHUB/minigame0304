@@ -1,0 +1,1627 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로블록스 끝말잇기 스테이지 배틀 (Roblox Word Chain Battle)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Google Fonts for Roblox-like blocky look -->
+  <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Jua', 'Noto Sans KR', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+      min-height: 100vh;
+      color: #ffffff;
+      user-select: none;
+    }
+
+    /* Custom scrollbar and animations */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+    ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+
+    @keyframes pulseGlow {
+      0%, 100% { filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.6)); }
+      50% { filter: drop-shadow(0 0 25px rgba(168, 85, 247, 0.9)); }
+    }
+
+    @keyframes healGlow {
+      0% { filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.4)); transform: scale(1); }
+      50% { filter: drop-shadow(0 0 30px rgba(34, 197, 94, 1)); transform: scale(1.05); }
+      100% { filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.4)); transform: scale(1); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    @keyframes bounceShort {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .glow-hero { animation: pulseGlow 3s infinite ease-in-out; }
+    .glow-heal { animation: healGlow 1s ease-in-out; }
+    .animate-shake { animation: shake 0.4s ease-in-out; }
+    .animate-bounce-short { animation: bounceShort 2s infinite ease-in-out; }
+
+    .roblox-btn {
+      box-shadow: 0 6px 0 #1e1b4b, 0 10px 15px rgba(0,0,0,0.4);
+      transition: all 0.1s ease;
+      background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
+      border: 3px solid #000;
+    }
+    .roblox-btn:hover {
+      filter: brightness(1.1);
+    }
+    .roblox-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #1e1b4b, 0 4px 6px rgba(0,0,0,0.4);
+    }
+
+    .roblox-btn-yellow {
+      background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
+      color: #000;
+      box-shadow: 0 6px 0 #713f12, 0 10px 15px rgba(0,0,0,0.4);
+    }
+
+    .roblox-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 4px solid #000;
+      box-shadow: 6px 6px 0px #000;
+    }
+
+    /* Roblox Character Pixel Block Styles */
+    .roblox-avatar {
+      position: relative;
+      width: 70px;
+      height: 90px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .r-head {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 2px solid #000;
+      position: relative;
+      z-index: 5;
+    }
+    .r-torso {
+      width: 42px;
+      height: 36px;
+      border-radius: 4px;
+      border: 2px solid #000;
+      margin-top: -2px;
+      position: relative;
+      z-index: 3;
+    }
+    .r-limbs {
+      display: flex;
+      justify-content: space-between;
+      width: 42px;
+      margin-top: -2px;
+    }
+    .r-leg {
+      width: 19px;
+      height: 32px;
+      border-radius: 3px;
+      border: 2px solid #000;
+    }
+    .r-arm {
+      position: absolute;
+      top: 30px;
+      width: 13px;
+      height: 34px;
+      border-radius: 3px;
+      border: 2px solid #000;
+      z-index: 4;
+    }
+    .r-arm.left { left: 1px; }
+    .r-arm.right { right: 1px; }
+
+    /* Speech Bubble */
+    .speech-bubble {
+      position: relative;
+      background: #ffffff;
+      border-radius: 12px;
+      border: 3px solid #000;
+      color: #000;
+      box-shadow: 4px 4px 0px #000;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 20px;
+      border-width: 12px 10px 0;
+      border-style: solid;
+      border-color: #ffffff transparent;
+      display: block;
+      width: 0;
+    }
+    .speech-bubble::before {
+      content: '';
+      position: absolute;
+      bottom: -16px;
+      left: 18px;
+      border-width: 14px 12px 0;
+      border-style: solid;
+      border-color: #000000 transparent;
+      display: block;
+      width: 0;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-start p-2 sm:p-4 min-h-screen">
+
+  <!-- Floating Toast Notification -->
+  <div id="toast-container" class="fixed top-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header Banner -->
+  <header class="w-full max-w-xl text-center mb-3">
+    <h1 class="text-3xl sm:text-4xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">
+      🎮 로블록스 끝말잇기 배틀
+    </h1>
+    <p class="text-xs sm:text-sm text-indigo-200 font-bold mt-1">
+      영웅 캐릭터를 선택하고 연속 스테이지의 강력한 상대들을 제압하세요!
+    </p>
+  </header>
+
+  <main class="w-full max-w-xl">
+
+    <!-- ================= 1. CHARACTER SELECT SCREEN ================= -->
+    <section id="select-screen" class="roblox-card p-4 sm:p-6 rounded-2xl space-y-4">
+      <div class="flex justify-between items-center border-b-2 border-indigo-900 pb-2">
+        <h2 class="text-lg sm:text-xl font-black text-yellow-400">
+          👦 대표 캐릭터 선택 (9종)
+        </h2>
+        <span class="text-xs bg-indigo-900 text-indigo-200 font-bold px-3 py-1 rounded-full border border-indigo-500">
+          특수 패시브 적용
+        </span>
+      </div>
+
+      <!-- 3x3 Character Grid -->
+      <div id="character-grid" class="grid grid-cols-3 gap-2 sm:gap-3">
+        <!-- Rendered via JavaScript -->
+      </div>
+
+      <!-- Selected Character Info Card -->
+      <div id="char-detail-card" class="bg-black/60 border-2 border-yellow-400 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+        <div class="flex items-center gap-3">
+          <div id="detail-avatar-preview" class="w-16 h-20 relative flex-shrink-0"></div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="detail-name" class="text-lg font-black text-yellow-300">클래식 누브</h3>
+              <span id="detail-title" class="text-[10px] bg-yellow-500 text-black font-bold px-2 py-0.5 rounded-full">대표 캐릭터</span>
+            </div>
+            <p id="detail-desc" class="text-xs text-gray-300 mt-0.5">기본에 충실한 표준형 누브입니다.</p>
+            <p id="detail-skill" class="text-xs text-cyan-300 font-bold mt-1">✨ 스킬: 균형 잡힌 공격력</p>
+          </div>
+        </div>
+        
+        <!-- Timer Control -->
+        <div class="flex flex-col items-end gap-1 w-full sm:w-auto">
+          <div class="text-xs text-gray-300 font-bold">제한 시간 선택:</div>
+          <div class="flex gap-1">
+            <button onclick="setTimer(20)" id="time-20" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-green-500 text-black">20초</button>
+            <button onclick="setTimer(12)" id="time-12" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white">12초</button>
+            <button onclick="setTimer(7)" id="time-7" class="px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white">7초</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Start Button -->
+      <button onclick="startGame()" class="roblox-btn w-full py-3.5 text-xl sm:text-2xl font-black text-yellow-300 rounded-xl tracking-wider uppercase">
+        🚀 끝말잇기 배틀 출전!
+      </button>
+    </section>
+
+    <!-- ================= 2. GAMEPLAY SCREEN ================= -->
+    <section id="game-screen" class="hidden space-y-3">
+      
+      <!-- Top Battle Arena Board -->
+      <div class="roblox-card p-3 sm:p-4 rounded-2xl relative overflow-hidden">
+        
+        <!-- Stage Badge Banner -->
+        <div class="flex justify-between items-center mb-2 bg-indigo-950 border-2 border-indigo-500 px-3 py-1 rounded-xl">
+          <div id="stage-badge" class="bg-yellow-400 text-black font-black text-sm px-3 py-0.5 rounded-full border border-black shadow">
+            STAGE 1
+          </div>
+          <div id="opponent-title-tag" class="text-xs sm:text-sm font-bold text-cyan-300">
+            상대: 베이컨 보이 🥓
+          </div>
+          <div class="text-xs font-bold text-yellow-300">
+            누적 점수: <span id="total-score-badge">0</span>
+          </div>
+        </div>
+
+        <!-- Opponent Display Area -->
+        <div class="flex items-start justify-between gap-2 border-b-2 border-gray-700 pb-3">
+          
+          <!-- Opponent Avatar Container -->
+          <div class="text-center w-24 flex-shrink-0">
+            <div id="opponent-avatar-container" class="roblox-avatar scale-75 origin-top">
+              <!-- Rendered dynamically -->
+            </div>
+            <span id="opponent-name-tag" class="bg-red-600 text-white font-black text-xs px-2 py-0.5 rounded-full border border-black inline-block -mt-4 relative z-10">
+              베이컨 보이 🥓
+            </span>
+          </div>
+
+          <!-- Speech Bubble & HP -->
+          <div class="flex-1 flex flex-col justify-between h-full space-y-2">
+            <!-- Speech Bubble -->
+            <div class="speech-bubble p-2 sm:p-3 text-xs sm:text-sm font-bold min-h-[55px] flex items-center justify-center text-center">
+              <span id="opponent-speech">누구든 나 베이컨을 넘을 순 없다! 🥓</span>
+            </div>
+
+            <!-- Opponent HP Bar -->
+            <div>
+              <div class="flex justify-between text-xs font-bold mb-0.5 text-red-400">
+                <span id="opponent-hp-label">상대 HP</span>
+                <span id="opponent-hp-text">100 / 100</span>
+              </div>
+              <div class="w-full bg-gray-800 rounded-full h-3 border-2 border-black overflow-hidden">
+                <div id="opponent-hp-bar" class="bg-gradient-to-r from-red-600 to-red-400 h-full w-full transition-all duration-300"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Round & Word Display -->
+        <div class="my-3 text-center bg-gray-900/90 border-2 border-indigo-500/50 p-3 rounded-xl relative">
+          <!-- Timer Circle -->
+          <div class="absolute top-2 right-2 bg-yellow-400 border-2 border-black text-black font-black w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-[2px_2px_0px_#000]" id="timer-box">
+            20
+          </div>
+
+          <div class="text-xs text-indigo-300 font-bold mb-1">제시어 (다음 시작 글자)</div>
+          <div class="flex items-center justify-center gap-3">
+            <div class="text-2xl sm:text-4xl font-black text-white bg-black/60 px-4 py-1 rounded-lg border-2 border-yellow-400 tracking-wider" id="current-word-display">
+              로블록스
+            </div>
+          </div>
+          <div class="text-sm font-bold text-yellow-300 mt-1">
+            👉 '<span id="target-char" class="text-xl underline text-green-400">스</span>' (으)로 시작하세요!
+          </div>
+        </div>
+
+        <!-- Player Side (Bottom Arena) -->
+        <div class="flex items-end justify-between gap-2 pt-1">
+          <!-- Player HP -->
+          <div class="flex-1 space-y-1">
+            <div class="flex justify-between text-xs font-bold text-green-400">
+              <span id="player-name-tag">영웅 HP</span>
+              <span id="player-hp-text">100 / 100</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-3 border-2 border-black overflow-hidden">
+              <div id="player-hp-bar" class="bg-gradient-to-r from-green-500 to-emerald-300 h-full w-full transition-all duration-300"></div>
+            </div>
+            <!-- Stats Bar -->
+            <div class="text-xs text-gray-300 font-bold flex justify-between items-center">
+              <span>단어: <span id="combo-text" class="text-cyan-300 text-sm">0</span>개</span>
+              <span id="skill-badge" class="text-[10px] bg-indigo-900 border border-indigo-400 text-indigo-200 px-2 py-0.5 rounded-full">패시브 발동중</span>
+            </div>
+          </div>
+
+          <!-- Player Avatar Display -->
+          <div class="text-center w-24 flex-shrink-0">
+            <div id="player-avatar-container" class="roblox-avatar scale-75 origin-bottom">
+              <!-- Rendered via JS -->
+            </div>
+            <span id="player-label" class="bg-blue-600 text-white font-black text-xs px-2 py-0.5 rounded-full border border-black inline-block relative z-10">
+              내 캐릭터
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Word History Box -->
+      <div class="roblox-card p-2.5 rounded-xl">
+        <div class="text-xs text-gray-400 font-bold mb-1 flex justify-between items-center">
+          <span>📜 단어 히스토리</span>
+          <span class="text-[10px] text-yellow-300">⚠️ 상대의 한방단어(륨, 녘, 틱...) 주의!</span>
+        </div>
+        <div id="history-box" class="h-20 overflow-y-auto bg-black/60 border border-gray-700 rounded-lg p-2 text-xs flex flex-wrap gap-1.5 align-content-start">
+          <span class="bg-indigo-900 border border-indigo-500 text-indigo-200 px-2 py-0.5 rounded-md">로블록스</span>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <form id="word-form" onsubmit="submitWord(event)" class="flex gap-2">
+        <input 
+          type="text" 
+          id="word-input" 
+          autocomplete="off" 
+          placeholder="단어를 입력하세요!" 
+          class="flex-1 bg-gray-900 border-4 border-black text-white text-lg font-bold px-4 py-3 rounded-xl focus:outline-none focus:border-yellow-400 placeholder-gray-500 shadow-inner"
+        />
+        <button 
+          type="submit" 
+          id="submit-btn"
+          class="roblox-btn px-6 text-xl font-black text-yellow-300 rounded-xl flex items-center justify-center gap-1"
+        >
+          공격 ⚔️
+        </button>
+      </form>
+
+      <!-- Control Buttons -->
+      <div class="flex justify-between items-center text-xs">
+        <button onclick="surrender()" class="text-gray-400 hover:text-red-400 underline font-bold">
+          🏳️ 항복하고 처음으로
+        </button>
+        <button onclick="toggleAudio()" id="audio-btn" class="bg-gray-800 border border-black px-2 py-1 rounded text-yellow-300 font-bold">
+          🔊 소리 ON
+        </button>
+      </div>
+
+    </section>
+
+    <!-- ================= 3. STAGE VICTORY / REWARD MODAL ================= -->
+    <div id="victoryModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity">
+      <div class="bg-slate-900 border-4 border-yellow-400 rounded-3xl p-6 sm:p-8 max-w-lg w-11/12 text-center shadow-2xl relative overflow-hidden animate-bounce-short">
+        <div class="inline-block px-4 py-1 bg-yellow-500/20 text-yellow-300 font-bold rounded-full text-xs sm:text-sm uppercase tracking-wider mb-2 border border-yellow-500/40">
+          STAGE CLEARED!
+        </div>
+        
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 mb-2">
+          보스 퇴치 성공! 🎉
+        </h2>
+        
+        <p id="victorySubText" class="text-slate-300 text-sm sm:text-base mb-6">
+          상대를 제압했습니다! 다음 스테이지로 진입하기 전 보상을 선택하세요.
+        </p>
+
+        <!-- Hero Card Preview -->
+        <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-6 flex items-center justify-between shadow-inner">
+          <div class="flex items-center space-x-3">
+            <div id="victoryHeroAvatar" class="w-14 h-14 bg-indigo-950 border-2 border-indigo-500 rounded-xl flex items-center justify-center text-3xl shadow">
+              👦
+            </div>
+            <div class="text-left">
+              <div id="victoryHeroName" class="font-bold text-white text-base sm:text-lg">클래식 노비</div>
+              <div class="text-xs text-green-400 font-semibold flex items-center space-x-1">
+                <span>❤️ 체력 회복 가능</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-slate-400">다음 보스</span>
+            <div id="victoryNextOpponent" class="font-bold text-red-400 text-sm sm:text-base">흑백 블록맨</div>
+          </div>
+        </div>
+
+        <!-- Choice Buttons -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <button onclick="handleVictoryChoice('keep')" class="roblox-btn bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-bold py-3.5 px-4 rounded-xl flex flex-col items-center justify-center border-b-4 border-green-800 transition">
+            <span class="text-base sm:text-lg flex items-center space-x-1">
+              <span>💖</span> <span>체력 Full 회복</span>
+            </span>
+            <span class="text-[11px] text-green-100 font-normal mt-0.5">현재 캐릭터 유지 & 100% 회복</span>
+          </button>
+
+          <button onclick="handleVictoryChoice('change')" class="roblox-btn bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-xl flex flex-col items-center justify-center border-b-4 border-indigo-900 transition">
+            <span class="text-base sm:text-lg flex items-center space-x-1">
+              <span>🔄</span> <span>캐릭터 교체</span>
+            </span>
+            <span class="text-[11px] text-purple-100 font-normal mt-0.5">9명의 영웅 중 선택 (풀체력)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 4. GAME OVER MODAL ================= -->
+    <div id="result-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="roblox-card p-6 rounded-2xl max-w-sm w-full text-center space-y-4">
+        <div id="result-icon" class="text-6xl">💀</div>
+        <h2 id="result-title" class="text-3xl font-black text-red-500">GAME OVER!</h2>
+        <p id="result-msg" class="text-sm text-gray-200">체력이 0이 되었습니다!</p>
+        
+        <div class="bg-black/60 border border-gray-700 p-3 rounded-xl space-y-1 text-sm font-bold">
+          <div class="flex justify-between text-gray-300">
+            <span>도달한 스테이지:</span>
+            <span id="final-stage" class="text-yellow-400">STAGE 1</span>
+          </div>
+          <div class="flex justify-between text-gray-300">
+            <span>최종 누적 점수:</span>
+            <span id="final-score" class="text-yellow-400">0점</span>
+          </div>
+          <div class="flex justify-between text-gray-300">
+            <span>성공한 단어:</span>
+            <span id="final-count" class="text-cyan-400">0개</span>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-2">
+          <button onclick="restartGame()" class="roblox-btn w-full py-3 text-lg font-black text-yellow-300 rounded-xl">
+            🔄 다시 도전하기
+          </button>
+          <button onclick="backToSelect()" class="roblox-btn roblox-btn-yellow w-full py-2.5 text-base font-black rounded-xl">
+            👥 영웅 캐릭터 변경
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="mt-2 text-center text-xs text-indigo-300/60 font-bold">
+    Roblox Endless Stage Word Chain Battle
+  </footer>
+
+  <script>
+    /* ===================================================================
+       1. HEROES & OPPONENTS DATA DEFINITIONS
+       =================================================================== */
+    const HEROES = [
+      {
+        id: 'classic',
+        name: '클래식 누브',
+        title: '표준형 영웅',
+        desc: '노란 머리/팔, 파란 몸통, 초록 다리의 정통 누브',
+        skill: '기본 밸런스형 (스탯 균형)',
+        hpBonus: 0,
+        dmgBonus: 1.0,
+        defBonus: 1.0,
+        html: `
+          <div class="r-head bg-yellow-400"></div>
+          <div class="r-torso bg-blue-600"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-green-600"></div>
+            <div class="r-leg bg-green-600"></div>
+          </div>
+          <div class="r-arm left bg-yellow-400"></div>
+          <div class="r-arm right bg-yellow-400"></div>
+        `
+      },
+      {
+        id: 'rainbow',
+        name: '무지개 누브',
+        title: '화려한 영웅',
+        desc: '화려한 레인보우 라이팅 오라를 뿜는 희귀 누브',
+        skill: '점수 1.5배 획득',
+        hpBonus: 10,
+        dmgBonus: 1.1,
+        defBonus: 1.0,
+        html: `
+          <div class="r-head bg-pink-500 animate-pulse"></div>
+          <div class="r-torso bg-gradient-to-r from-red-500 via-yellow-500 to-purple-500"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-cyan-400"></div>
+            <div class="r-leg bg-yellow-400"></div>
+          </div>
+          <div class="r-arm left bg-lime-400"></div>
+          <div class="r-arm right bg-fuchsia-500"></div>
+        `
+      },
+      {
+        id: 'shark',
+        name: '상어 후드 누브',
+        title: '해양의 영웅',
+        desc: '날카로운 상어 이빨 후드를 뒤집어쓴 강한 누브',
+        skill: '공격력 +20% 증가',
+        hpBonus: 15,
+        dmgBonus: 1.2,
+        defBonus: 0.9,
+        html: `
+          <div class="r-head bg-blue-900 border-2 border-cyan-400 flex items-end justify-center">
+            <div class="text-[8px] text-white font-bold pb-0.5">🦈</div>
+          </div>
+          <div class="r-torso bg-cyan-800"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-slate-800"></div>
+            <div class="r-leg bg-slate-800"></div>
+          </div>
+          <div class="r-arm left bg-blue-700"></div>
+          <div class="r-arm right bg-blue-700"></div>
+        `
+      },
+      {
+        id: 'gojo',
+        name: '고죠 사토루 누브',
+        title: '무하한의 영웅',
+        desc: '안대를 착용하고 무하한 결계를 펼치는 최강 누브',
+        skill: '피해량 25% 감소',
+        hpBonus: 20,
+        dmgBonus: 1.15,
+        defBonus: 0.75,
+        html: `
+          <div class="r-head bg-white relative flex items-center justify-center">
+            <div class="w-full h-2 bg-black absolute"></div>
+          </div>
+          <div class="r-torso bg-indigo-950"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-slate-900"></div>
+            <div class="r-leg bg-slate-900"></div>
+          </div>
+          <div class="r-arm left bg-indigo-900"></div>
+          <div class="r-arm right bg-indigo-900"></div>
+        `
+      },
+      {
+        id: 'jammin',
+        name: '잼민이 누브',
+        title: '게이머 영웅',
+        desc: 'RGB 헤드셋을 끼고 신나게 단어를 연타하는 누브',
+        skill: '콤보 데미지 보너스',
+        hpBonus: 5,
+        dmgBonus: 1.25,
+        defBonus: 1.05,
+        html: `
+          <div class="r-head bg-amber-300 relative">
+            <div class="w-full h-1.5 bg-red-600 absolute top-0"></div>
+          </div>
+          <div class="r-torso bg-emerald-600"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-blue-800"></div>
+            <div class="r-leg bg-blue-800"></div>
+          </div>
+          <div class="r-arm left bg-amber-300"></div>
+          <div class="r-arm right bg-amber-300"></div>
+        `
+      },
+      {
+        id: 'puppy',
+        name: '강아지 누브',
+        title: '힐링의 영웅',
+        desc: '귀여운 강아지 귀와 코를 가진 힐링형 영웅',
+        skill: '단어 입력 시 HP +3 회복',
+        hpBonus: 30,
+        dmgBonus: 0.95,
+        defBonus: 0.9,
+        html: `
+          <div class="r-head bg-amber-700 flex items-center justify-center text-[9px]">🐶</div>
+          <div class="r-torso bg-amber-100"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-amber-800"></div>
+            <div class="r-leg bg-amber-800"></div>
+          </div>
+          <div class="r-arm left bg-amber-700"></div>
+          <div class="r-arm right bg-amber-700"></div>
+        `
+      },
+      {
+        id: 'cat',
+        name: '고양이 누브',
+        title: '민첩의 영웅',
+        desc: '스피드가 빠른 고양이 귀 장착 영웅',
+        skill: '제한시간 +3초 증가',
+        hpBonus: 10,
+        dmgBonus: 1.05,
+        defBonus: 0.95,
+        html: `
+          <div class="r-head bg-gray-200 flex items-center justify-center text-[9px]">🐱</div>
+          <div class="r-torso bg-pink-400"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-gray-300"></div>
+            <div class="r-leg bg-gray-300"></div>
+          </div>
+          <div class="r-arm left bg-gray-200"></div>
+          <div class="r-arm right bg-gray-200"></div>
+        `
+      },
+      {
+        id: 'cyborg',
+        name: '사이보그 누브',
+        title: '기계의 영웅',
+        desc: '붉은 안구 센서와 차가운 강철 바이저를 착용한 사이보그',
+        skill: '체력 +40 증가',
+        hpBonus: 40,
+        dmgBonus: 1.0,
+        defBonus: 0.85,
+        html: `
+          <div class="r-head bg-slate-400 border-2 border-red-500"></div>
+          <div class="r-torso bg-slate-700"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-slate-900"></div>
+            <div class="r-leg bg-slate-900"></div>
+          </div>
+          <div class="r-arm left bg-slate-500"></div>
+          <div class="r-arm right bg-slate-500"></div>
+        `
+      },
+      {
+        id: 'demon',
+        name: '악마 누브',
+        title: '파괴의 영웅',
+        desc: '붉은 뿔과 악마 날개를 지닌 가공할 단어 파괴자',
+        skill: '공격력 +35% 극대화',
+        hpBonus: -10,
+        dmgBonus: 1.35,
+        defBonus: 1.1,
+        html: `
+          <div class="r-head bg-red-700 border-2 border-black flex items-center justify-center text-[9px]">😈</div>
+          <div class="r-torso bg-black"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-red-950"></div>
+            <div class="r-leg bg-red-950"></div>
+          </div>
+          <div class="r-arm left bg-red-700"></div>
+          <div class="r-arm right bg-red-700"></div>
+        `
+      }
+    ];
+
+    const OPPONENTS = [
+      {
+        id: 'bacon',
+        name: '베이컨 보이 🥓',
+        tag: '상대: 베이컨 보이',
+        hp: 100,
+        lethalChance: 0.1,
+        lines: {
+          start: '누구든 나 베이컨을 넘을 순 없다! 🥓',
+          hit: '으윽! 제법이구나... 받아라!',
+          attack: '이 단어로 널 제압하겠다!',
+          lethal: '치명적인 한방단어 맛을 보아라!',
+          defeat: '말도 안 돼... 내 베이컨 머리가...!'
+        },
+        html: `
+          <div class="r-head bg-amber-200">
+            <div class="w-full h-2 bg-rose-700 rounded-t"></div>
+          </div>
+          <div class="r-torso bg-red-700"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-yellow-900"></div>
+            <div class="r-leg bg-yellow-900"></div>
+          </div>
+          <div class="r-arm left bg-amber-200"></div>
+          <div class="r-arm right bg-amber-200"></div>
+        `
+      },
+      {
+        id: 'monochrome',
+        name: '흑백 블록맨 ⬛',
+        tag: '상대: 흑백 캐릭터',
+        hp: 120,
+        lethalChance: 0.15,
+        lines: {
+          start: '모든 색을 지워버리겠다.',
+          hit: '흑백의 세계는 흔들리지 않는다...',
+          attack: '차가운 단어 공격!',
+          lethal: '너의 단어 공격을 은폐시키겠다!',
+          defeat: '빛이... 너무 강하군...'
+        },
+        html: `
+          <div class="r-head bg-white"></div>
+          <div class="r-torso bg-black border border-white"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-gray-900"></div>
+            <div class="r-leg bg-gray-900"></div>
+          </div>
+          <div class="r-arm left bg-white"></div>
+          <div class="r-arm right bg-white"></div>
+        `
+      },
+      {
+        id: 'orca',
+        name: '범고래 후드 🐋',
+        tag: '상대: 범고래 캐릭터',
+        hp: 130,
+        lethalChance: 0.18,
+        lines: {
+          start: '바다의 포식자 범고래 등장!',
+          hit: '크윽! 물살을 가르는 단어로 반격한다!',
+          attack: '해일 같은 단어 폭풍!',
+          lethal: '심해의 한방단어 수심 속으로 침몰해라!',
+          defeat: '물속으로 퇴각한다...'
+        },
+        html: `
+          <div class="r-head bg-slate-900 border-2 border-white flex justify-center items-center text-[9px]">🐋</div>
+          <div class="r-torso bg-black"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-slate-800"></div>
+            <div class="r-leg bg-slate-800"></div>
+          </div>
+          <div class="r-arm left bg-slate-900"></div>
+          <div class="r-arm right bg-slate-900"></div>
+        `
+      },
+      {
+        id: 'sukuna',
+        name: '스쿠나 누브 👹',
+        tag: '상대: 주왕 스쿠나',
+        hp: 150,
+        lethalChance: 0.25,
+        lines: {
+          start: '복마어주자에 온 것을 환영한다!',
+          hit: '네 단어 따위 해체해 주마!',
+          attack: '팔적경 썰기 단어 공격!',
+          lethal: '푸가(開)! 한방 단어로 가루로 만들어주마!',
+          defeat: '건방진... 꼬맹이가...!'
+        },
+        html: `
+          <div class="r-head bg-pink-300 border-2 border-red-600 flex justify-center items-center text-[9px]">👹</div>
+          <div class="r-torso bg-black border border-red-500"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-stone-900"></div>
+            <div class="r-leg bg-stone-900"></div>
+          </div>
+          <div class="r-arm left bg-pink-300"></div>
+          <div class="r-arm right bg-pink-300"></div>
+        `
+      },
+      {
+        id: 'kkondae',
+        name: '꼰대 부장님 👴',
+        tag: '상대: 꼰대 캐릭터',
+        hp: 140,
+        lethalChance: 0.2,
+        lines: {
+          start: '내가 너만 할 때는 단어를 100개씩 댔어!',
+          hit: '라떼는 말이야! 이런 단어로 안 졌어!',
+          attack: '훈수 단어 받아라!',
+          lethal: '결재 불허! 완벽한 한방 단어다!',
+          defeat: '요즘 애들은 무섭구만...'
+        },
+        html: `
+          <div class="r-head bg-amber-200 flex justify-center items-center text-[9px]">👴</div>
+          <div class="r-torso bg-amber-900"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-slate-800"></div>
+            <div class="r-leg bg-slate-800"></div>
+          </div>
+          <div class="r-arm left bg-amber-200"></div>
+          <div class="r-arm right bg-amber-200"></div>
+        `
+      },
+      {
+        id: 'wolf',
+        name: '질풍의 늑대 🐺',
+        tag: '상대: 늑대 캐릭터',
+        hp: 145,
+        lethalChance: 0.22,
+        lines: {
+          start: '달빛 아래서 너의 단어를 찢어주마! 아우우!',
+          hit: '크르르... 날카로운 단어였군!',
+          attack: '늑대 무리의 어택!',
+          lethal: '야성의 한방 단어 이빨을 받아라!',
+          defeat: '크윽... 밤하늘로 돌아간다...'
+        },
+        html: `
+          <div class="r-head bg-gray-600 flex justify-center items-center text-[9px]">🐺</div>
+          <div class="r-torso bg-gray-800"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-gray-900"></div>
+            <div class="r-leg bg-gray-900"></div>
+          </div>
+          <div class="r-arm left bg-gray-600"></div>
+          <div class="r-arm right bg-gray-600"></div>
+        `
+      },
+      {
+        id: 'tiger',
+        name: '맹호 호랑이 🐯',
+        tag: '상대: 호랑이 캐릭터',
+        hp: 160,
+        lethalChance: 0.24,
+        lines: {
+          start: '어흥! 산신령 호랑이님의 일갈을 들어라!',
+          hit: '네 놈의 공격에 털끝 하나 안 건드린다!',
+          attack: '호랑이 덮치기 공격!',
+          lethal: '호사유피! 강력한 한방 단어로 끝낸다!',
+          defeat: '산속으로 쫓겨나다니...'
+        },
+        html: `
+          <div class="r-head bg-orange-500 flex justify-center items-center text-[9px]">🐯</div>
+          <div class="r-torso bg-amber-600"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-amber-900"></div>
+            <div class="r-leg bg-amber-900"></div>
+          </div>
+          <div class="r-arm left bg-orange-500"></div>
+          <div class="r-arm right bg-orange-500"></div>
+        `
+      },
+      {
+        id: 'retro',
+        name: '클래식 2006 🏛️',
+        tag: '상대: 과거 로블록스',
+        hp: 135,
+        lethalChance: 0.15,
+        lines: {
+          start: '2006년 전설의 도트 단어가 돌아왔다.',
+          hit: '구관이 명관이다!',
+          attack: '레트로 픽셀 공격!',
+          lethal: '고전 레전드 한방 단어!',
+          defeat: '과거의 유물로 돌아가겠다...'
+        },
+        html: `
+          <div class="r-head bg-amber-300"></div>
+          <div class="r-torso bg-yellow-600"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-red-800"></div>
+            <div class="r-leg bg-red-800"></div>
+          </div>
+          <div class="r-arm left bg-amber-300"></div>
+          <div class="r-arm right bg-amber-300"></div>
+        `
+      },
+      {
+        id: 'angel',
+        name: '천사 블록맨 👼',
+        tag: '상대: 천사 캐릭터',
+        hp: 170,
+        lethalChance: 0.28,
+        lines: {
+          start: '신성한 한글의 심판을 받으라!',
+          hit: '천상의 빛이 날 보호한다!',
+          attack: '천사 날개 단어 공격!',
+          lethal: '최후의 신성한 한방 단어!',
+          defeat: '하늘로 승천합니다...'
+        },
+        html: `
+          <div class="r-head bg-amber-100 flex justify-center items-center text-[9px]">👼</div>
+          <div class="r-torso bg-sky-200"></div>
+          <div class="r-limbs">
+            <div class="r-leg bg-white"></div>
+            <div class="r-leg bg-white"></div>
+          </div>
+          <div class="r-arm left bg-amber-100"></div>
+          <div class="r-arm right bg-amber-100"></div>
+        `
+      }
+    ];
+
+    /* ===================================================================
+       2. KOREAN WORD DATABASE & RULES (두음법칙 & 한방단어)
+       =================================================================== */
+    const LETHAL_WORDS = {
+      '스': ['스팀', ['스프링'], ['스파이더맨']],
+      '라': ['라듐', '라뤔'],
+      '나': ['나트륨'],
+      '칼': ['칼륨', '칼슘'],
+      '마': ['마그네슘'],
+      '헬': ['헬륨'],
+      '베': ['베릴륨'],
+      '바': ['바륨'],
+      '게': ['게르마늄'],
+      '우': ['우라늄'],
+      '플': ['플루토늄'],
+      '세': ['세슘'],
+      '프': ['프랑슘'],
+      '해': ['해녘'],
+      '들': ['들녘'],
+      '새': ['새녘'],
+      '아': ['아침녘'],
+      '티': ['티타늄'],
+      '지': ['지르코늄']
+    };
+
+    const WORD_DATABASE = [
+      "로블록스", "스튜디오", "오징어게임", "스킨", "스피드", "스피커", "스트리머", "스위치",
+      "드래곤", "곤충", "충전기", "기차", "차량", "양말", "말풍선", "선물", "물고기", "기사",
+      "사자", "자전거", "거북이", "이발소", "소나무", "무지개", "개구리", "리듬", "듬직",
+      "직장", "장난감", "감자", "자두", "두부", "부메랑", "랑데부", "부모님", "님카지",
+      "지도", "도시", "시계", "계란", "란제리", "리본", "본사", "사탕", "탕수육", "육군",
+      "군대", "대통령", "영웅", "웅덩이", "이불", "불꽃", "꽃밭", "밭일", "일기장", "장미",
+      "미소", "소녀", "여우", "우주", "주스", "스노우", "우산", "산길", "길거리", "리코더",
+      "더위", "위성", "성당", "당근", "근육", "육지", "지구", "구름", "름바", "바다",
+      "다람쥐", "쥐잡기", "기타", "타자", "자석", "석양", "양파", "파도", "도둑", "둑방",
+      "방패", "패배", "배구", "구슬", "슬기", "기억", "억수", "수박", "박수", "수영장",
+      "장수풍뎅이", "이빨", "빨강", "강아지", "지렁이", "이유", "유리", "리유저블", "블록",
+      "록스타", "타이어", "어린이", "이름", "름료", "요리사", "사슴", "슴가", "가방",
+      "방학", "학원", "원숭이", "이글루", "루비", "비행기", "기풍", "풍선", "선장", "장갑"
+    ];
+
+    const DUEUM_RULES = {
+      '라': '나', '락': '낙', '란': '난', '랄': '날', '람': '남', '랍': '납', '랑': '낭',
+      '래': '내', '랭': '냉', '롸': '놔', '뢰': '뇌', '롼': '난', '림': '임', '립': '입',
+      '려': '여', '령': '영', '렬': '열', '렴': '염', '엽': '엽', '로': '노', '록': '녹',
+      '론': '논', '롱': '농', '뢰': '뇌', '루': '누', '류': '유', '육': '육', '륜': '윤',
+      '률': '율', '륭': '융', '리': '이', '린': '인', '릴': '일', '림': '임', '립': '입',
+      '녀': '여', '뇨': '요', '뉴': '유', '니': '이', '닌': '인'
+    };
+
+    function getPossibleStartChars(char) {
+      const results = [char];
+      if (DUEUM_RULES[char]) {
+        results.push(DUEUM_RULES[char]);
+      }
+      return results;
+    }
+
+    function getLastChar(word) {
+      return word.charAt(word.length - 1);
+    }
+
+    function getFirstChar(word) {
+      return word.charAt(0);
+    }
+
+    /* ===================================================================
+       3. AUDIO SYNTHESIZER & UI TOAST
+       =================================================================== */
+    let audioCtx = null;
+    let audioEnabled = true;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playSound(type) {
+      if (!audioEnabled) return;
+      initAudio();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'click') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(850, now + 0.05);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      } 
+      else if (type === 'correct') {
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.2, now + idx * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.2);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + idx * 0.05 + 0.2);
+        });
+      } 
+      else if (type === 'oof') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.22);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      } 
+      else if (type === 'lethal') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.linearRampToValueAtTime(650, now + 0.3);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      }
+      else if (type === 'heal') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.3);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+      else if (type === 'stage_clear') {
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+        notes.forEach((f, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(f, now + i * 0.08);
+          gain.gain.setValueAtTime(0.25, now + i * 0.08);
+          gain.gain.linearRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.25);
+        });
+      }
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'bg-black/90 border-2 border-yellow-400 text-yellow-300 px-4 py-2 rounded-xl text-sm font-bold shadow-lg transform transition-all duration-300 translate-y-[-10px] opacity-0';
+      toast.innerText = msg;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const btn = document.getElementById('audio-btn');
+      btn.innerText = audioEnabled ? '🔊 소리 ON' : '🔇 소리 OFF';
+    }
+
+    /* ===================================================================
+       4. GAME STATE & SELECTION LOGIC
+       =================================================================== */
+    let selectedHeroId = 'classic';
+    let maxTime = 20;
+    let timerInterval = null;
+    let timeLeft = 20;
+
+    let currentStage = 1;
+    let currentOpponent = null;
+    let nextOpponent = null;
+
+    let playerMaxHp = 100;
+    let playerHp = 100;
+    let opponentMaxHp = 100;
+    let opponentHp = 100;
+
+    let score = 0;
+    let wordCount = 0;
+
+    let usedWords = new Set();
+    let currentWord = "로블록스";
+    let isMidStageHeroSelect = false;
+
+    function renderHeroGrid() {
+      const gridContainer = document.getElementById('character-grid');
+      gridContainer.innerHTML = '';
+
+      HEROES.forEach(hero => {
+        const isSelected = (hero.id === selectedHeroId);
+        const card = document.createElement('div');
+        card.className = `char-card cursor-pointer roblox-card p-2 rounded-xl border-4 transition-all hover:scale-105 flex flex-col items-center justify-between ${
+          isSelected ? 'bg-indigo-900 border-yellow-400 scale-105' : 'bg-gray-800 border-gray-600'
+        }`;
+        card.onclick = () => selectHero(hero.id);
+
+        card.innerHTML = `
+          <div class="text-[10px] bg-yellow-400 text-black font-black px-1.5 py-0.5 rounded-full mb-1 truncate max-w-full">
+            ${hero.title}
+          </div>
+          <div class="roblox-avatar scale-75 origin-top my-1">
+            ${hero.html}
+          </div>
+          <div class="text-center w-full mt-1">
+            <h4 class="font-black text-xs sm:text-sm text-yellow-300 truncate">${hero.name}</h4>
+          </div>
+        `;
+
+        gridContainer.appendChild(card);
+      });
+
+      updateDetailCard();
+    }
+
+    function selectHero(id) {
+      playSound('click');
+      selectedHeroId = id;
+      renderHeroGrid();
+
+      if (isMidStageHeroSelect) {
+        const hero = HEROES.find(c => c.id === selectedHeroId);
+        playerMaxHp = 100 + hero.hpBonus;
+        playerHp = playerMaxHp;
+
+        document.getElementById('player-avatar-container').innerHTML = hero.html;
+        document.getElementById('player-name-tag').innerText = `${hero.name} HP`;
+        document.getElementById('skill-badge').innerText = hero.skill.split('(')[0];
+
+        updateHpDisplays();
+        playSound('heal');
+        showToast(`✨ ${hero.name}(으)로 교체 완료! 체력이 100% 회복되었습니다.`);
+
+        isMidStageHeroSelect = false;
+        advanceToNextStage();
+      }
+    }
+
+    function updateDetailCard() {
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+      if (!hero) return;
+
+      document.getElementById('detail-avatar-preview').innerHTML = `<div class="roblox-avatar scale-75 origin-top">${hero.html}</div>`;
+      document.getElementById('detail-name').innerText = hero.name;
+      document.getElementById('detail-title').innerText = hero.title;
+      document.getElementById('detail-desc').innerText = hero.desc;
+      document.getElementById('detail-skill').innerText = `✨ 패시브: ${hero.skill}`;
+    }
+
+    function setTimer(seconds) {
+      playSound('click');
+      maxTime = seconds;
+      [20, 12, 7].forEach(s => {
+        const btn = document.getElementById(`time-${s}`);
+        if (s === seconds) {
+          btn.className = "px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-green-500 text-black";
+        } else {
+          btn.className = "px-2.5 py-1 text-xs rounded-lg border-2 border-black font-bold bg-gray-700 text-white";
+        }
+      });
+    }
+
+    /* ===================================================================
+       5. STAGE & GAMEPLAY CORE LOGIC
+       =================================================================== */
+    function startGame() {
+      playSound('click');
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+
+      document.getElementById('select-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+
+      // Setup Hero
+      document.getElementById('player-avatar-container').innerHTML = hero.html;
+      document.getElementById('player-name-tag').innerText = `${hero.name} HP`;
+      document.getElementById('skill-badge').innerText = hero.skill.split('(')[0];
+
+      // Reset Match Variables
+      currentStage = 1;
+      score = 0;
+      wordCount = 0;
+      playerMaxHp = 100 + hero.hpBonus;
+      playerHp = playerMaxHp;
+
+      // Stage 1 always starts with Bacon Boy
+      currentOpponent = OPPONENTS[0];
+      setupStage(currentStage);
+    }
+
+    function setupStage(stageNum) {
+      usedWords = new Set();
+      currentWord = "로블록스";
+      usedWords.add(currentWord);
+
+      opponentMaxHp = 100 + (stageNum - 1) * 20;
+      opponentHp = opponentMaxHp;
+
+      document.getElementById('stage-badge').innerText = `STAGE ${stageNum}`;
+      document.getElementById('opponent-title-tag').innerText = currentOpponent.tag;
+      document.getElementById('opponent-avatar-container').innerHTML = currentOpponent.html;
+      document.getElementById('opponent-name-tag').innerText = currentOpponent.name;
+      document.getElementById('opponent-hp-label').innerText = `${currentOpponent.name} HP`;
+
+      setOpponentSpeech(currentOpponent.lines.start);
+
+      updateHpDisplays();
+      updateScoreDisplay();
+
+      const historyBox = document.getElementById('history-box');
+      historyBox.innerHTML = `<span class="bg-indigo-900 border border-indigo-500 text-indigo-200 px-2 py-0.5 rounded-md">로블록스</span>`;
+
+      updateTargetWordDisplay();
+      resetTimer();
+    }
+
+    function getRandomNextOpponent() {
+      const filtered = OPPONENTS.filter(o => o.id !== currentOpponent.id);
+      return filtered[Math.floor(Math.random() * filtered.length)];
+    }
+
+    function updateTargetWordDisplay() {
+      document.getElementById('current-word-display').innerText = currentWord;
+      const last = getLastChar(currentWord);
+      const possible = getPossibleStartChars(last);
+      
+      if (possible.length > 1) {
+        document.getElementById('target-char').innerText = `${possible[0]} 또는 ${possible[1]}`;
+      } else {
+        document.getElementById('target-char').innerText = possible[0];
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+      
+      let timeLimit = maxTime;
+      if (hero.id === 'cat') timeLimit += 3;
+
+      timeLeft = timeLimit;
+      updateTimerUI();
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          handleTimeOut();
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      const timerBox = document.getElementById('timer-box');
+      timerBox.innerText = timeLeft;
+      if (timeLeft <= 3) {
+        timerBox.className = "absolute top-2 right-2 bg-red-600 border-2 border-black text-white font-black w-10 h-10 rounded-full flex items-center justify-center text-lg animate-ping";
+      } else {
+        timerBox.className = "absolute top-2 right-2 bg-yellow-400 border-2 border-black text-black font-black w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-[2px_2px_0px_#000]";
+      }
+    }
+
+    function submitWord(e) {
+      e.preventDefault();
+      const inputEl = document.getElementById('word-input');
+      const val = inputEl.value.trim();
+      inputEl.value = '';
+
+      if (!val) return;
+
+      if (val.length < 2) {
+        shakeInput("2글자 이상의 단어를 입력하세요!");
+        return;
+      }
+
+      if (!/^[가-힣]+$/.test(val)) {
+        shakeInput("한글 단어만 입력 가능합니다!");
+        return;
+      }
+
+      const lastC = getLastChar(currentWord);
+      const validStarts = getPossibleStartChars(lastC);
+      const inputFirst = getFirstChar(val);
+
+      if (!validStarts.includes(inputFirst)) {
+        shakeInput(`'${validStarts.join("' 또는 '")}'(으)로 시작해야 합니다!`);
+        return;
+      }
+
+      if (usedWords.has(val)) {
+        shakeInput("이미 사용된 단어입니다!");
+        return;
+      }
+
+      // PLAYER ATTACK SUCCESS
+      clearInterval(timerInterval);
+      playSound('correct');
+      confetti({ particleCount: 20, spread: 50, origin: { y: 0.8 } });
+
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+
+      usedWords.add(val);
+      currentWord = val;
+      wordCount++;
+
+      let scoreMult = (hero.id === 'rainbow') ? 1.5 : 1.0;
+      const earnedScore = Math.floor((val.length * 100 + timeLeft * 10) * scoreMult);
+      score += earnedScore;
+      updateScoreDisplay();
+
+      addHistoryChip(val, 'player');
+
+      // Damage Calculation
+      let baseDmg = 14 + val.length * 4;
+      let finalDmg = Math.min(Math.floor(baseDmg * hero.dmgBonus), 50);
+      
+      opponentHp = Math.max(0, opponentHp - finalDmg);
+
+      // Puppy Passive Healing
+      if (hero.id === 'puppy') {
+        playerHp = Math.min(playerMaxHp, playerHp + 3);
+      }
+
+      updateHpDisplays();
+
+      animatePlayerAttack();
+      animateOpponentDamage();
+      playSound('oof');
+
+      setOpponentSpeech(currentOpponent.lines.hit);
+
+      if (opponentHp <= 0) {
+        setTimeout(() => triggerStageVictoryChoice(), 600);
+        return;
+      }
+
+      document.getElementById('submit-btn').disabled = true;
+      updateTargetWordDisplay();
+
+      // Opponent Turn
+      setTimeout(() => {
+        opponentTurn();
+      }, 1100);
+    }
+
+    function opponentTurn() {
+      const lastC = getLastChar(currentWord);
+      const validStarts = getPossibleStartChars(lastC);
+
+      let chosenWord = "";
+      let isLethal = false;
+
+      const lethalProb = currentOpponent.lethalChance + (currentStage * 0.03);
+      const triggerLethalChance = (opponentHp < opponentMaxHp * 0.4 || Math.random() < lethalProb);
+      
+      if (triggerLethalChance) {
+        for (let start of validStarts) {
+          if (LETHAL_WORDS[start]) {
+            const unusedLethals = LETHAL_WORDS[start].filter(w => !usedWords.has(w));
+            if (unusedLethals.length > 0) {
+              chosenWord = unusedLethals[Math.floor(Math.random() * unusedLethals.length)];
+              isLethal = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!chosenWord) {
+        const candidates = WORD_DATABASE.filter(w => {
+          return validStarts.includes(getFirstChar(w)) && !usedWords.has(w);
+        });
+
+        if (candidates.length > 0) {
+          chosenWord = candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+          const dynamicSuffixes = ["기", "스", "리", "차", "가", "나", "자", "타", "파", "하", "폰", "링", "방", "동"];
+          for (let s of validStarts) {
+            for (let suff of dynamicSuffixes) {
+              let candidate = s + suff;
+              if (!usedWords.has(candidate)) {
+                chosenWord = candidate;
+                break;
+              }
+            }
+            if (chosenWord) break;
+          }
+        }
+      }
+
+      if (!chosenWord) {
+        setOpponentSpeech(currentOpponent.lines.defeat);
+        setTimeout(() => triggerStageVictoryChoice(), 800);
+        return;
+      }
+
+      usedWords.add(chosenWord);
+      currentWord = chosenWord;
+
+      addHistoryChip(chosenWord, 'opponent', isLethal);
+      updateTargetWordDisplay();
+
+      animateOpponentAttack();
+      animatePlayerDamage();
+
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+
+      if (isLethal) {
+        playSound('lethal');
+        let baseDmg = 32 + Math.floor(Math.random() * 10);
+        let actualDmg = Math.floor(baseDmg * hero.defBonus);
+        playerHp = Math.max(0, playerHp - actualDmg);
+        
+        setOpponentSpeech(`'${chosenWord}'! ${currentOpponent.lines.lethal}`);
+      } else {
+        playSound('oof');
+        let baseDmg = 12 + Math.floor(Math.random() * 8);
+        let actualDmg = Math.floor(baseDmg * hero.defBonus);
+        playerHp = Math.max(0, playerHp - actualDmg);
+
+        setOpponentSpeech(`'${chosenWord}'! ${currentOpponent.lines.attack}`);
+      }
+
+      updateHpDisplays();
+      document.getElementById('submit-btn').disabled = false;
+
+      if (playerHp <= 0) {
+        setTimeout(() => triggerGameOver(), 600);
+        return;
+      }
+
+      resetTimer();
+    }
+
+    function handleTimeOut() {
+      playSound('oof');
+      animatePlayerDamage();
+      
+      const hero = HEROES.find(c => c.id === selectedHeroId);
+      let penalty = Math.floor(25 * hero.defBonus);
+
+      playerHp = Math.max(0, playerHp - penalty);
+      updateHpDisplays();
+
+      setOpponentSpeech("시간 초과! ⏰ 망설이다가 공격기회를 날렸구나!");
+
+      if (playerHp <= 0) {
+        triggerGameOver();
+      } else {
+        setTimeout(() => {
+          resetTimer();
+        }, 1000);
+      }
+    }
+
+    /* ===================================================================
+       6. STAGE CLEAR & VICTORY REWARD MODAL FLOW
+       =================================================================== */
+    function triggerStageVictoryChoice() {
+      clearInterval(timerInterval);
+      playSound('stage_clear');
+      confetti({ particleCount: 80, spread: 80, origin: { y: 0.5 } });
+
+      const stageBonus = currentStage * 300;
+      score += stageBonus;
+      updateScoreDisplay();
+
+      nextOpponent = getRandomNextOpponent();
+      const currentHero = HEROES.find(h => h.id === selectedHeroId);
+
+      document.getElementById('victoryHeroName').innerText = currentHero.name;
+      document.getElementById('victoryNextOpponent').innerText = nextOpponent.name;
+
+      document.getElementById('victoryModal').classList.remove('hidden');
+    }
+
+    function handleVictoryChoice(choice) {
+      document.getElementById('victoryModal').classList.add('hidden');
+
+      if (choice === 'keep') {
+        playerHp = playerMaxHp;
+        updateHpDisplays();
+        playSound('heal');
+        showToast(`💖 ${HEROES.find(h => h.id === selectedHeroId).name}의 체력이 100% 회복되었습니다!`);
+        advanceToNextStage();
+      } else if (choice === 'change') {
+        isMidStageHeroSelect = true;
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('select-screen').classList.remove('hidden');
+        renderHeroGrid();
+        showToast(`🔄 원하시는 교체 영웅을 클릭하세요!`);
+      }
+    }
+
+    function advanceToNextStage() {
+      currentStage++;
+      currentOpponent = nextOpponent;
+
+      document.getElementById('select-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('submit-btn').disabled = false;
+
+      setupStage(currentStage);
+    }
+
+    function triggerGameOver() {
+      clearInterval(timerInterval);
+      playSound('oof');
+
+      document.getElementById('final-stage').innerText = `STAGE ${currentStage}`;
+      document.getElementById('final-score').innerText = `${score}점`;
+      document.getElementById('final-count').innerText = `${wordCount}개`;
+
+      document.getElementById('result-modal').classList.remove('hidden');
+    }
+
+    function surrender() {
+      if (confirm("정말 항복하고 캐릭터 선택으로 돌아가시겠습니까?")) {
+        clearInterval(timerInterval);
+        backToSelect();
+      }
+    }
+
+    /* ===================================================================
+       7. UI & ANIMATION HELPERS
+       =================================================================== */
+    function shakeInput(msg) {
+      playSound('oof');
+      const inputEl = document.getElementById('word-input');
+      inputEl.classList.add('border-red-500', 'animate-shake');
+      setOpponentSpeech(`⚠️ ${msg}`);
+      setTimeout(() => {
+        inputEl.classList.remove('border-red-500', 'animate-shake');
+      }, 500);
+    }
+
+    function setOpponentSpeech(text) {
+      document.getElementById('opponent-speech').innerText = text;
+    }
+
+    function updateHpDisplays() {
+      const pPct = Math.max(0, Math.floor((playerHp / playerMaxHp) * 100));
+      document.getElementById('player-hp-bar').style.width = `${pPct}%`;
+      document.getElementById('player-hp-text').innerText = `${playerHp} / ${playerMaxHp}`;
+
+      const oPct = Math.max(0, Math.floor((opponentHp / opponentMaxHp) * 100));
+      document.getElementById('opponent-hp-bar').style.width = `${oPct}%`;
+      document.getElementById('opponent-hp-text').innerText = `${opponentHp} / ${opponentMaxHp}`;
+    }
+
+    function updateScoreDisplay() {
+      document.getElementById('total-score-badge').innerText = score;
+      document.getElementById('combo-text').innerText = wordCount;
+    }
+
+    function addHistoryChip(word, owner, isLethal = false) {
+      const historyBox = document.getElementById('history-box');
+      const chip = document.createElement('span');
+      if (owner === 'player') {
+        chip.className = "bg-green-900 border border-green-500 text-green-200 px-2 py-0.5 rounded-md font-bold";
+        chip.innerText = `나: ${word}`;
+      } else {
+        if (isLethal) {
+          chip.className = "bg-yellow-500 border-2 border-red-600 text-black px-2 py-0.5 rounded-md font-black animate-pulse";
+          chip.innerText = `⚡한방: ${word}`;
+        } else {
+          chip.className = "bg-red-900 border border-red-500 text-red-200 px-2 py-0.5 rounded-md font-bold";
+          chip.innerText = `${currentOpponent.name.split(' ')[0]}: ${word}`;
+        }
+      }
+      historyBox.appendChild(chip);
+      historyBox.scrollTop = historyBox.scrollHeight;
+    }
+
+    function animatePlayerAttack() {
+      const el = document.getElementById('player-avatar-container');
+      el.classList.add('animate-bounce-short');
+      setTimeout(() => el.classList.remove('animate-bounce-short'), 400);
+    }
+
+    function animateOpponentDamage() {
+      const el = document.getElementById('opponent-avatar-container');
+      el.classList.add('animate-shake');
+      setTimeout(() => el.classList.remove('animate-shake'), 400);
+    }
+
+    function animateOpponentAttack() {
+      const el = document.getElementById('opponent-avatar-container');
+      el.classList.add('animate-bounce-short');
+      setTimeout(() => el.classList.remove('animate-bounce-short'), 400);
+    }
+
+    function animatePlayerDamage() {
+      const el = document.getElementById('player-avatar-container');
+      el.classList.add('animate-shake');
+      setTimeout(() => el.classList.remove('animate-shake'), 400);
+    }
+
+    function restartGame() {
+      document.getElementById('result-modal').classList.add('hidden');
+      startGame();
+    }
+
+    function backToSelect() {
+      document.getElementById('result-modal').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('select-screen').classList.remove('hidden');
+      isMidStageHeroSelect = false;
+      renderHeroGrid();
+    }
+
+    // Window Onload Init
+    window.onload = function() {
+      renderHeroGrid();
+    };
+  </script>
+</body>
+</html>

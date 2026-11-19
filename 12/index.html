@@ -1,0 +1,734 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>스피드 클릭 게임 (Speed Clicker)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .target-node {
+            transition: transform 0.08s ease-out, opacity 0.1s linear;
+        }
+        .target-node:active {
+            transform: scale(0.85) !important;
+        }
+        @keyframes clickPulse {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .click-effect {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            border: 2px solid rgba(244, 63, 94, 0.8);
+            animation: clickPulse 0.4s ease-out forwards;
+        }
+        @keyframes floatText {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(1.2); opacity: 0; }
+        }
+        .combo-text {
+            position: absolute;
+            pointer-events: none;
+            font-weight: 900;
+            color: #f59e0b;
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+            animation: floatText 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-hidden relative">
+
+    <!-- Ambient Glow Background -->
+    <div class="fixed inset-0 pointer-events-none z-0">
+        <div id="bgGlow1" class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/15 rounded-full blur-3xl transition-colors duration-500"></div>
+        <div id="bgGlow2" class="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-indigo-600/15 rounded-full blur-3xl transition-colors duration-500"></div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-2xl mx-auto p-4 flex justify-between items-center z-20 relative">
+        <div class="flex items-center gap-3">
+            <div class="p-2.5 bg-rose-500/20 rounded-2xl border border-rose-500/30 text-rose-400">
+                <i data-lucide="zap" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-rose-400 bg-clip-text text-transparent">스피드 클릭 (Speed Clicker)</h1>
+                <p class="text-xs text-slate-400">순발력과 반응속도 한계 도전</p>
+            </div>
+        </div>
+        <button id="helpBtn" class="p-2.5 rounded-2xl glass-card text-slate-300 hover:text-white transition hover:bg-slate-800/60">
+            <i data-lucide="help-circle" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-2xl mx-auto flex-1 flex flex-col p-4 z-10 relative gap-4">
+
+        <!-- Mode Selector Cards -->
+        <div id="modeSelector" class="grid grid-cols-3 gap-2">
+            <button data-mode="target" class="mode-btn active p-3 rounded-2xl glass-card border border-rose-500/50 bg-rose-500/10 text-rose-300 font-semibold text-xs sm:text-sm flex flex-col items-center gap-1.5 transition-all">
+                <i data-lucide="crosshair" class="w-5 h-5"></i>
+                <span>타겟 모드 (10초)</span>
+            </button>
+            <button data-mode="cps" class="mode-btn p-3 rounded-2xl glass-card border border-slate-800 text-slate-400 font-semibold text-xs sm:text-sm flex flex-col items-center gap-1.5 transition-all hover:text-slate-200">
+                <i data-lucide="mouse-pointer-click" class="w-5 h-5"></i>
+                <span>CPS 연타 모드</span>
+            </button>
+            <button data-mode="reflex" class="mode-btn p-3 rounded-2xl glass-card border border-slate-800 text-slate-400 font-semibold text-xs sm:text-sm flex flex-col items-center gap-1.5 transition-all hover:text-slate-200">
+                <i data-lucide="timer" class="w-5 h-5"></i>
+                <span>반응속도 테스트</span>
+            </button>
+        </div>
+
+        <!-- Live Dashboard Statistics -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="glass-card rounded-2xl p-3 text-center border border-slate-800">
+                <div class="text-[11px] font-semibold text-slate-400 mb-0.5">남은 시간 / 상태</div>
+                <div id="statTimer" class="text-xl sm:text-2xl font-black text-white font-mono">10.0s</div>
+            </div>
+            <div class="glass-card rounded-2xl p-3 text-center border border-slate-800">
+                <div id="statLabel2" class="text-[11px] font-semibold text-slate-400 mb-0.5">점수 (클릭 수)</div>
+                <div id="statScore" class="text-xl sm:text-2xl font-black text-rose-400 font-mono">0</div>
+            </div>
+            <div class="glass-card rounded-2xl p-3 text-center border border-slate-800">
+                <div id="statLabel3" class="text-[11px] font-semibold text-slate-400 mb-0.5">콤보 / 정확도</div>
+                <div id="statExtra" class="text-xl sm:text-2xl font-black text-amber-400 font-mono">0x</div>
+            </div>
+        </div>
+
+        <!-- Main Game Area Canvas/Board -->
+        <div id="gameBoard" class="w-full flex-1 min-h-[360px] sm:min-h-[420px] glass-card rounded-3xl relative overflow-hidden border border-slate-800 flex items-center justify-center shadow-2xl">
+            
+            <!-- Start Overlay Screen -->
+            <div id="startOverlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center bg-slate-950/80 backdrop-blur-md">
+                <div class="w-16 h-16 bg-rose-500/20 text-rose-400 rounded-3xl flex items-center justify-center mb-4 border border-rose-500/30 shadow-lg shadow-rose-500/20">
+                    <i data-lucide="play" class="w-8 h-8 fill-current ml-1"></i>
+                </div>
+                <h2 id="modeTitle" class="text-2xl font-black text-white mb-2">타겟 조준 모드</h2>
+                <p id="modeDesc" class="text-xs sm:text-sm text-slate-400 max-w-xs mb-6 leading-relaxed">
+                    화면에 무작위로 타격 지점이 스폰됩니다. 10초 동안 최대한 빠르고 정확하게 타겟을 클릭하세요!
+                </p>
+                <button id="startBtn" class="px-8 py-4 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-extrabold text-lg rounded-2xl shadow-xl shadow-rose-500/25 transition-all transform active:scale-95">
+                    게임 시작
+                </button>
+            </div>
+
+            <!-- Reflex Mode Signal Container -->
+            <div id="reflexBox" class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer select-none">
+                <span id="reflexText" class="text-2xl sm:text-3xl font-black text-white pointer-events-none">화면이 초록색이 되면 클릭하세요!</span>
+                <span id="reflexSubtext" class="text-xs text-slate-400 mt-2 pointer-events-none">준비하세요...</span>
+            </div>
+
+            <!-- Big CPS Click Target Button -->
+            <button id="cpsTargetBtn" class="hidden absolute inset-6 sm:inset-12 bg-gradient-to-br from-indigo-600 to-rose-600 rounded-3xl flex flex-col items-center justify-center text-white font-black text-3xl shadow-2xl active:scale-95 transition-transform border border-white/20 select-none">
+                <i data-lucide="mouse-pointer" class="w-16 h-16 mb-2 animate-bounce"></i>
+                <span>폭풍 클릭!</span>
+                <span id="cpsCounterText" class="text-sm font-semibold text-indigo-200 mt-2">클릭하여 시작하세요</span>
+            </button>
+
+            <!-- Dynamic Target Spawn Container for Target Mode -->
+            <div id="targetContainer" class="absolute inset-0 pointer-events-auto"></div>
+
+            <!-- Game Over Result Sheet -->
+            <div id="resultOverlay" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/90 backdrop-blur-xl animate-fade-in">
+                <div class="text-xs font-extrabold tracking-widest text-rose-400 uppercase bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20 mb-2">
+                    GAME OVER
+                </div>
+                <h2 id="resultRank" class="text-3xl font-black text-white mb-1">SSS급 순발력!</h2>
+                <p id="resultSub" class="text-xs text-slate-400 mb-6">최고의 스피드와 정밀함입니다</p>
+
+                <!-- Result Stats Grid -->
+                <div class="grid grid-cols-2 gap-3 w-full max-w-xs mb-6">
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center">
+                        <div class="text-[11px] text-slate-400">최종 점수</div>
+                        <div id="resScore" class="text-xl font-bold text-rose-400 font-mono">0점</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center">
+                        <div id="resStatLabel2" class="text-[11px] text-slate-400">CPS / 정확도</div>
+                        <div id="resStatVal2" class="text-xl font-bold text-amber-400 font-mono">0.0</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 text-center col-span-2">
+                        <div class="text-[11px] text-slate-400">모드 최고 기록</div>
+                        <div id="resBestScore" class="text-lg font-bold text-indigo-300 font-mono">-</div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 w-full max-w-xs">
+                    <button id="retryBtn" class="flex-1 py-3.5 bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <span>다시 도전</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-2xl mx-auto text-center py-3 text-xs text-slate-500 z-10">
+        최대한 빠르게 스폰되는 목표물을 터치하세요!
+    </footer>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-card max-w-sm w-full rounded-3xl p-6 border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="info" class="w-5 h-5 text-rose-400"></i>
+                    게임 안내
+                </h3>
+                <button id="closeHelpModal" class="p-1 text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-sm text-slate-300 leading-relaxed">
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                    <strong class="text-rose-400 block mb-1">🎯 타겟 조준 모드 (10초)</strong>
+                    10초 동안 무작위로 생성되는 점들을 연속 명중시키세요. 헛방 클릭 시 콤보가 단축됩니다!
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                    <strong class="text-indigo-400 block mb-1">⚡ CPS 연타 모드 (5초)</strong>
+                    5초 동안 큰 버튼을 미친듯이 폭풍 클릭하여 초당 클릭 수(CPS)를 측정합니다.
+                </div>
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                    <strong class="text-amber-400 block mb-1">⏱️ 반응속도 테스트</strong>
+                    화면이 빨간색에서 **초록색**으로 바뀌는 순간 빛의 속도로 클릭하여 반응속도(ms)를 기록합니다.
+                </div>
+            </div>
+            <button id="modalOkBtn" class="w-full mt-5 py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-semibold text-white transition">
+                확인했습니다
+            </button>
+        </div>
+    </div>
+
+    <!-- Script Logic -->
+    <script>
+        // DOM References
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const modeTitle = document.getElementById('modeTitle');
+        const modeDesc = document.getElementById('modeDesc');
+        const startOverlay = document.getElementById('startOverlay');
+        const startBtn = document.getElementById('startBtn');
+        const gameBoard = document.getElementById('gameBoard');
+        const targetContainer = document.getElementById('targetContainer');
+        const reflexBox = document.getElementById('reflexBox');
+        const reflexText = document.getElementById('reflexText');
+        const reflexSubtext = document.getElementById('reflexSubtext');
+        const cpsTargetBtn = document.getElementById('cpsTargetBtn');
+        const cpsCounterText = document.getElementById('cpsCounterText');
+        
+        // Stats Elements
+        const statTimer = document.getElementById('statTimer');
+        const statScore = document.getElementById('statScore');
+        const statExtra = document.getElementById('statExtra');
+        const statLabel2 = document.getElementById('statLabel2');
+        const statLabel3 = document.getElementById('statLabel3');
+
+        // Results Overlay
+        const resultOverlay = document.getElementById('resultOverlay');
+        const resultRank = document.getElementById('resultRank');
+        const resultSub = document.getElementById('resultSub');
+        const resScore = document.getElementById('resScore');
+        const resStatVal2 = document.getElementById('resStatVal2');
+        const resStatLabel2 = document.getElementById('resStatLabel2');
+        const resBestScore = document.getElementById('resBestScore');
+        const retryBtn = document.getElementById('retryBtn');
+
+        // Modals
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpModal');
+        const closeHelpModal = document.getElementById('closeHelpModal');
+        const modalOkBtn = document.getElementById('modalOkBtn');
+
+        // Game State Variables
+        let currentMode = 'target'; // 'target', 'cps', 'reflex'
+        let isPlaying = false;
+        let timerInterval = null;
+        let timeLeft = 10;
+        let score = 0;
+        let clicksTotal = 0;
+        let clicksHit = 0;
+        let combo = 0;
+        let maxCombo = 0;
+
+        // Reflex state
+        let reflexStartTime = 0;
+        let reflexTimeout = null;
+        let reflexState = 'idle'; // 'waiting', 'ready', 'clicked'
+
+        // Lucide Icons Render
+        lucide.createIcons();
+
+        // Mode Configurations
+        const MODES = {
+            target: {
+                title: "타겟 조준 모드",
+                desc: "10초 동안 무작위로 스폰되는 타겟을 신속하게 클릭하세요. 연속 히트 시 콤보 가산점이 붙습니다!",
+                timeLimit: 10,
+                statLabel2: "점수 (Hits)",
+                statLabel3: "콤보 / 정확도"
+            },
+            cps: {
+                title: "CPS 연타 테스트",
+                desc: "5초 동안 폭풍 연타를 날리세요! 초당 클릭 수(CPS, Clicks Per Second)를 측정합니다.",
+                timeLimit: 5,
+                statLabel2: "총 클릭 수",
+                statLabel3: "CPS 속도"
+            },
+            reflex: {
+                title: "반응속도 테스트",
+                desc: "화면 색상이 초록색으로 찰나에 변할 때 즉시 터치하세요! 밀리초(ms) 단위의 반응 속도를 측정합니다.",
+                timeLimit: 0,
+                statLabel2: "반응 속도",
+                statLabel3: "상태"
+            }
+        };
+
+        // Switch Game Mode Selection
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isPlaying) return;
+                const mode = btn.dataset.mode;
+                currentMode = mode;
+
+                modeBtns.forEach(b => {
+                    b.classList.remove('active', 'border-rose-500/50', 'bg-rose-500/10', 'text-rose-300');
+                    b.classList.add('border-slate-800', 'text-slate-400');
+                });
+                btn.classList.add('active', 'border-rose-500/50', 'bg-rose-500/10', 'text-rose-300');
+                btn.classList.remove('border-slate-800', 'text-slate-400');
+
+                setupModeUI();
+            });
+        });
+
+        function setupModeUI() {
+            const config = MODES[currentMode];
+            modeTitle.textContent = config.title;
+            modeDesc.textContent = config.desc;
+            statLabel2.textContent = config.statLabel2;
+            statLabel3.textContent = config.statLabel3;
+
+            // Reset Board UI visibility
+            cpsTargetBtn.classList.add('hidden');
+            reflexBox.classList.add('hidden');
+            targetContainer.innerHTML = '';
+            resultOverlay.classList.add('hidden');
+            startOverlay.classList.remove('hidden');
+
+            if (currentMode === 'target') {
+                statTimer.textContent = `${config.timeLimit}.0s`;
+                statScore.textContent = '0';
+                statExtra.textContent = '0x';
+            } else if (currentMode === 'cps') {
+                statTimer.textContent = `${config.timeLimit}.0s`;
+                statScore.textContent = '0';
+                statExtra.textContent = '0.0 CPS';
+            } else if (currentMode === 'reflex') {
+                statTimer.textContent = '--';
+                statScore.textContent = '-- ms';
+                statExtra.textContent = '대기 중';
+            }
+        }
+
+        // Start Game Dispatcher
+        startBtn.addEventListener('click', () => {
+            startOverlay.classList.add('hidden');
+            isPlaying = true;
+
+            if (currentMode === 'target') {
+                startTargetGame();
+            } else if (currentMode === 'cps') {
+                startCpsGame();
+            } else if (currentMode === 'reflex') {
+                startReflexGame();
+            }
+        });
+
+        // -------------------------------------------------------------
+        // 1. TARGET MODE LOGIC
+        // -------------------------------------------------------------
+        function startTargetGame() {
+            score = 0;
+            clicksTotal = 0;
+            clicksHit = 0;
+            combo = 0;
+            maxCombo = 0;
+            timeLeft = MODES.target.timeLimit;
+
+            statScore.textContent = '0';
+            statExtra.textContent = '0x';
+            statTimer.textContent = `${timeLeft.toFixed(1)}s`;
+
+            // Miss listener on background
+            targetContainer.addEventListener('pointerdown', handleTargetMiss);
+
+            // Spawn first targets
+            spawnTargetNode();
+            spawnTargetNode();
+
+            // Timer Tick
+            const startTime = performance.now();
+            timerInterval = setInterval(() => {
+                const elapsed = (performance.now() - startTime) / 1000;
+                timeLeft = Math.max(0, MODES.target.timeLimit - elapsed);
+                statTimer.textContent = `${timeLeft.toFixed(1)}s`;
+
+                if (timeLeft <= 0) {
+                    endTargetGame();
+                }
+            }, 50);
+        }
+
+        function spawnTargetNode() {
+            if (!isPlaying || currentMode !== 'target') return;
+
+            const target = document.createElement('div');
+            const size = Math.floor(Math.random() * 25) + 45; // 45px - 70px
+            
+            const maxX = gameBoard.clientWidth - size - 20;
+            const maxY = gameBoard.clientHeight - size - 20;
+            
+            const posX = Math.max(10, Math.floor(Math.random() * maxX));
+            const posY = Math.max(10, Math.floor(Math.random() * maxY));
+
+            // Random vibrant colors
+            const colors = ['bg-rose-500', 'bg-amber-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-cyan-500'];
+            const colorClass = colors[Math.floor(Math.random() * colors.length)];
+
+            target.className = `target-node absolute ${colorClass} rounded-full flex items-center justify-center cursor-pointer shadow-lg shadow-black/40 border-2 border-white/40`;
+            target.style.width = `${size}px`;
+            target.style.height = `${size}px`;
+            target.style.left = `${posX}px`;
+            target.style.top = `${posY}px`;
+            target.style.transform = 'scale(0)';
+
+            // Target Inner Ring Icon
+            target.innerHTML = `<div class="w-2/5 h-2/5 rounded-full border-2 border-white/80 pointer-events-none"></div>`;
+
+            // Click Event
+            target.addEventListener('pointerdown', (e) => {
+                e.stopPropagation(); // Stop background miss event
+                if (!isPlaying) return;
+
+                score += 10 + (combo * 2);
+                clicksHit++;
+                clicksTotal++;
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+
+                statScore.textContent = score;
+                const accuracy = Math.round((clicksHit / clicksTotal) * 100);
+                statExtra.textContent = `${combo}x (${accuracy}%)`;
+
+                // Spawn floating combo text
+                showFloatingText(`+${10 + (combo*2)}`, e.clientX, e.clientY);
+
+                // Ripple effect
+                createClickRipple(e.clientX, e.clientY);
+
+                // Remove target and spawn new one
+                target.remove();
+                spawnTargetNode();
+            });
+
+            targetContainer.appendChild(target);
+
+            // Pop-in animation
+            requestAnimationFrame(() => {
+                target.style.transform = 'scale(1)';
+            });
+
+            // Target Auto Disappear logic (difficulty scaling)
+            setTimeout(() => {
+                if (target.parentNode && isPlaying) {
+                    target.remove();
+                    combo = 0; // Combo breaks on timeout
+                    statExtra.textContent = `${combo}x`;
+                    spawnTargetNode();
+                }
+            }, Math.max(800, 1800 - (clicksHit * 25)));
+        }
+
+        function handleTargetMiss(e) {
+            if (!isPlaying || currentMode !== 'target') return;
+            clicksTotal++;
+            combo = 0;
+            const accuracy = clicksTotal > 0 ? Math.round((clicksHit / clicksTotal) * 100) : 100;
+            statExtra.textContent = `0x (${accuracy}%)`;
+            createClickRipple(e.clientX, e.clientY);
+        }
+
+        function endTargetGame() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+            targetContainer.removeEventListener('pointerdown', handleTargetMiss);
+            targetContainer.innerHTML = '';
+
+            const accuracy = clicksTotal > 0 ? Math.round((clicksHit / clicksTotal) * 100) : 0;
+            
+            // Evaluation Rank
+            let rank = "C등급";
+            let sub = "조금 더 빠른 조준이 필요합니다!";
+            if (score >= 450) { rank = "GOD (신)"; sub = "경이로운 타격 속도입니다!"; triggerConfetti(); }
+            else if (score >= 320) { rank = "SSS급 전설"; sub = "놀라운 반사 신경과 정밀도!"; triggerConfetti(); }
+            else if (score >= 220) { rank = "S급 마스터"; sub = "매우 우수한 순발력입니다."; }
+            else if (score >= 120) { rank = "A급 스피더"; sub = "준수한 클리킹 실력입니다."; }
+
+            // Best Score Save
+            const best = saveBestScore('target_best', score);
+
+            // Display Results
+            resultRank.textContent = rank;
+            resultSub.textContent = sub;
+            resScore.textContent = `${score}점`;
+            resStatLabel2.textContent = "명중률 / 최고 콤보";
+            resStatVal2.textContent = `${accuracy}% / ${maxCombo}x`;
+            resBestScore.textContent = `${best}점`;
+
+            resultOverlay.classList.remove('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // 2. CPS CLICK MODE LOGIC
+        // -------------------------------------------------------------
+        function startCpsGame() {
+            score = 0;
+            timeLeft = MODES.cps.timeLimit;
+            cpsTargetBtn.classList.remove('hidden');
+            cpsCounterText.textContent = '클릭하면 타이머가 시작됩니다!';
+            statScore.textContent = '0';
+            statExtra.textContent = '0.0 CPS';
+            statTimer.textContent = `${timeLeft.toFixed(1)}s`;
+
+            let hasStartedClicking = false;
+
+            const handleCpsClick = (e) => {
+                if (!isPlaying) return;
+
+                if (!hasStartedClicking) {
+                    hasStartedClicking = true;
+                    cpsCounterText.textContent = '폭풍 클릭 중!';
+
+                    const startTime = performance.now();
+                    timerInterval = setInterval(() => {
+                        const elapsed = (performance.now() - startTime) / 1000;
+                        timeLeft = Math.max(0, MODES.cps.timeLimit - elapsed);
+                        statTimer.textContent = `${timeLeft.toFixed(1)}s`;
+
+                        const currentCps = (score / Math.max(0.1, elapsed)).toFixed(1);
+                        statExtra.textContent = `${currentCps} CPS`;
+
+                        if (timeLeft <= 0) {
+                            cpsTargetBtn.removeEventListener('pointerdown', handleCpsClick);
+                            endCpsGame();
+                        }
+                    }, 50);
+                }
+
+                score++;
+                statScore.textContent = score;
+                createClickRipple(e.clientX, e.clientY);
+            };
+
+            cpsTargetBtn.addEventListener('pointerdown', handleCpsClick);
+        }
+
+        function endCpsGame() {
+            clearInterval(timerInterval);
+            isPlaying = false;
+
+            const finalCps = (score / MODES.cps.timeLimit).toFixed(1);
+
+            let rank = "보통 손가락";
+            let sub = "더 빠르게 클릭해 보세요!";
+            if (finalCps >= 12.0) { rank = "빛의 손가락 (GOD)"; sub = "인간의 한계를 넘어섰습니다!"; triggerConfetti(); }
+            else if (finalCps >= 9.5) { rank = "광속의 연타 마스터"; sub = "엄청난 클릭 속도입니다!"; triggerConfetti(); }
+            else if (finalCps >= 7.0) { rank = "상위 10% 스피더"; sub = "아주 훌륭한 연타 능력입니다."; }
+
+            const best = saveBestScore('cps_best', parseFloat(finalCps));
+
+            resultRank.textContent = rank;
+            resultSub.textContent = sub;
+            resScore.textContent = `${score} 회`;
+            resStatLabel2.textContent = "초당 클릭 수 (CPS)";
+            resStatVal2.textContent = `${finalCps} CPS`;
+            resBestScore.textContent = `${best} CPS`;
+
+            resultOverlay.classList.remove('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // 3. REFLEX TEST LOGIC
+        // -------------------------------------------------------------
+        function startReflexGame() {
+            if (reflexTimeout) clearTimeout(reflexTimeout);
+            
+            reflexBox.classList.remove('hidden');
+            reflexBox.className = "absolute inset-0 z-10 flex flex-col items-center justify-center bg-rose-900/80 cursor-pointer select-none transition-colors duration-200";
+            reflexText.textContent = "화면이 초록색으로 변하면 클릭하세요!";
+            reflexSubtext.textContent = "빨간 화면 상태일 때 누르면 부정 출발입니다!";
+
+            statTimer.textContent = "--";
+            statScore.textContent = "-- ms";
+            statExtra.textContent = "대기 중";
+
+            reflexState = 'waiting';
+
+            // Click event binding (pointerdown for faster & reliable touch response)
+            reflexBox.onpointerdown = handleReflexClick;
+
+            // Random delay between 2 to 5 seconds
+            const randomDelay = Math.floor(Math.random() * 3000) + 2000;
+
+            reflexTimeout = setTimeout(() => {
+                if (!isPlaying || currentMode !== 'reflex') return;
+                reflexState = 'ready';
+                reflexBox.className = "absolute inset-0 z-10 flex flex-col items-center justify-center bg-emerald-500 cursor-pointer select-none transition-colors duration-75";
+                reflexText.textContent = "지금 클릭하세요!!!";
+                reflexSubtext.textContent = "CLICK CLICK CLICK!";
+                reflexStartTime = performance.now();
+            }, randomDelay);
+        }
+
+        function handleReflexClick(e) {
+            if (e) e.stopPropagation();
+            if (!isPlaying || currentMode !== 'reflex') return;
+
+            if (reflexState === 'waiting') {
+                // Clicked too early!
+                clearTimeout(reflexTimeout);
+                reflexState = 'penalty';
+                reflexBox.className = "absolute inset-0 z-10 flex flex-col items-center justify-center bg-amber-800/90 cursor-pointer select-none";
+                reflexText.textContent = "너무 빨리 눌렀습니다!";
+                reflexSubtext.textContent = "초록색으로 바뀌고 눌러야 합니다. 잠시 후 재시도합니다.";
+                
+                setTimeout(() => {
+                    if (isPlaying && currentMode === 'reflex') {
+                        startReflexGame();
+                    }
+                }, 1500);
+            } else if (reflexState === 'ready') {
+                // Successful Reaction
+                const reactionTime = Math.round(performance.now() - reflexStartTime);
+                reflexState = 'clicked';
+                createClickRipple(e ? e.clientX : window.innerWidth / 2, e ? e.clientY : window.innerHeight / 2);
+                endReflexGame(reactionTime);
+            }
+        }
+
+        function endReflexGame(ms) {
+            isPlaying = false;
+            reflexBox.onpointerdown = null;
+
+            statScore.textContent = `${ms} ms`;
+            statExtra.textContent = "측정 완료";
+
+            let rank = "평범한 반응속도";
+            let sub = "집중해서 다시 도전해보세요!";
+            if (ms <= 180) { rank = "프로게이머 급 (신)"; sub = "광속의 반사 신경을 보유하셨네요!"; triggerConfetti(); }
+            else if (ms <= 230) { rank = "상위 5% 최상급"; sub = "반응속도가 대단히 빠릅니다!"; triggerConfetti(); }
+            else if (ms <= 280) { rank = "우수한 순발력"; sub = "평균보다 빠른 반응속도입니다."; }
+
+            // Save lower is best
+            const savedBest = localStorage.getItem('reflex_best');
+            let best = savedBest ? parseInt(savedBest) : ms;
+            if (ms < best) {
+                best = ms;
+                localStorage.setItem('reflex_best', best.toString());
+            }
+
+            resultRank.textContent = rank;
+            resultSub.textContent = sub;
+            resScore.textContent = `${ms} ms`;
+            resStatLabel2.textContent = "반응 등급";
+            resStatVal2.textContent = `${ms < 200 ? 'S등급' : ms < 250 ? 'A등급' : 'B등급'}`;
+            resBestScore.textContent = `${best} ms`;
+
+            resultOverlay.classList.remove('hidden');
+        }
+
+        // Helper: Save best score to localStorage
+        function saveBestScore(key, val) {
+            const saved = localStorage.getItem(key);
+            let best = saved ? parseFloat(saved) : val;
+            if (val > best) {
+                best = val;
+                localStorage.setItem(key, best.toString());
+            }
+            return best;
+        }
+
+        // Helper: Floating Text Effect
+        function showFloatingText(text, x, y) {
+            const el = document.createElement('div');
+            el.className = 'combo-text text-xl';
+            el.textContent = text;
+            el.style.left = `${x - 20}px`;
+            el.style.top = `${y - 20}px`;
+            document.body.appendChild(el);
+
+            setTimeout(() => el.remove(), 600);
+        }
+
+        // Helper: Click Ripple Effect
+        function createClickRipple(x, y) {
+            const ripple = document.createElement('div');
+            ripple.className = 'click-effect';
+            ripple.style.width = '40px';
+            ripple.style.height = '40px';
+            ripple.style.left = `${x - 20}px`;
+            ripple.style.top = `${y - 20}px`;
+            document.body.appendChild(ripple);
+
+            setTimeout(() => ripple.remove(), 400);
+        }
+
+        // Helper: Confetti Trigger
+        function triggerConfetti() {
+            confetti({
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // Retry Button
+        retryBtn.addEventListener('click', () => {
+            resultOverlay.classList.add('hidden');
+            setupModeUI();
+        });
+
+        // Help Modal Controls
+        helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+        closeHelpModal.addEventListener('click', () => helpModal.classList.add('hidden'));
+        modalOkBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+
+        // Initialize UI
+        window.onload = () => {
+            setupModeUI();
+        };
+    </script>
+</body>
+</html>

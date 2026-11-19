@@ -1,0 +1,1510 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VALORANT 3D Web FPS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Tone.js for Audio FX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@500;700&family=Pretendard:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+            overflow: hidden;
+            background-color: #0f1923;
+            color: #ece8e1;
+        }
+
+        .val-font {
+            font-family: 'Teko', sans-serif;
+        }
+
+        #flashOverlay {
+            transition: opacity 0.12s ease-out;
+        }
+
+        /* Dynamic Crosshair */
+        .crosshair-line {
+            position: absolute;
+            background-color: #00ffaa;
+            box-shadow: 0 0 3px rgba(0,255,170,0.8);
+            transition: all 0.05s ease-out;
+        }
+
+        /* ADS Scope Vignette Frame */
+        #adsScope {
+            transition: opacity 0.15s ease-out;
+            background: radial-gradient(circle, transparent 38%, rgba(0, 0, 0, 0.88) 72%, black 100%);
+            border: 2px solid rgba(0, 255, 170, 0.35);
+        }
+
+        /* Buy Menu Glassmorphism */
+        .buy-card {
+            background: linear-gradient(135deg, rgba(15, 25, 35, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(16px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .buy-card:hover {
+            border-color: #ff4655;
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(255, 70, 85, 0.4);
+        }
+
+        /* Kill Banner Graphic & Ace Effects */
+        .kill-banner {
+            animation: killBannerPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes killBannerPop {
+            0% { transform: scale(0.4); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .hard-glow {
+            box-shadow: 0 0 25px rgba(244, 63, 94, 0.6), inset 0 0 15px rgba(244, 63, 94, 0.4);
+            border-color: #f43f5e !important;
+        }
+
+        /* Minimap Canvas */
+        #minimapCanvas {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.85);
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen">
+
+    <!-- 3D Render Canvas Container -->
+    <div id="gameCanvas" class="w-full h-full absolute inset-0"></div>
+
+    <!-- Minimap HUD Top Left -->
+    <div class="absolute top-6 left-6 z-20 pointer-events-none flex flex-col gap-2">
+        <canvas id="minimapCanvas" width="160" height="160" class="shadow-2xl backdrop-blur-md"></canvas>
+        <!-- Difficulty Indicator Badge -->
+        <div id="difficultyBadge" class="bg-slate-950/80 border border-slate-700/80 px-3 py-1 rounded-xl text-xs font-bold text-amber-400 hidden backdrop-blur w-fit">
+            DIFFICULTY: <span id="diffLabel" class="font-black text-amber-400 val-font text-base tracking-wider">NORMAL</span>
+        </div>
+    </div>
+
+    <!-- Vignette Damage Effect -->
+    <div id="damageVignette" class="absolute inset-0 opacity-0 pointer-events-none z-30 bg-red-900/30 border-8 border-rose-600/60 transition-opacity duration-150"></div>
+
+    <!-- ADS Gun Scope Overlay UI -->
+    <div id="adsScope" class="absolute inset-0 opacity-0 pointer-events-none z-20 flex items-center justify-center">
+        <div class="w-80 h-80 rounded-full border border-emerald-500/40 relative flex items-center justify-center shadow-[0_0_50px_rgba(0,255,170,0.25)]">
+            <div class="w-full h-[1px] bg-emerald-400/60"></div>
+            <div class="h-full w-[1px] bg-emerald-400/60 absolute"></div>
+            <div class="w-4 h-4 border border-emerald-400 rounded-full absolute bg-emerald-400/20"></div>
+        </div>
+    </div>
+
+    <!-- Flashbang Fullscreen Overlay -->
+    <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-40"></div>
+
+    <!-- Spike Status Banner -->
+    <div id="spikeBanner" class="absolute top-6 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-950 font-black px-8 py-2 rounded-full val-font text-3xl tracking-widest hidden z-20 shadow-2xl border-2 border-amber-300 animate-bounce">
+        💣 SPIKE PLANTED! DEFUSE IT! (45s)
+    </div>
+
+    <!-- Buy Phase Banner -->
+    <div id="phaseBanner" class="absolute top-20 left-1/2 -translate-x-1/2 bg-rose-600/90 text-white font-black px-8 py-2.5 rounded-full val-font text-3xl tracking-widest hidden z-20 shadow-2xl border border-rose-400/50 backdrop-blur">
+        BUY PHASE - PRESS [B] TO OPEN ARMORY
+    </div>
+
+    <!-- Kill Banner Center Notification -->
+    <div id="killBannerContainer" class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 flex flex-col items-center gap-2"></div>
+
+    <!-- Buy Menu Modal -->
+    <div id="buyMenu" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xl z-50 hidden flex flex-col justify-between p-8">
+        <div class="flex justify-between items-center border-b border-slate-700/80 pb-4">
+            <div>
+                <h2 class="text-5xl font-black val-font tracking-wider text-white">ARMORY (무기 상점)</h2>
+                <p class="text-xs text-slate-400">[B] 또는 [Esc] 키를 눌러 상점 닫기</p>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-900/90 border border-amber-500/50 px-6 py-2.5 rounded-2xl shadow-lg">
+                <i class="fa-solid fa-coins text-amber-400 text-3xl"></i>
+                <span id="creditsText" class="text-4xl font-black val-font text-amber-400 tracking-wider">3000 ¤</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-6 my-auto">
+            <!-- Weapon: Vandal -->
+            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-rose-400 uppercase tracking-widest">라이플</span>
+                        <span class="text-xs bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30 font-bold">헤드샷 1회 처치</span>
+                    </div>
+                    <h3 class="text-4xl font-black val-font text-white mt-1">VANDAL (밴달)</h3>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">강력한 단발 피해량. 모든 거리 원샷 헤드샷 가능.</p>
+                </div>
+                <div class="mt-6">
+                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">2,900 ¤</div>
+                    <button onclick="window.buyWeapon('vandal', 2900)" class="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-rose-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
+                </div>
+            </div>
+
+            <!-- Weapon: Phantom -->
+            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-indigo-400 uppercase tracking-widest">소음기 라이플</span>
+                        <span class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30 font-bold">빠른 연사 / 집탄율</span>
+                    </div>
+                    <h3 class="text-4xl font-black val-font text-white mt-1">PHANTOM (팬텀)</h3>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">높은 연사력과 안정적인 반동 제어.</p>
+                </div>
+                <div class="mt-6">
+                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">2,900 ¤</div>
+                    <button onclick="window.buyWeapon('phantom', 2900)" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-indigo-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
+                </div>
+            </div>
+
+            <!-- Weapon: Spectre -->
+            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-sky-400 uppercase tracking-widest">기관단총</span>
+                        <span class="text-xs bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded border border-sky-500/30 font-bold">근거리 기습</span>
+                    </div>
+                    <h3 class="text-4xl font-black val-font text-white mt-1">SPECTRE (스펙터)</h3>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">기동성이 뛰어난 서브머신건.</p>
+                </div>
+                <div class="mt-6">
+                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">1,600 ¤</div>
+                    <button onclick="window.buyWeapon('spectre', 1600)" class="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-sky-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
+                </div>
+            </div>
+
+            <!-- Heavy Armor & Skill Pack -->
+            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">장비 패키지</span>
+                        <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">풀 쉴드 + 풀 스킬</span>
+                    </div>
+                    <h3 class="text-4xl font-black val-font text-white mt-1">FULL UTILITY (풀팩)</h3>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">중갑주(+50 HP) 및 모든 스킬을 완충합니다.</p>
+                </div>
+                <div class="mt-6">
+                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">1,400 ¤</div>
+                    <button onclick="window.buyFullPack(1400)" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-emerald-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center text-slate-500 text-xs">구매 시간 동안 필요한 장비를 준비하세요. [B] 키로 닫습니다.</div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10 hidden">
+        
+        <!-- TOP: Round Info & Kill Feed -->
+        <div class="flex justify-between items-start w-full">
+            <div class="w-40"></div> <!-- Placeholder for minimap spacing -->
+
+            <!-- Score & Timer -->
+            <div class="flex items-center gap-6 bg-slate-950/85 backdrop-blur-md px-8 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
+                <div class="text-emerald-400 font-black text-3xl val-font tracking-wider">DEFENDERS <span id="teamScore" class="text-4xl text-white ml-2">0</span></div>
+                <div class="flex flex-col items-center">
+                    <div class="text-[11px] font-bold text-slate-400 tracking-widest" id="roundCounter">ROUND 1 / 13 WIN</div>
+                    <div class="text-3xl font-black text-amber-400 px-5 py-0.5 bg-slate-900/90 rounded-lg val-font tracking-widest border border-slate-700" id="roundTimer">00:10</div>
+                </div>
+                <div class="text-rose-400 font-black text-3xl val-font tracking-wider"><span id="enemyScore" class="text-4xl text-white mr-2">0</span> ATTACKERS</div>
+            </div>
+
+            <!-- Kill Feed Logs -->
+            <div id="killFeed" class="flex flex-col gap-2 items-end max-w-xs"></div>
+        </div>
+
+        <!-- CENTER: Dynamic Crosshair & Hitmarker -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <!-- Dynamic Crosshair -->
+            <div id="crosshair" class="relative w-8 h-8 flex items-center justify-center transition-all duration-75">
+                <div id="chLeft" class="crosshair-line w-2.5 h-0.5 -left-3.5"></div>
+                <div id="chRight" class="crosshair-line w-2.5 h-0.5 -right-3.5"></div>
+                <div id="chTop" class="crosshair-line h-2.5 w-0.5 -top-3.5"></div>
+                <div id="chBottom" class="crosshair-line h-2.5 w-0.5 -bottom-3.5"></div>
+                <div class="w-1 h-1 bg-emerald-400 rounded-full shadow-sm"></div>
+            </div>
+            <!-- Hit Marker Flash -->
+            <div id="hitmarker" class="absolute opacity-0 transition-opacity duration-100 text-rose-500 text-4xl font-black scale-125">✕</div>
+        </div>
+
+        <!-- BOTTOM: Player Status, Weapon & Skills -->
+        <div class="flex justify-between items-end w-full">
+            
+            <!-- Health & Armor & Credits -->
+            <div class="flex items-center gap-5 bg-slate-950/85 backdrop-blur-md p-4 rounded-2xl border border-slate-700/60 shadow-2xl">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-coins text-amber-400 text-2xl"></i>
+                    <span id="hudCreditsText" class="text-3xl font-black val-font tracking-wider text-amber-300">3000 ¤</span>
+                </div>
+                <div class="h-8 w-0.5 bg-slate-800"></div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-sky-400 text-2xl"></i>
+                    <span id="armorText" class="text-3xl font-black val-font tracking-wider text-sky-300">50</span>
+                </div>
+                <div class="h-8 w-0.5 bg-slate-800"></div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-heart text-rose-500 text-3xl"></i>
+                    <span id="healthText" class="text-5xl font-black val-font tracking-wider text-white">100</span>
+                </div>
+            </div>
+
+            <!-- Agent Skills Bar (SOVA / JETT Style) -->
+            <div class="flex items-center gap-3 bg-slate-950/85 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
+                <!-- Skill C: Heal -->
+                <div class="flex flex-col items-center">
+                    <div id="skillC" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-slate-600 flex items-center justify-center text-amber-400 font-bold text-lg relative shadow-inner">
+                        <i class="fa-solid fa-kit-medical"></i>
+                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">C</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 font-bold">회복구</span>
+                </div>
+
+                <!-- Skill Q: Smoke -->
+                <div class="flex flex-col items-center">
+                    <div id="skillQ" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 font-bold text-lg relative shadow-inner">
+                        <i class="fa-solid fa-smog"></i>
+                        <span id="skillQCharges" class="absolute -bottom-1 -right-1 bg-emerald-600 text-white text-[10px] px-1.5 rounded-full font-bold">2</span>
+                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">Q</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 font-bold">연막탄</span>
+                </div>
+
+                <!-- Skill E: Flash -->
+                <div class="flex flex-col items-center">
+                    <div id="skillE" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-sky-500 flex items-center justify-center text-sky-400 font-bold text-lg relative shadow-inner">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span id="skillECharges" class="absolute -bottom-1 -right-1 bg-sky-600 text-white text-[10px] px-1.5 rounded-full font-bold">1</span>
+                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">E</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 mt-1 font-bold">섬광탄</span>
+                </div>
+
+                <!-- Skill X: Ultimate -->
+                <div class="flex flex-col items-center">
+                    <div id="skillX" class="w-14 h-14 rounded-xl bg-gradient-to-tr from-rose-600 via-amber-600 to-yellow-500 border-2 border-amber-300 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-rose-600/50 relative">
+                        <i class="fa-solid fa-crosshairs animate-pulse"></i>
+                        <span class="absolute -top-2 -left-2 bg-slate-950 text-amber-400 text-xs px-1.5 py-0.5 rounded border border-amber-500 font-black">X</span>
+                    </div>
+                    <span class="text-[10px] text-amber-400 mt-1 font-black">궁극기</span>
+                </div>
+            </div>
+
+            <!-- Weapon Ammo & Spike Carrier Badge -->
+            <div class="flex items-center gap-4">
+                <div id="spikeCarrierBadge" class="hidden flex-col items-center justify-center bg-amber-500/20 border border-amber-500/50 px-4 py-3 rounded-2xl backdrop-blur-md">
+                    <i class="fa-solid fa-box-archive text-amber-400 text-2xl animate-pulse"></i>
+                    <span class="text-[10px] font-black text-amber-400 mt-1">스파이크 보유 [4]</span>
+                </div>
+
+                <div class="flex flex-col items-end bg-slate-950/85 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
+                    <div class="text-xs font-bold text-slate-400 tracking-wider mb-0.5 flex items-center gap-2">
+                        <span id="weaponName" class="text-amber-400 font-black">VANDAL</span>
+                        <span id="fireTypeBadge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-semibold">AUTO</span>
+                    </div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="ammoCurrent" class="text-5xl font-black val-font text-white tracking-widest">25</span>
+                        <span class="text-slate-500 font-bold text-2xl">/</span>
+                        <span id="ammoReserve" class="text-2xl font-bold val-font text-slate-400">75</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Game Over Screen -->
+    <div id="gameOverScreen" class="absolute inset-0 bg-slate-950/95 z-50 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-2xl">
+        <div id="winTitle" class="text-8xl font-black val-font tracking-wider mb-2 text-emerald-400 drop-shadow-lg">VICTORY</div>
+        <p id="winSubtitle" class="text-slate-300 text-2xl mb-8 font-semibold">아군 팀이 먼저 13라운드를 선점하여 최종 승리했습니다!</p>
+        <button onclick="location.reload()" class="px-10 py-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-3xl rounded-2xl val-font tracking-wider shadow-2xl shadow-rose-600/40 transition hover:scale-105 cursor-pointer">
+            경기 재시작 (RESTART MATCH)
+        </button>
+    </div>
+
+    <!-- Game Start Screen -->
+    <div id="startScreen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center z-50 p-6 text-center">
+        <div class="max-w-xl w-full bg-slate-900/90 p-8 rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col items-center">
+            <div class="w-20 h-20 bg-gradient-to-tr from-rose-600 to-amber-500 rounded-3xl flex items-center justify-center text-4xl text-white font-black mb-4 shadow-xl shadow-rose-600/40">V</div>
+            <h1 class="text-6xl font-black val-font tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-rose-500 via-amber-300 to-indigo-400 mb-1">
+                VALORANT 3D FPS - REPLICATED
+            </h1>
+            <p class="text-slate-400 text-xs mb-5 leading-relaxed">
+                반동 집탄군, 미니맵, 정교한 사이트 구현! 5v5 발로란트 공방 매치에 도전하세요.
+            </p>
+
+            <!-- 난이도 선택 버튼 그룹 -->
+            <div class="w-full mb-6">
+                <div class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest text-left">난이도 선택 (DIFFICULTY SELECT)</div>
+                <div class="grid grid-cols-3 gap-3">
+                    <button id="btnEasy" onclick="window.selectDifficulty('easy')" class="py-3 bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 rounded-xl transition text-slate-300 font-bold val-font text-xl tracking-wider cursor-pointer">
+                        🌱 EASY<br><span class="text-[10px] font-normal text-slate-400">조준 느림 / 초보용</span>
+                    </button>
+                    <button id="btnNormal" onclick="window.selectDifficulty('normal')" class="py-3 bg-slate-800 hover:bg-amber-600/30 border-2 border-amber-500 rounded-xl transition text-amber-400 font-bold val-font text-xl tracking-wider cursor-pointer">
+                        ⚔️ NORMAL<br><span class="text-[10px] font-normal text-amber-300">표준 밸런스</span>
+                    </button>
+                    <button id="btnHard" onclick="window.selectDifficulty('hard')" class="py-3 bg-slate-800 hover:bg-rose-600/30 border border-slate-700 hover:border-rose-500 rounded-xl transition text-slate-300 font-bold val-font text-xl tracking-wider cursor-pointer">
+                        🔥 HARD<br><span class="text-[10px] font-normal text-rose-400">레디언트 AI / 네온 맵</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 w-full text-[11px] text-left mb-6 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">WASD</span> 이동 / <span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">Shift</span> 정숙 걸음</div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-rose-600 rounded text-white font-bold">B</span> 상점 열기/닫기</div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">좌클릭 / 우클릭</span> 사격 / ADS 조준</div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-amber-600 rounded text-white font-bold">4</span> 스파이크 설치</div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-emerald-600 rounded text-white font-bold">Q / E</span> 연막탄 / 섬광탄</div>
+                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-amber-500 rounded text-white font-bold">C / X</span> 체력 회복 / 궁극기</div>
+            </div>
+
+            <button id="startGameBtn" class="w-full py-4 bg-gradient-to-r from-rose-600 via-amber-600 to-rose-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-3xl rounded-2xl shadow-xl shadow-rose-600/40 transition-all duration-300 val-font tracking-wider cursor-pointer transform hover:scale-[1.02]">
+                경기 시작 (START MATCH)
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        window.selectDifficulty = function(diff) {
+            selectedDifficulty = diff;
+            const buttons = {
+                easy: document.getElementById('btnEasy'),
+                normal: document.getElementById('btnNormal'),
+                hard: document.getElementById('btnHard')
+            };
+
+            Object.keys(buttons).forEach(key => {
+                if (buttons[key]) {
+                    buttons[key].className = "py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition text-slate-400 font-bold val-font text-xl tracking-wider cursor-pointer";
+                }
+            });
+
+            if (diff === 'easy' && buttons.easy) {
+                buttons.easy.className = "py-3 bg-emerald-950/80 border-2 border-emerald-500 rounded-xl transition text-emerald-400 font-bold val-font text-xl tracking-wider cursor-pointer shadow-lg shadow-emerald-500/20";
+            } else if (diff === 'normal' && buttons.normal) {
+                buttons.normal.className = "py-3 bg-amber-950/80 border-2 border-amber-500 rounded-xl transition text-amber-400 font-bold val-font text-xl tracking-wider cursor-pointer shadow-lg shadow-amber-500/20";
+            } else if (diff === 'hard' && buttons.hard) {
+                buttons.hard.className = "py-3 bg-rose-950/80 border-2 border-rose-500 rounded-xl transition text-rose-400 font-bold val-font text-xl tracking-wider cursor-pointer hard-glow";
+            }
+        };
+
+        // --- GAME STATE VARIABLES ---
+        let scene, camera, renderer;
+        let isGameStarted = false;
+        let isPointerLocked = false;
+        let isBuyMenuOpen = false;
+
+        // Audio Synths
+        let gunSynth, specterSynth, flashSynth, spikeBeepSynth, headshotSynth, killChimeSynth, aceSynth;
+
+        // UI Refs
+        let hud, startScreen, buyMenu, phaseBanner, spikeBanner, creditsText, hudCreditsText;
+        let healthText, armorText, ammoCurrent, ammoReserve, killFeed, flashOverlay;
+        let damageVignette, adsScope, hitmarker, teamScoreEl, enemyScoreEl;
+        let roundCounterEl, roundTimerEl, killBannerContainer, spikeCarrierBadge, difficultyBadge, diffLabel;
+        let minimapCtx;
+
+        // Multi-kill count
+        let currentKillStreak = 0;
+
+        // Recoil system
+        let recoilPitch = 0;
+        let recoilYaw = 0;
+        let isShooting = false;
+        let muzzleFlashLight;
+
+        // Difficulty Settings
+        let selectedDifficulty = 'normal';
+        const difficultySettings = {
+            easy: { name: 'EASY', aiInterval: 1000, aiDmg: 12, aiAcc: 0.35, aiMove: false, allyInterval: 1000, allyDmg: 15, allyAcc: 0.4, allyMove: false, labelColor: 'text-emerald-400' },
+            normal: { name: 'NORMAL', aiInterval: 650, aiDmg: 18, aiAcc: 0.65, aiMove: true, allyInterval: 650, allyDmg: 20, allyAcc: 0.65, allyMove: true, labelColor: 'text-amber-400' },
+            hard: { name: 'HARD (RADIANT)', aiInterval: 280, aiDmg: 28, aiAcc: 0.90, aiMove: true, allyInterval: 300, allyDmg: 25, allyAcc: 0.88, allyMove: true, labelColor: 'text-rose-500' }
+        };
+
+        // Match State
+        let teamWins = 0;
+        let enemyWins = 0;
+        const WIN_SCORE = 13;
+        let currentRound = 1;
+        let isBuyPhase = true;
+        let roundTimerSeconds = 10;
+
+        // Spike State
+        let isSpikePlanted = false;
+        let spikeTimer = 45;
+        let spikeMesh = null;
+        let hasSpike = true;
+
+        // Particles
+        const particles = [];
+
+        // Player
+        const player = {
+            height: 1.7,
+            speed: 0.15,
+            walkSpeed: 0.07,
+            health: 100,
+            maxHealth: 100,
+            armor: 50,
+            credits: 3000,
+            isADS: false,
+            skillQ: 2,
+            skillE: 1,
+            skillC: 1,
+            skillXReady: true,
+            weaponType: 'vandal',
+            damage: 40,
+            ammo: 25,
+            maxAmmo: 25,
+            reserveAmmo: 75,
+            isReloading: false,
+            fireRate: 105,
+            lastShotTime: 0
+        };
+
+        const keys = {};
+
+        // World Objects
+        let mapGroup;
+        const teammates = [];
+        const enemies = [];
+        const smokes = [];
+        const mapObstacles = [];
+
+        // Weapon Mesh
+        let gunMesh;
+        let gunBasePos = new THREE.Vector3(0.28, -0.22, -0.42);
+
+        // Map Spawns
+        const allySpawns = [
+            new THREE.Vector3(0, 1.7, 48),
+            new THREE.Vector3(-8, 1.7, 48),
+            new THREE.Vector3(8, 1.7, 48),
+            new THREE.Vector3(-16, 1.7, 50),
+            new THREE.Vector3(16, 1.7, 50)
+        ];
+
+        const enemySpawns = [
+            new THREE.Vector3(0, 1.7, -48),
+            new THREE.Vector3(-8, 1.7, -48),
+            new THREE.Vector3(8, 1.7, -48),
+            new THREE.Vector3(-16, 1.7, -50),
+            new THREE.Vector3(16, 1.7, -50)
+        ];
+
+        function initUIElements() {
+            hud = document.getElementById('hud');
+            startScreen = document.getElementById('startScreen');
+            buyMenu = document.getElementById('buyMenu');
+            phaseBanner = document.getElementById('phaseBanner');
+            spikeBanner = document.getElementById('spikeBanner');
+            creditsText = document.getElementById('creditsText');
+            hudCreditsText = document.getElementById('hudCreditsText');
+            healthText = document.getElementById('healthText');
+            armorText = document.getElementById('armorText');
+            ammoCurrent = document.getElementById('ammoCurrent');
+            ammoReserve = document.getElementById('ammoReserve');
+            killFeed = document.getElementById('killFeed');
+            flashOverlay = document.getElementById('flashOverlay');
+            damageVignette = document.getElementById('damageVignette');
+            adsScope = document.getElementById('adsScope');
+            hitmarker = document.getElementById('hitmarker');
+            teamScoreEl = document.getElementById('teamScore');
+            enemyScoreEl = document.getElementById('enemyScore');
+            roundCounterEl = document.getElementById('roundCounter');
+            roundTimerEl = document.getElementById('roundTimer');
+            killBannerContainer = document.getElementById('killBannerContainer');
+            spikeCarrierBadge = document.getElementById('spikeCarrierBadge');
+            difficultyBadge = document.getElementById('difficultyBadge');
+            diffLabel = document.getElementById('diffLabel');
+
+            const miniCanvas = document.getElementById('minimapCanvas');
+            if (miniCanvas) minimapCtx = miniCanvas.getContext('2d');
+        }
+
+        function init() {
+            initUIElements();
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0f1d);
+            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.01);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.copy(allySpawns[0]);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            const container = document.getElementById('gameCanvas');
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.5);
+            sunLight.position.set(50, 90, 30);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            scene.add(sunLight);
+
+            createTacticalMap();
+            createPlayerGun();
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', (e) => { keys[e.code] = true; handleKeyDown(e); });
+            document.addEventListener('keyup', (e) => { keys[e.code] = false; });
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('mouseup', (e) => { if (e.button === 0) isShooting = false; });
+
+            document.getElementById('startGameBtn').addEventListener('click', async () => {
+                await initAudio();
+                startMatch();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === document.body) {
+                    isPointerLocked = true;
+                    if (!isBuyMenuOpen) hud.classList.remove('hidden');
+                } else {
+                    isPointerLocked = false;
+                }
+            });
+
+            setInterval(updateRoundTimer, 1000);
+            animate();
+        }
+
+        async function initAudio() {
+            if (gunSynth) return;
+            try {
+                if (typeof Tone !== 'undefined') {
+                    await Tone.start();
+                    gunSynth = new Tone.NoiseSynth({
+                        noise: { type: 'pink' },
+                        envelope: { attack: 0.001, decay: 0.18, sustain: 0 }
+                    }).toDestination();
+                    gunSynth.volume.value = -1;
+
+                    specterSynth = new Tone.Synth({
+                        oscillator: { type: 'triangle' },
+                        envelope: { attack: 0.001, decay: 0.08, sustain: 0 }
+                    }).toDestination();
+                    specterSynth.volume.value = -6;
+
+                    headshotSynth = new Tone.Synth({
+                        oscillator: { type: 'sine' },
+                        envelope: { attack: 0.001, decay: 0.25, sustain: 0 }
+                    }).toDestination();
+                    headshotSynth.volume.value = 4;
+
+                    killChimeSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    killChimeSynth.volume.value = -2;
+
+                    aceSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    aceSynth.volume.value = 4;
+
+                    flashSynth = new Tone.MetalSynth().toDestination();
+                    spikeBeepSynth = new Tone.MembraneSynth().toDestination();
+                }
+            } catch (e) {}
+        }
+
+        // --- Detailed Map Generation (Bermuda / Haven Style) ---
+        function createTacticalMap() {
+            mapGroup = new THREE.Group();
+            mapObstacles.length = 0;
+
+            const isHard = selectedDifficulty === 'hard';
+
+            // Main Ground Floor
+            const floorMat = new THREE.MeshStandardMaterial({ 
+                color: isHard ? 0x050814 : 0x1e293b, 
+                roughness: 0.6 
+            });
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            mapGroup.add(floor);
+
+            // Wall Material
+            const wallMat = new THREE.MeshStandardMaterial({ color: isHard ? 0x0f172a : 0x334155, roughness: 0.7 });
+            
+            function addWall(w, h, d, x, y, z, colorOverride) {
+                const mat = colorOverride ? new THREE.MeshStandardMaterial({ color: colorOverride, roughness: 0.6 }) : wallMat;
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                wall.position.set(x, y + h / 2, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                mapGroup.add(wall);
+
+                // Add bounding box for player collision
+                mapObstacles.push(new THREE.Box3().setFromObject(wall));
+            }
+
+            // Outer Boundary Walls
+            addWall(160, 14, 4, 0, 0, -80);
+            addWall(160, 14, 4, 0, 0, 80);
+            addWall(4, 14, 160, -80, 0, 0);
+            addWall(4, 14, 160, 80, 0, 0);
+
+            // --- Site A (East - Left) ---
+            addWall(30, 8, 4, -45, 0, -25, 0x1e1b4b);
+            addWall(4, 8, 30, -30, 0, -40, 0x1e1b4b);
+            // Site A Mark Floor Ground
+            const siteAFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(24, 24),
+                new THREE.MeshStandardMaterial({ color: 0xef4444, transparent: true, opacity: 0.25 })
+            );
+            siteAFloor.rotation.x = -Math.PI / 2;
+            siteAFloor.position.set(-50, 0.05, -50);
+            mapGroup.add(siteAFloor);
+
+            // --- Site B (Center - Main) ---
+            addWall(24, 6, 24, 0, 0, -10, 0x334155);
+            // Site B Mark Floor
+            const siteBFloor = new THREE.Mesh(
+                new THREE.PlaneGeometry(28, 28),
+                new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.25 })
+            );
+            siteBFloor.rotation.x = -Math.PI / 2;
+            siteBFloor.position.set(0, 0.05, 0);
+            mapGroup.add(siteBFloor);
+
+            // --- Site C (West - Right) ---
+            addWall(30, 8, 4, 45, 0, -25, 0x1e1b4b);
+            addWall(4, 8, 30, 30, 0, -40, 0x1e1b4b);
+
+            // --- Cover Crates & Radianti Boxes ---
+            const radBoxMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.8 });
+            const boxMat = new THREE.MeshStandardMaterial({ color: isHard ? 0x881337 : 0xd97706, roughness: 0.5 });
+
+            function addCrate(x, y, z, sx = 3, sy = 3, sz = 3, isRad = false) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), isRad ? radBoxMat : boxMat);
+                mesh.position.set(x, y + sy / 2, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mapGroup.add(mesh);
+                mapObstacles.push(new THREE.Box3().setFromObject(mesh));
+            }
+
+            // Site Covers
+            addCrate(-50, 0, -48, 4, 3.5, 4, true);
+            addCrate(-45, 0, -52, 3, 3, 3);
+            addCrate(0, 0, 5, 4, 3, 4, true);
+            addCrate(5, 0, -5, 3, 3, 3);
+            addCrate(50, 0, -48, 4, 3.5, 4, true);
+
+            // Mid Choke Corridor Walls
+            addWall(4, 10, 40, -18, 0, 15);
+            addWall(4, 10, 40, 18, 0, 15);
+
+            scene.add(mapGroup);
+        }
+
+        // --- DETAILED VANDAL / PHANTOM GUN MODELING ---
+        function createPlayerGun() {
+            if (gunMesh) camera.remove(gunMesh);
+            gunMesh = new THREE.Group();
+
+            const isPhantom = (player.weaponType === 'phantom');
+            const bodyMat = new THREE.MeshStandardMaterial({ color: isPhantom ? 0x1e293b : 0x0f172a, roughness: 0.25, metalness: 0.7 });
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.2, metalness: 0.9 });
+
+            // Receiver Body
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.6), bodyMat);
+            gunMesh.add(body);
+
+            // Magazine Clip
+            const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.12), goldMat);
+            mag.position.set(0, -0.16, 0.05);
+            mag.rotation.x = -0.2;
+            gunMesh.add(mag);
+
+            // Barrel & Muzzle
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, isPhantom ? 0.6 : 0.5), bodyMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.set(0, 0.03, -0.48);
+            gunMesh.add(barrel);
+
+            // Muzzle Flash Light
+            muzzleFlashLight = new THREE.PointLight(0xffaa00, 0, 8);
+            muzzleFlashLight.position.set(0, 0.03, -0.8);
+            gunMesh.add(muzzleFlashLight);
+
+            gunMesh.position.copy(gunBasePos);
+            camera.add(gunMesh);
+            scene.add(camera);
+        }
+
+        function startMatch() {
+            isGameStarted = true;
+            teamWins = 0;
+            enemyWins = 0;
+            currentRound = 1;
+            player.credits = 3000;
+            
+            const setting = difficultySettings[selectedDifficulty];
+            difficultyBadge.classList.remove('hidden');
+            diffLabel.textContent = setting.name;
+            diffLabel.className = `font-black val-font text-base tracking-wider ${setting.labelColor}`;
+
+            startScreen.classList.add('hidden');
+            hud.classList.remove('hidden');
+            
+            startNewRound();
+            document.body.requestPointerLock();
+        }
+
+        function startNewRound() {
+            isBuyPhase = true;
+            isSpikePlanted = false;
+            spikeTimer = 45;
+            hasSpike = true;
+            roundTimerSeconds = 10;
+            currentKillStreak = 0;
+
+            phaseBanner.classList.remove('hidden');
+            spikeBanner.classList.add('hidden');
+            spikeCarrierBadge.classList.remove('hidden');
+
+            if (spikeMesh) scene.remove(spikeMesh);
+
+            player.health = 100;
+            player.ammo = player.maxAmmo;
+            player.reserveAmmo = 75;
+            camera.position.copy(allySpawns[0]);
+
+            player.credits += 3000;
+            updateCreditUI();
+            updateHealthUI();
+            updateAmmoUI();
+
+            teammates.forEach(b => scene.remove(b.mesh));
+            enemies.forEach(b => scene.remove(b.mesh));
+            teammates.length = 0;
+            enemies.length = 0;
+
+            const allyNames = ["SOVA", "SAGE", "JETT", "REYNA"];
+            for (let i = 0; i < 4; i++) {
+                spawnAgent(allySpawns[i + 1], allyNames[i], 'ally');
+            }
+
+            const enemyNames = ["OMEN", "VIPER", "PHOENIX", "BRIM", "RAZE"];
+            for (let i = 0; i < 5; i++) {
+                spawnAgent(enemySpawns[i], enemyNames[i], 'enemy');
+            }
+
+            roundCounterEl.textContent = `ROUND ${currentRound} / 13 WIN`;
+            updateScoreUI();
+        }
+
+        function updateRoundTimer() {
+            if (!isGameStarted) return;
+
+            if (isSpikePlanted) {
+                spikeTimer--;
+                spikeBanner.textContent = `💣 SPIKE PLANTED! EXPLODING IN (${spikeTimer}s)`;
+                if (spikeBeepSynth) spikeBeepSynth.triggerAttackRelease("C3", "8n");
+
+                if (spikeTimer <= 0) {
+                    roundEnd('ally', "SPIKE EXPLODED! ATTACKERS WIN!");
+                }
+                return;
+            }
+
+            roundTimerSeconds--;
+            const mins = Math.floor(Math.abs(roundTimerSeconds) / 60);
+            const secs = Math.abs(roundTimerSeconds) % 60;
+            roundTimerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            if (isBuyPhase && roundTimerSeconds <= 0) {
+                isBuyPhase = false;
+                phaseBanner.classList.add('hidden');
+                toggleBuyMenu(false);
+                roundTimerSeconds = 100;
+                addKillFeed("SYSTEM", "COMBAT PHASE STARTED!", "skill");
+            } else if (!isBuyPhase && roundTimerSeconds <= 0) {
+                roundEnd('enemy', "TIME EXPIRED! DEFENDERS WIN!");
+            }
+        }
+
+        function checkRoundState() {
+            if (isBuyPhase) return;
+
+            const aliveEnemies = enemies.filter(e => !e.isDead).length;
+            const aliveAllies = teammates.filter(t => !t.isDead).length + (player.health > 0 ? 1 : 0);
+
+            if (aliveEnemies === 0) {
+                roundEnd('ally', "ALL ENEMIES ELIMINATED!");
+            } else if (aliveAllies === 0 && !isSpikePlanted) {
+                roundEnd('enemy', "ALL ALLIES ELIMINATED!");
+            }
+        }
+
+        function roundEnd(winner, reason) {
+            if (winner === 'ally') {
+                teamWins++;
+                player.credits += 3000;
+                addKillFeed("ROUND WIN", reason, "skill");
+            } else {
+                enemyWins++;
+                player.credits += 1900;
+                addKillFeed("ROUND LOSS", reason, "kill");
+            }
+
+            updateScoreUI();
+
+            if (teamWins >= WIN_SCORE || enemyWins >= WIN_SCORE) {
+                endMatch(teamWins >= WIN_SCORE);
+                return;
+            }
+
+            currentRound++;
+            setTimeout(() => {
+                startNewRound();
+            }, 3000);
+        }
+
+        function endMatch(isVictory) {
+            isGameStarted = false;
+            document.exitPointerLock();
+            const screen = document.getElementById('gameOverScreen');
+            const title = document.getElementById('winTitle');
+            const sub = document.getElementById('winSubtitle');
+
+            screen.classList.remove('hidden');
+            if (isVictory) {
+                title.textContent = "VICTORY";
+                title.className = "text-8xl font-black val-font tracking-wider mb-2 text-emerald-400 drop-shadow-lg";
+                sub.textContent = "아군 팀이 13라운드를 선점하여 최종 승리했습니다!";
+            } else {
+                title.textContent = "DEFEAT";
+                title.className = "text-8xl font-black val-font tracking-wider mb-2 text-rose-500 drop-shadow-lg";
+                sub.textContent = "적 팀이 13라운드를 선점했습니다. 다음 기회에!";
+            }
+        }
+
+        function toggleBuyMenu(forceState) {
+            isBuyMenuOpen = forceState !== undefined ? forceState : !isBuyMenuOpen;
+            if (isBuyMenuOpen) {
+                buyMenu.classList.remove('hidden');
+                document.exitPointerLock();
+            } else {
+                buyMenu.classList.add('hidden');
+                if (isGameStarted) document.body.requestPointerLock();
+            }
+        }
+
+        window.buyWeapon = function(type, price) {
+            if (player.credits < price) return alert("크레딧이 부족합니다!");
+            player.credits -= price;
+            player.weaponType = type;
+            if (type === 'vandal') {
+                player.damage = 42;
+                player.maxAmmo = 25;
+                player.fireRate = 100;
+                document.getElementById('weaponName').textContent = "VANDAL";
+            } else if (type === 'phantom') {
+                player.damage = 36;
+                player.maxAmmo = 30;
+                player.fireRate = 85;
+                document.getElementById('weaponName').textContent = "PHANTOM";
+            } else if (type === 'spectre') {
+                player.damage = 26;
+                player.maxAmmo = 30;
+                player.fireRate = 70;
+                document.getElementById('weaponName').textContent = "SPECTRE";
+            }
+            player.ammo = player.maxAmmo;
+            createPlayerGun();
+            updateCreditUI();
+            updateAmmoUI();
+        };
+
+        window.buyFullPack = function(price) {
+            if (player.credits < price) return alert("크레딧이 부족합니다!");
+            player.credits -= price;
+            player.armor = 50;
+            player.skillQ = 2;
+            player.skillE = 1;
+            player.skillC = 1;
+            document.getElementById('skillQCharges').textContent = player.skillQ;
+            document.getElementById('skillECharges').textContent = player.skillE;
+            updateCreditUI();
+            updateHealthUI();
+        };
+
+        function spawnAgent(pos, name, team) {
+            const group = new THREE.Group();
+            const isHardMode = (selectedDifficulty === 'hard');
+            const color = (team === 'ally') ? 0x10b981 : (isHardMode ? 0xff0055 : 0xf43f5e);
+            
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color, 
+                roughness: 0.3,
+                emissive: (team === 'enemy') ? 0xaa0022 : 0x002211,
+                emissiveIntensity: 0.3
+            });
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.3), bodyMat);
+            torso.position.y = 0.375;
+            torso.castShadow = true;
+
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), legMat);
+            leftLeg.position.set(-0.15, -0.35, 0);
+            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), legMat);
+            rightLeg.position.set(0.15, -0.35, 0);
+
+            const headMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.24, 16, 16),
+                new THREE.MeshStandardMaterial({ color: 0xffcbd1, roughness: 0.4 })
+            );
+            headMesh.position.y = 0.92;
+
+            const visorColor = (team === 'enemy') ? 0xff1100 : 0x00ffaa;
+            const visor = new THREE.Mesh(
+                new THREE.BoxGeometry(0.32, 0.09, 0.18),
+                new THREE.MeshBasicMaterial({ color: visorColor })
+            );
+            visor.position.set(0, 0.94, -0.15);
+
+            group.add(torso, leftLeg, rightLeg, headMesh, visor);
+            group.position.copy(pos);
+            scene.add(group);
+
+            const botObj = {
+                mesh: group,
+                headMesh: headMesh,
+                name: name,
+                team: team,
+                health: 100,
+                lastShootTime: 0,
+                strafeDir: Math.random() < 0.5 ? 1 : -1,
+                strafeTimer: 0,
+                isDead: false
+            };
+
+            if (team === 'ally') teammates.push(botObj);
+            else enemies.push(botObj);
+        }
+
+        function handleMouseMove(e) {
+            if (!isPointerLocked || isBuyMenuOpen) return;
+            const sensitivity = player.isADS ? 0.0011 : 0.0022;
+            camera.rotation.y -= e.movementX * sensitivity;
+            const pitch = camera.rotation.x - e.movementY * sensitivity;
+            camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+        }
+
+        function handleMouseDown(e) {
+            if (!isPointerLocked || isBuyMenuOpen || isBuyPhase) return;
+            if (e.button === 0) {
+                isShooting = true;
+                shootGun();
+            } else if (e.button === 2) {
+                player.isADS = !player.isADS;
+                camera.fov = player.isADS ? 40 : 75;
+                
+                if (player.isADS) {
+                    adsScope.style.opacity = '1';
+                    gunMesh.position.set(0, -0.14, -0.28);
+                } else {
+                    adsScope.style.opacity = '0';
+                    gunMesh.position.copy(gunBasePos);
+                }
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function handleKeyDown(e) {
+            if (e.code === 'KeyB') toggleBuyMenu();
+            if (!isPointerLocked || isBuyMenuOpen) return;
+
+            if (e.code === 'KeyR') reloadWeapon();
+            if (e.code === 'KeyQ') useSkillQ();
+            if (e.code === 'KeyE') useSkillE();
+            if (e.code === 'KeyC') useSkillC();
+            if (e.code === 'KeyX') useSkillX();
+            if (e.code === 'Digit4') plantOrDefuseSpike();
+        }
+
+        function plantOrDefuseSpike() {
+            if (isBuyPhase) return;
+            const distToCenter = camera.position.distanceTo(new THREE.Vector3(0, 1.7, 0));
+
+            if (hasSpike && !isSpikePlanted && distToCenter < 12) {
+                isSpikePlanted = true;
+                hasSpike = false;
+                spikeCarrierBadge.classList.add('hidden');
+                spikeBanner.classList.remove('hidden');
+
+                spikeMesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 1.2, 0.8),
+                    new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706 })
+                );
+                spikeMesh.position.set(camera.position.x, 0.6, camera.position.z);
+                scene.add(spikeMesh);
+
+                addKillFeed("YOU", "PLANTED THE SPIKE!", "skill");
+            }
+        }
+
+        function shootGun() {
+            const now = performance.now();
+            if (now - player.lastShotTime < player.fireRate || player.isReloading) return;
+
+            if (player.ammo <= 0) {
+                reloadWeapon();
+                return;
+            }
+
+            player.ammo--;
+            player.lastShotTime = now;
+            updateAmmoUI();
+
+            // Muzzle Flash & Recoil Logic
+            if (muzzleFlashLight) {
+                muzzleFlashLight.intensity = 3;
+                setTimeout(() => muzzleFlashLight.intensity = 0, 35);
+            }
+
+            // Recoil offset simulation
+            recoilPitch += 0.006;
+            recoilYaw += (Math.random() - 0.5) * 0.004;
+            camera.rotation.x += 0.006;
+            camera.rotation.y += recoilYaw;
+
+            gunMesh.position.z += 0.05;
+            expandCrosshair();
+
+            setTimeout(() => {
+                gunMesh.position.set(
+                    player.isADS ? 0 : gunBasePos.x,
+                    player.isADS ? -0.14 : gunBasePos.y,
+                    player.isADS ? -0.28 : gunBasePos.z
+                );
+            }, 50);
+
+            if (gunSynth) gunSynth.triggerAttackRelease("16n");
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+
+            createTracer(raycaster.ray.origin, raycaster.ray.direction);
+
+            const enemyMeshes = enemies.filter(e => !e.isDead).map(e => e.mesh);
+            const intersects = raycaster.intersectObjects(enemyMeshes, true);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const bot = enemies.find(e => e.mesh === hit.object.parent || e.mesh === hit.object.parent?.parent);
+
+                if (bot && !bot.isDead) {
+                    const isHeadshot = (hit.object === bot.headMesh);
+                    const dmg = isHeadshot ? player.damage * 4 : player.damage;
+                    bot.health -= dmg;
+
+                    createSparkParticles(hit.point);
+
+                    if (isHeadshot && headshotSynth) {
+                        headshotSynth.triggerAttackRelease("A5", "16n");
+                    }
+
+                    hitmarker.style.opacity = '1';
+                    hitmarker.style.color = isHeadshot ? '#f43f5e' : '#10b981';
+                    setTimeout(() => { hitmarker.style.opacity = '0'; }, 120);
+
+                    if (bot.health <= 0) {
+                        bot.isDead = true;
+                        scene.remove(bot.mesh);
+                        player.credits += 300;
+                        currentKillStreak++;
+                        updateCreditUI();
+
+                        triggerKillBanner(bot.name, isHeadshot, currentKillStreak);
+                        addKillFeed("YOU", `${isHeadshot ? '🎯 HEADSHOT' : '🔫 KILL'} ${bot.name}`, "kill");
+                        checkRoundState();
+                    }
+                }
+            }
+
+            if (isShooting) {
+                setTimeout(shootGun, player.fireRate);
+            }
+        }
+
+        function expandCrosshair() {
+            const chL = document.getElementById('chLeft');
+            const chR = document.getElementById('chRight');
+            const chT = document.getElementById('chTop');
+            const chB = document.getElementById('chBottom');
+
+            if (chL) chL.style.transform = 'translateX(-6px)';
+            if (chR) chR.style.transform = 'translateX(6px)';
+            if (chT) chT.style.transform = 'translateY(-6px)';
+            if (chB) chB.style.transform = 'translateY(6px)';
+
+            setTimeout(() => {
+                if (chL) chL.style.transform = 'none';
+                if (chR) chR.style.transform = 'none';
+                if (chT) chT.style.transform = 'none';
+                if (chB) chB.style.transform = 'none';
+            }, 90);
+        }
+
+        function createSparkParticles(pos) {
+            for (let i = 0; i < 8; i++) {
+                const geom = new THREE.SphereGeometry(0.06, 8, 8);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+                const mesh = new THREE.Mesh(geom, mat);
+                mesh.position.copy(pos);
+                scene.add(mesh);
+
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.2,
+                    Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.2
+                );
+
+                particles.push({ mesh, velocity, life: 15 });
+            }
+        }
+
+        // VALORANT Kill Banner & Ace Multi-kill Sound
+        function triggerKillBanner(victimName, isHeadshot, streak) {
+            const streakTitles = ["KILLED", "DOUBLE KILL", "TRIPLE KILL", "QUADRA KILL", "ACE (5K!)"];
+            const titleText = streakTitles[Math.min(streak - 1, 4)];
+
+            if (streak >= 5 && aceSynth) {
+                aceSynth.triggerAttackRelease(["C4", "G4", "C5", "E5"], "2n");
+            } else if (killChimeSynth) {
+                killChimeSynth.triggerAttackRelease(["E5", "G5"], "8n");
+            }
+
+            const banner = document.createElement('div');
+            banner.className = "kill-banner bg-slate-950/90 border-2 border-rose-500 text-white px-8 py-3 rounded-2xl flex items-center gap-4 shadow-2xl backdrop-blur-md";
+            banner.innerHTML = `
+                <i class="fa-solid ${isHeadshot ? 'fa-bullseye text-rose-500' : 'fa-skull text-amber-400'} text-4xl"></i>
+                <div>
+                    <div class="text-xs text-amber-400 font-bold tracking-widest">${titleText}</div>
+                    <div class="text-2xl font-black val-font tracking-wider text-rose-400">${victimName}</div>
+                </div>
+            `;
+            killBannerContainer.appendChild(banner);
+            setTimeout(() => banner.remove(), 2000);
+        }
+
+        function createTracer(origin, direction, isEnemy = false) {
+            const geom = new THREE.BufferGeometry().setFromPoints([
+                origin.clone().add(new THREE.Vector3(0.1, -0.1, 0)),
+                origin.clone().add(direction.clone().multiplyScalar(45))
+            ]);
+            const color = isEnemy ? 0xf43f5e : 0xf59e0b;
+            const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+            const line = new THREE.Line(geom, mat);
+            scene.add(line);
+            setTimeout(() => scene.remove(line), 40);
+        }
+
+        function reloadWeapon() {
+            if (player.isReloading || player.ammo === player.maxAmmo || player.reserveAmmo <= 0) return;
+            player.isReloading = true;
+            ammoCurrent.textContent = "...";
+            setTimeout(() => {
+                const reloadAmount = Math.min(player.maxAmmo - player.ammo, player.reserveAmmo);
+                player.ammo += reloadAmount;
+                player.reserveAmmo -= reloadAmount;
+                player.isReloading = false;
+                updateAmmoUI();
+            }, 1200);
+        }
+
+        function useSkillQ() {
+            if (player.skillQ <= 0) return;
+            player.skillQ--;
+            document.getElementById('skillQCharges').textContent = player.skillQ;
+
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const smokeMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(5, 32, 32),
+                new THREE.MeshStandardMaterial({ color: 0x10b981, transparent: true, opacity: 0.75, roughness: 0.1 })
+            );
+            smokeMesh.position.copy(camera.position.clone().add(dir.multiplyScalar(10)));
+            scene.add(smokeMesh);
+            smokes.push({ mesh: smokeMesh, spawnTime: performance.now() });
+        }
+
+        function useSkillE() {
+            if (player.skillE <= 0) return;
+            player.skillE--;
+            document.getElementById('skillECharges').textContent = player.skillE;
+            flashOverlay.style.opacity = '1';
+            if (flashSynth) flashSynth.triggerAttackRelease("C6", "8n");
+            setTimeout(() => { flashOverlay.style.opacity = '0'; }, 1000);
+        }
+
+        function useSkillC() {
+            if (player.skillC <= 0) return;
+            player.skillC--;
+            player.health = Math.min(100, player.health + 50);
+            updateHealthUI();
+        }
+
+        function useSkillX() {
+            if (!player.skillXReady) return;
+            player.skillXReady = false;
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const targetPos = camera.position.clone().add(dir.multiplyScalar(16));
+
+            enemies.forEach(bot => {
+                if (!bot.isDead && bot.mesh.position.distanceTo(targetPos) < 10) {
+                    bot.health -= 150;
+                    if (bot.health <= 0) {
+                        bot.isDead = true;
+                        scene.remove(bot.mesh);
+                    }
+                }
+            });
+            checkRoundState();
+        }
+
+        function updateBots() {
+            if (isBuyPhase) return;
+
+            const now = performance.now();
+            const config = difficultySettings[selectedDifficulty];
+
+            // Enemy AI Logic
+            enemies.forEach(bot => {
+                if (bot.isDead) return;
+
+                const targets = [
+                    { pos: camera.position, isPlayer: true, health: player.health },
+                    ...teammates.filter(t => !t.isDead).map(t => ({ pos: t.mesh.position, isPlayer: false, bot: t }))
+                ];
+
+                let closest = null;
+                let minDist = 999;
+                targets.forEach(t => {
+                    const d = bot.mesh.position.distanceTo(t.pos);
+                    if (d < minDist) {
+                        minDist = d;
+                        closest = t;
+                    }
+                });
+
+                if (closest && minDist < 50) {
+                    bot.mesh.lookAt(closest.pos.x, bot.mesh.position.y, closest.pos.z);
+                    
+                    if (config.aiMove) {
+                        bot.strafeTimer++;
+                        if (bot.strafeTimer > 35) {
+                            bot.strafeDir *= -1;
+                            bot.strafeTimer = 0;
+                        }
+                        bot.mesh.translateX(0.05 * bot.strafeDir);
+                    }
+
+                    if (minDist > 8) bot.mesh.translateZ(0.06);
+
+                    if (now - bot.lastShootTime > config.aiInterval) {
+                        bot.lastShootTime = now;
+                        createTracer(bot.mesh.position.clone().add(new THREE.Vector3(0, 0.8, 0)), closest.pos.clone().sub(bot.mesh.position).normalize(), true);
+
+                        if (Math.random() < config.aiAcc) {
+                            if (closest.isPlayer) {
+                                player.health -= config.aiDmg;
+                                damageVignette.style.opacity = '1';
+                                setTimeout(() => damageVignette.style.opacity = '0', 180);
+
+                                updateHealthUI();
+                                if (player.health <= 0) {
+                                    addKillFeed("ENEMY", "ELIMINATED YOU", "kill");
+                                    checkRoundState();
+                                }
+                            } else {
+                                closest.bot.health -= config.aiDmg;
+                                if (closest.bot.health <= 0) {
+                                    closest.bot.isDead = true;
+                                    scene.remove(closest.bot.mesh);
+                                    addKillFeed("ENEMY", `KILLED ALLY (${closest.bot.name})`, "kill");
+                                    checkRoundState();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Ally AI Logic
+            teammates.forEach(bot => {
+                if (bot.isDead) return;
+                const aliveEnemies = enemies.filter(e => !e.isDead);
+                if (aliveEnemies.length === 0) return;
+
+                const target = aliveEnemies[0];
+                const dist = bot.mesh.position.distanceTo(target.mesh.position);
+
+                bot.mesh.lookAt(target.mesh.position.x, bot.mesh.position.y, target.mesh.position.z);
+                if (dist > 9) bot.mesh.translateZ(0.05);
+
+                if (now - bot.lastShootTime > config.allyInterval) {
+                    bot.lastShootTime = now;
+                    createTracer(bot.mesh.position.clone().add(new THREE.Vector3(0, 0.8, 0)), target.mesh.position.clone().sub(bot.mesh.position).normalize());
+
+                    if (Math.random() < config.allyAcc) {
+                        target.health -= config.allyDmg;
+                        if (target.health <= 0) {
+                            target.isDead = true;
+                            scene.remove(target.mesh);
+                            addKillFeed(`ALLY (${bot.name})`, `ELIMINATED ${target.name}`, "kill");
+                            checkRoundState();
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateMinimap() {
+            if (!minimapCtx) return;
+            minimapCtx.clearRect(0, 0, 160, 160);
+
+            // Center: Player Position Map Coordinates
+            const mapScale = 1.1;
+            const cx = 80;
+            const cy = 80;
+
+            // Draw player dot
+            minimapCtx.fillStyle = '#00ffaa';
+            minimapCtx.beginPath();
+            minimapCtx.arc(cx, cy, 4, 0, Math.PI * 2);
+            minimapCtx.fill();
+
+            // Draw Teammates
+            teammates.forEach(t => {
+                if (t.isDead) return;
+                const dx = (t.mesh.position.x - camera.position.x) * mapScale;
+                const dz = (t.mesh.position.z - camera.position.z) * mapScale;
+                minimapCtx.fillStyle = '#38bdf8';
+                minimapCtx.beginPath();
+                minimapCtx.arc(cx + dx, cy + dz, 3, 0, Math.PI * 2);
+                minimapCtx.fill();
+            });
+
+            // Draw Enemies
+            enemies.forEach(e => {
+                if (e.isDead) return;
+                const dx = (e.mesh.position.x - camera.position.x) * mapScale;
+                const dz = (e.mesh.position.z - camera.position.z) * mapScale;
+                minimapCtx.fillStyle = '#f43f5e';
+                minimapCtx.beginPath();
+                minimapCtx.arc(cx + dx, cy + dz, 3, 0, Math.PI * 2);
+                minimapCtx.fill();
+            });
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.add(p.velocity);
+                p.life--;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateCreditUI() {
+            if (creditsText) creditsText.textContent = `${player.credits} ¤`;
+            if (hudCreditsText) hudCreditsText.textContent = `${player.credits} ¤`;
+        }
+
+        function updateScoreUI() {
+            if (teamScoreEl) teamScoreEl.textContent = teamWins;
+            if (enemyScoreEl) enemyScoreEl.textContent = enemyWins;
+        }
+
+        function updateHealthUI() {
+            if (healthText) healthText.textContent = Math.max(0, Math.round(player.health));
+            if (armorText) armorText.textContent = Math.max(0, Math.round(player.armor));
+        }
+
+        function updateAmmoUI() {
+            if (ammoCurrent) ammoCurrent.textContent = player.ammo;
+            if (ammoReserve) ammoReserve.textContent = player.reserveAmmo;
+        }
+
+        function addKillFeed(killer, action, type) {
+            if (!killFeed) return;
+            const item = document.createElement('div');
+            item.className = "bg-slate-950/90 border border-slate-700/80 px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xl backdrop-blur-md";
+            item.innerHTML = `<span class="text-amber-400 font-black">${killer}</span> <span class="text-slate-300">${action}</span>`;
+            killFeed.appendChild(item);
+            setTimeout(() => item.remove(), 4000);
+        }
+
+        function updatePlayerMovement() {
+            if (!isPointerLocked || isBuyMenuOpen) return;
+
+            const moveDir = new THREE.Vector3();
+            if (keys['KeyW']) moveDir.z -= 1;
+            if (keys['KeyS']) moveDir.z += 1;
+            if (keys['KeyA']) moveDir.x -= 1;
+            if (keys['KeyD']) moveDir.x += 1;
+            moveDir.normalize();
+
+            const speed = keys['ShiftLeft'] ? player.walkSpeed : player.speed;
+            const yaw = camera.rotation.y;
+
+            camera.position.x += (moveDir.x * Math.cos(yaw) + moveDir.z * Math.sin(yaw)) * speed;
+            camera.position.z += (-moveDir.x * Math.sin(yaw) + moveDir.z * Math.cos(yaw)) * speed;
+
+            camera.position.x = Math.max(-75, Math.min(75, camera.position.x));
+            camera.position.z = Math.max(-75, Math.min(75, camera.position.z));
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (isGameStarted) {
+                updatePlayerMovement();
+                updateBots();
+                updateParticles();
+                updateMinimap();
+            }
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

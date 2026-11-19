@@ -1,0 +1,819 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 체스 챌린지 (5단계 난이도)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chess.js 라이브러리 (체스 규칙 및 이동 검증 엔진) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;600;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 체스판 스타일링 */
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        }
+
+        .square {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(1.8rem, 4.5vw, 3.2rem);
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .square.light {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .square.dark {
+            background-color: #475569;
+            color: #f8fafc;
+        }
+
+        .square.selected {
+            background-color: #f59e0b !important; /* Amber */
+        }
+
+        .square.last-move {
+            background-color: rgba(245, 158, 11, 0.4) !important;
+        }
+
+        /* 이동 가능 하이라이트 핀 */
+        .move-hint::after {
+            content: '';
+            width: 28%;
+            height: 28%;
+            background-color: rgba(16, 185, 129, 0.7); /* Emerald */
+            border-radius: 50%;
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .capture-hint {
+            box-shadow: inset 0 0 0 4px rgba(239, 68, 68, 0.8) !important; /* Red */
+        }
+
+        /* 체스 기물 텍스트/이모지 스타일링 */
+        .piece {
+            line-height: 1;
+            z-index: 10;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+            transition: transform 0.1s ease;
+        }
+
+        .square:hover .piece {
+            transform: scale(1.08);
+        }
+
+        /* 스크롤바 미학 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-3 md:p-6">
+
+    <!-- Header Navigation -->
+    <header class="max-w-5xl w-full mx-auto flex justify-between items-center pb-4 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl font-bold shadow-inner">
+                <i class="fa-solid fa-chess-king"></i>
+            </div>
+            <div>
+                <h1 class="text-lg md:text-xl font-bold text-slate-100 flex items-center gap-2">
+                    AI CHESS MASTER
+                </h1>
+                <p class="text-xs text-slate-400">인공지능과 펼치는 5단계 정밀 체스 대국</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="resetBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs md:text-sm font-semibold transition border border-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-rotate-right text-amber-400"></i> 새 게임
+            </button>
+            <button id="undoBtn" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs md:text-sm font-semibold transition border border-slate-700 flex items-center gap-2">
+                <i class="fa-solid fa-rotate-left text-cyan-400"></i> 무르기
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-5xl w-full mx-auto my-auto py-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left / Top: Controls & Status (3 cols on lg) -->
+        <div class="lg:col-span-4 flex flex-col gap-4 order-2 lg:order-1">
+            
+            <!-- Difficulty Selection Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-400"></i> AI 난이도 설정
+                </h2>
+                <div class="grid grid-cols-1 gap-1.5" id="difficultyGroup">
+                    <button data-level="1" class="diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+                        <span>🌱 1단계: 이지 (Easy)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">초보자용</span>
+                    </button>
+                    <button data-level="2" class="diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        <span>⚔️ 2단계: 노말 (Normal)</span>
+                        <span class="text-[10px] text-amber-400 font-mono">기본 지능</span>
+                    </button>
+                    <button data-level="3" class="diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+                        <span>🔥 3단계: 프로 (Pro)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">수읽기 AI</span>
+                    </button>
+                    <button data-level="4" class="diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+                        <span>💀 4단계: 지옥 (Hell)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">강력한 위치 계산</span>
+                    </button>
+                    <button data-level="5" class="diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700">
+                        <span>👑 5단계: 불가능 (Impossible)</span>
+                        <span class="text-[10px] text-slate-400 font-mono">최고 정밀 전략</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Player Status & Captured Pieces Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
+                <!-- AI (Black) Info -->
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-rose-400 font-bold">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">AI (흑)</div>
+                            <div id="aiStatusText" class="text-[11px] text-slate-400">대기 중...</div>
+                        </div>
+                    </div>
+                    <!-- Captured White Pieces -->
+                    <div id="capturedWhite" class="text-base flex gap-1 font-mono text-slate-300 min-h-[24px]"></div>
+                </div>
+
+                <!-- Human Player (White) Info -->
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">플레이어 (백)</div>
+                            <div id="playerStatusText" class="text-[11px] text-emerald-400 font-medium">당신의 차례입니다</div>
+                        </div>
+                    </div>
+                    <!-- Captured Black Pieces -->
+                    <div id="capturedBlack" class="text-base flex gap-1 font-mono text-slate-300 min-h-[24px]"></div>
+                </div>
+            </div>
+
+            <!-- Move History Log Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-list-ol text-cyan-400"></i> 기보 기록 (Move History)
+                </h2>
+                <div id="moveLog" class="h-32 overflow-y-auto bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 font-mono text-xs text-slate-300 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <!-- Moves populated by JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right / Center: Interactive Chess Board (8 cols on lg) -->
+        <div class="lg:col-span-8 flex flex-col items-center justify-center order-1 lg:order-2">
+            
+            <!-- Turn & Game Alert Banner -->
+            <div id="gameAlertBanner" class="w-full max-w-lg mb-3 py-2 px-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center text-xs md:text-sm font-semibold text-slate-200 shadow-md transition-all flex items-center justify-center gap-2">
+                <span id="turnIndicatorBadge" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="gameAlertText">백(플레이어)의 차례입니다. 기물을 마우스로 클릭하여 이동하세요.</span>
+            </div>
+
+            <!-- The Main Chess Board Container -->
+            <div class="relative w-full max-w-lg rounded-2xl overflow-hidden border-4 border-slate-800 shadow-2xl bg-slate-900">
+                <div id="chessboard" class="board-grid w-full">
+                    <!-- Squares generated via JS -->
+                </div>
+
+                <!-- Thinking Overlay for AI -->
+                <div id="aiThinkingOverlay" class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center hidden z-30">
+                    <div class="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <p class="text-sm font-bold text-amber-300 tracking-wider font-mono">AI가 최적의 수를 계산 중...</p>
+                </div>
+            </div>
+
+            <!-- Board File/Rank Label Helpers -->
+            <div class="w-full max-w-lg flex justify-between px-2 pt-2 text-[10px] font-mono text-slate-500 uppercase">
+                <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-5xl w-full mx-auto pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-2">
+        <div>Chess Engine powered by Chess.js & Minimax Evaluation</div>
+        <div class="flex gap-4">
+            <span>내 턴: <strong class="text-amber-400">백(White)</strong></span>
+            <span>AI: <strong class="text-rose-400">흑(Black)</strong></span>
+        </div>
+    </footer>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl relative">
+            <div id="modalIcon" class="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 text-3xl flex items-center justify-center mx-auto mb-4 border border-amber-500/40">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h3 id="modalTitle" class="text-xl font-black text-slate-100 mb-2">승리했습니다!</h3>
+            <p id="modalDescription" class="text-xs text-slate-300 mb-6 leading-relaxed">멋진 전략으로 AI를 제압했습니다.</p>
+            <button id="modalResetBtn" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-sm transition shadow-lg">
+                다시 게임하기
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Game State & Initialization
+            const game = new Chess();
+            let selectedSquare = null;
+            let possibleMoves = [];
+            let currentDifficulty = 2; // Default: Normal (Level 2)
+            let isAiThinking = false;
+
+            // Unicode Chess Pieces
+            const PIECE_SYMBOLS = {
+                'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
+                'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'
+            };
+
+            // DOM Elements
+            const boardElement = document.getElementById('chessboard');
+            const gameAlertText = document.getElementById('gameAlertText');
+            const turnIndicatorBadge = document.getElementById('turnIndicatorBadge');
+            const aiThinkingOverlay = document.getElementById('aiThinkingOverlay');
+            const moveLogElement = document.getElementById('moveLog');
+            const capturedWhiteElement = document.getElementById('capturedWhite');
+            const capturedBlackElement = document.getElementById('capturedBlack');
+            const playerStatusText = document.getElementById('playerStatusText');
+            const aiStatusText = document.getElementById('aiStatusText');
+
+            const resetBtn = document.getElementById('resetBtn');
+            const undoBtn = document.getElementById('undoBtn');
+            const difficultyButtons = document.querySelectorAll('.diff-btn');
+
+            const gameOverModal = document.getElementById('gameOverModal');
+            const modalTitle = document.getElementById('modalTitle');
+            modalIcon = document.getElementById('modalIcon');
+            const modalDescription = document.getElementById('modalDescription');
+            const modalResetBtn = document.getElementById('modalResetBtn');
+
+            // Sound Effects using Web Audio API
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            let audioCtx = null;
+
+            function playSound(type) {
+                try {
+                    if (!audioCtx) audioCtx = new AudioContext();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    const now = audioCtx.currentTime;
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    if (type === 'move') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                        osc.start(now);
+                        osc.stop(now + 0.08);
+                    } else if (type === 'capture') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(600, now);
+                        osc.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+                        gain.gain.setValueAtTime(0.25, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                        osc.start(now);
+                        osc.stop(now + 0.12);
+                    } else if (type === 'check') {
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.setValueAtTime(880, now + 0.1);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now);
+                        osc.stop(now + 0.25);
+                    }
+                } catch (e) {
+                    // Audio context error fallback
+                }
+            }
+
+            // Render Board UI
+            function renderBoard() {
+                boardElement.innerHTML = '';
+                const board = game.board();
+                const history = game.history({ verbose: true });
+                const lastMove = history.length > 0 ? history[history.length - 1] : null;
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const squareName = String.fromCharCode(97 + c) + (8 - r);
+                        const squareData = board[r][c];
+
+                        const squareDiv = document.createElement('div');
+                        const isLight = (r + c) % 2 === 0;
+                        squareDiv.className = `square ${isLight ? 'light' : 'dark'}`;
+                        squareDiv.dataset.square = squareName;
+
+                        // Highlight selected square
+                        if (selectedSquare === squareName) {
+                            squareDiv.classList.add('selected');
+                        }
+
+                        // Highlight last move
+                        if (lastMove && (lastMove.from === squareName || lastMove.to === squareName)) {
+                            squareDiv.classList.add('last-move');
+                        }
+
+                        // Move hints
+                        const isPossible = possibleMoves.some(m => m.to === squareName);
+                        if (isPossible) {
+                            if (squareData) {
+                                squareDiv.classList.add('capture-hint');
+                            } else {
+                                squareDiv.classList.add('move-hint');
+                            }
+                        }
+
+                        // Piece Render
+                        if (squareData) {
+                            const pieceSpan = document.createElement('span');
+                            pieceSpan.className = 'piece';
+                            
+                            // Visual distinction for black/white pieces
+                            const pieceChar = squareData.color === 'w' 
+                                ? squareData.type.toUpperCase() 
+                                : squareData.type.toLowerCase();
+
+                            pieceSpan.textContent = PIECE_SYMBOLS[pieceChar];
+                            
+                            if (squareData.color === 'w') {
+                                pieceSpan.classList.add('text-amber-200');
+                            } else {
+                                pieceSpan.classList.add('text-slate-900');
+                            }
+
+                            squareDiv.appendChild(pieceSpan);
+                        }
+
+                        // Click Listener
+                        squareDiv.addEventListener('click', () => handleSquareClick(squareName));
+
+                        boardElement.appendChild(squareDiv);
+                    }
+                }
+
+                updateUIStatus();
+            }
+
+            // Handle Square Interactions
+            function handleSquareClick(square) {
+                if (game.game_over() || isAiThinking) return;
+                if (game.turn() !== 'w') return; // Player is White
+
+                // If clicking on an already selected piece, deselect
+                if (selectedSquare === square) {
+                    selectedSquare = null;
+                    possibleMoves = [];
+                    renderBoard();
+                    return;
+                }
+
+                // If piece selected and clicked valid target move
+                if (selectedSquare) {
+                    const moveObj = possibleMoves.find(m => m.to === square);
+                    if (moveObj) {
+                        executeMove(moveObj);
+                        selectedSquare = null;
+                        possibleMoves = [];
+                        return;
+                    }
+                }
+
+                // Select new piece
+                const piece = game.get(square);
+                if (piece && piece.color === 'w') {
+                    selectedSquare = square;
+                    possibleMoves = game.moves({ square: square, verbose: true });
+                    renderBoard();
+                } else {
+                    selectedSquare = null;
+                    possibleMoves = [];
+                    renderBoard();
+                }
+            }
+
+            // Execute Player or AI Move
+            function executeMove(move) {
+                const isCapture = game.get(move.to) !== null || (move.flags && move.flags.includes('e'));
+                const result = game.move(move);
+
+                if (result) {
+                    if (isCapture) {
+                        playSound('capture');
+                    } else {
+                        playSound('move');
+                    }
+
+                    if (game.in_check()) {
+                        playSound('check');
+                    }
+
+                    renderBoard();
+
+                    // Trigger AI turn if game not over
+                    if (!game.game_over() && game.turn() === 'b') {
+                        triggerAiMove();
+                    }
+                }
+            }
+
+            // Update Status Messages, History Log & Captured Pieces
+            function updateUIStatus() {
+                // Update Move Log
+                const history = game.history();
+                moveLogElement.innerHTML = '';
+                for (let i = 0; i < history.length; i += 2) {
+                    const moveNum = Math.floor(i / 2) + 1;
+                    const whiteMove = history[i] || '';
+                    const blackMove = history[i + 1] || '';
+                    const logRow = document.createElement('div');
+                    logRow.className = 'flex justify-between border-b border-slate-900 pb-0.5';
+                    logRow.innerHTML = `<span class="text-slate-500">${moveNum}.</span><span class="text-amber-300 font-semibold">${whiteMove}</span><span class="text-rose-300 font-semibold">${blackMove}</span>`;
+                    moveLogElement.appendChild(logRow);
+                }
+                moveLogElement.scrollTop = moveLogElement.scrollHeight;
+
+                // Captured Pieces Calculation
+                const board = game.board();
+                const currentPieces = { w: { p: 0, n: 0, b: 0, r: 0, q: 0 }, b: { p: 0, n: 0, b: 0, r: 0, q: 0 } };
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const p = board[r][c];
+                        if (p && p.type !== 'k') {
+                            currentPieces[p.color][p.type]++;
+                        }
+                    }
+                }
+
+                const initialPieces = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+                let capturedWhiteHTML = '';
+                let capturedBlackHTML = '';
+
+                // White pieces captured by Black
+                for (let type in initialPieces) {
+                    const diff = initialPieces[type] - currentPieces['w'][type];
+                    if (diff > 0) {
+                        capturedWhiteHTML += PIECE_SYMBOLS[type.toUpperCase()].repeat(diff);
+                    }
+                }
+
+                // Black pieces captured by White
+                for (let type in initialPieces) {
+                    const diff = initialPieces[type] - currentPieces['b'][type];
+                    if (diff > 0) {
+                        capturedBlackHTML += PIECE_SYMBOLS[type.toLowerCase()].repeat(diff);
+                    }
+                }
+
+                capturedWhiteElement.textContent = capturedWhiteHTML;
+                capturedBlackElement.textContent = capturedBlackHTML;
+
+                // Turn & State Alerts
+                if (game.in_checkmate()) {
+                    const winner = game.turn() === 'w' ? 'AI (흑)' : '플레이어 (백)';
+                    gameAlertText.textContent = `체크메이트! ${winner}의 승리입니다.`;
+                    turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                    showGameOverModal(game.turn() === 'b');
+                } else if (game.in_draw()) {
+                    gameAlertText.textContent = '무승부 게임입니다! (스테일메이트/기물 부족)';
+                    turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-slate-400';
+                    showGameOverModal(null);
+                } else if (game.in_check()) {
+                    const checkingTurn = game.turn() === 'w' ? '플레이어 (백)' : 'AI (흑)';
+                    gameAlertText.textContent = `⚠️ 체크! ${checkingTurn}의 킹이 위협받고 있습니다!`;
+                    turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+                } else {
+                    if (game.turn() === 'w') {
+                        gameAlertText.textContent = '백(플레이어)의 차례입니다.';
+                        playerStatusText.textContent = '당신의 차례입니다';
+                        playerStatusText.className = 'text-[11px] text-emerald-400 font-medium';
+                        aiStatusText.textContent = '대기 중...';
+                        aiStatusText.className = 'text-[11px] text-slate-400';
+                        turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+                    } else {
+                        gameAlertText.textContent = '흑(AI)이 신중히 수를 계산하고 있습니다...';
+                        playerStatusText.textContent = 'AI 연산 중...';
+                        playerStatusText.className = 'text-[11px] text-slate-400';
+                        aiStatusText.textContent = '수의 깊이 계산 중';
+                        aiStatusText.className = 'text-[11px] text-rose-400 font-medium animate-pulse';
+                        turnIndicatorBadge.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+                    }
+                }
+            }
+
+            // =========================================================
+            // 2. AI ENGINES & EVALUATION ALGORITHMS (5 난이도)
+            // =========================================================
+
+            // Piece Values for Evaluation
+            const PIECE_VALUES = { p: 10, n: 30, b: 32, r: 50, q: 90, k: 900 };
+
+            // Positional Evaluation Tables
+            const PAWN_TABLE = [
+                0,  0,  0,  0,  0,  0,  0,  0,
+                50, 50, 50, 50, 50, 50, 50, 50,
+                10, 10, 20, 30, 30, 20, 10, 10,
+                 5,  5, 10, 25, 25, 10,  5,  5,
+                 0,  0,  0, 20, 20,  0,  0,  0,
+                 5, -5,-10,  0,  0,-10, -5,  5,
+                 5, 10, 10,-20,-20, 10, 10,  5,
+                 0,  0,  0,  0,  0,  0,  0,  0
+            ];
+
+            const KNIGHT_TABLE = [
+                -50,-40,-30,-30,-30,-30,-40,-50,
+                -40,-20,  0,  0,  0,  0,-20,-40,
+                -30,  0, 10, 15, 15, 10,  0,-30,
+                -30,  5, 15, 20, 20, 15,  5,-30,
+                -30,  0, 15, 20, 20, 15,  0,-30,
+                -30,  5, 10, 15, 15, 10,  5,-30,
+                -40,-20,  0,  5,  5,  0,-20,-40,
+                -50,-40,-30,-30,-30,-30,-40,-50
+            ];
+
+            function evaluateBoard(chessBoard) {
+                let totalEval = 0;
+                const board = chessBoard.board();
+
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const piece = board[r][c];
+                        if (piece) {
+                            let val = PIECE_VALUES[piece.type];
+                            let posVal = 0;
+
+                            const squareIdx = r * 8 + c;
+                            if (piece.type === 'p') posVal = PAWN_TABLE[squareIdx];
+                            else if (piece.type === 'n') posVal = KNIGHT_TABLE[squareIdx];
+
+                            const score = val + posVal * 0.1;
+                            if (piece.color === 'w') {
+                                totalEval -= score; // Player is White
+                            } else {
+                                totalEval += score; // AI is Black
+                            }
+                        }
+                    }
+                }
+                return totalEval;
+            }
+
+            // Minimax with Alpha-Beta Pruning
+            function minimax(depth, alpha, beta, isMaximizing) {
+                if (depth === 0 || game.game_over()) {
+                    return evaluateBoard(game);
+                }
+
+                const moves = game.moves();
+
+                if (isMaximizing) { // AI's Turn (Black)
+                    let maxEval = -9999;
+                    for (let move of moves) {
+                        game.move(move);
+                        let evaluation = minimax(depth - 1, alpha, beta, false);
+                        game.undo();
+                        maxEval = Math.max(maxEval, evaluation);
+                        alpha = Math.max(alpha, evaluation);
+                        if (beta <= alpha) break;
+                    }
+                    return maxEval;
+                } else { // Player's Turn (White)
+                    let minEval = 9999;
+                    for (let move of moves) {
+                        game.move(move);
+                        let evaluation = minimax(depth - 1, alpha, beta, true);
+                        game.undo();
+                        minEval = Math.min(minEval, evaluation);
+                        beta = Math.min(beta, evaluation);
+                        if (beta <= alpha) break;
+                    }
+                    return minEval;
+                }
+            }
+
+            // AI Decision Engine based on selected level
+            function getBestAiMove() {
+                const possibleMoves = game.moves({ verbose: true });
+                if (possibleMoves.length === 0) return null;
+
+                // Level 1: Easy (Random move with basic capture preference)
+                if (currentDifficulty === 1) {
+                    const captures = possibleMoves.filter(m => m.captured);
+                    if (captures.length > 0 && Math.random() > 0.4) {
+                        return captures[Math.floor(Math.random() * captures.length)];
+                    }
+                    return possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                }
+
+                // Level 2: Normal (1-ply greedy check)
+                if (currentDifficulty === 2) {
+                    let bestMove = null;
+                    let bestValue = -9999;
+
+                    for (let move of possibleMoves) {
+                        game.move(move);
+                        let boardValue = evaluateBoard(game);
+                        game.undo();
+                        if (boardValue > bestValue) {
+                            bestValue = boardValue;
+                            bestMove = move;
+                        }
+                    }
+                    return bestMove || possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                }
+
+                // Level 3: Pro (Minimax Depth 2)
+                if (currentDifficulty === 3) {
+                    let bestMove = null;
+                    let bestValue = -9999;
+
+                    for (let move of possibleMoves) {
+                        game.move(move);
+                        let boardValue = minimax(1, -10000, 10000, false);
+                        game.undo();
+                        if (boardValue > bestValue) {
+                            bestValue = boardValue;
+                            bestMove = move;
+                        }
+                    }
+                    return bestMove;
+                }
+
+                // Level 4: Hell (Minimax Depth 3)
+                if (currentDifficulty === 4) {
+                    let bestMove = null;
+                    let bestValue = -9999;
+
+                    for (let move of possibleMoves) {
+                        game.move(move);
+                        let boardValue = minimax(2, -10000, 10000, false);
+                        game.undo();
+                        if (boardValue > bestValue) {
+                            bestValue = boardValue;
+                            bestMove = move;
+                        }
+                    }
+                    return bestMove;
+                }
+
+                // Level 5: Impossible (Minimax Depth 3 + Tactical evaluation bonus)
+                if (currentDifficulty === 5) {
+                    let bestMove = null;
+                    let bestValue = -9999;
+
+                    for (let move of possibleMoves) {
+                        game.move(move);
+                        // Extra bonus for checkmates or checks
+                        let bonus = 0;
+                        if (game.in_checkmate()) bonus += 1000;
+                        else if (game.in_check()) bonus += 30;
+
+                        let boardValue = minimax(2, -10000, 10000, false) + bonus;
+                        game.undo();
+
+                        if (boardValue > bestValue) {
+                            bestValue = boardValue;
+                            bestMove = move;
+                        }
+                    }
+                    return bestMove;
+                }
+
+                return possibleMoves[0];
+            }
+
+            function triggerAiMove() {
+                isAiThinking = true;
+                aiThinkingOverlay.classList.remove('hidden');
+
+                // Artificial delay for realistic thinking animation
+                const delay = currentDifficulty >= 4 ? 600 : 350;
+
+                setTimeout(() => {
+                    const aiMove = getBestAiMove();
+                    isAiThinking = false;
+                    aiThinkingOverlay.classList.add('hidden');
+
+                    if (aiMove) {
+                        executeMove(aiMove);
+                    }
+                }, delay);
+            }
+
+            // Game Over Modal Control
+            function showGameOverModal(isPlayerWin) {
+                if (isPlayerWin === true) {
+                    modalTitle.textContent = '🎉 승리했습니다!';
+                    modalDescription.textContent = '탁월한 수 읽기와 전략으로 AI를 제압했습니다!';
+                    modalIcon.className = 'w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 text-3xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/40';
+                } else if (isPlayerWin === false) {
+                    modalTitle.textContent = '💀 패배했습니다';
+                    modalDescription.textContent = 'AI의 연산과 수 읽기에 킹을 빼앗겼습니다. 다시 도전해 보세요.';
+                    modalIcon.className = 'w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 text-3xl flex items-center justify-center mx-auto mb-4 border border-rose-500/40';
+                } else {
+                    modalTitle.textContent = '🤝 무승부';
+                    modalDescription.textContent = '치열한 접전 끝에 어느 쪽도 승리 조건에 도달하지 못했습니다.';
+                    modalIcon.className = 'w-16 h-16 rounded-full bg-slate-500/20 text-slate-300 text-3xl flex items-center justify-center mx-auto mb-4 border border-slate-500/40';
+                }
+                gameOverModal.classList.remove('hidden');
+            }
+
+            // Controls & Event Listeners
+            resetBtn.addEventListener('click', () => {
+                game.reset();
+                selectedSquare = null;
+                possibleMoves = [];
+                renderBoard();
+            });
+
+            modalResetBtn.addEventListener('click', () => {
+                gameOverModal.classList.add('hidden');
+                game.reset();
+                selectedSquare = null;
+                possibleMoves = [];
+                renderBoard();
+            });
+
+            undoBtn.addEventListener('click', () => {
+                if (isAiThinking) return;
+                // Undo two moves (both AI and Player)
+                game.undo();
+                game.undo();
+                selectedSquare = null;
+                possibleMoves = [];
+                renderBoard();
+            });
+
+            // Difficulty Buttons Switch
+            difficultyButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const level = parseInt(btn.dataset.level);
+                    currentDifficulty = level;
+
+                    difficultyButtons.forEach(b => {
+                        b.className = 'diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700';
+                    });
+
+                    btn.className = 'diff-btn py-2 px-3 rounded-xl text-left text-xs md:text-sm font-semibold transition flex justify-between items-center bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                });
+            });
+
+            // Initial Board Render
+            renderBoard();
+        });
+    </script>
+</body>
+</html>

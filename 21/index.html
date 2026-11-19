@@ -1,0 +1,830 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Web FPS Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Inter', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 20px; height: 20px;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 20px;
+        }
+
+        #hud {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #blocker {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: auto;
+            color: white;
+        }
+
+        .hidden { display: none !important; }
+        
+        #spectator-ui {
+            position: absolute;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            color: #ff4444;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px black;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- UI Elements -->
+    <div id="ui-layer">
+        <div id="crosshair" class="hidden">+</div>
+        <div id="headshot-text" class="hidden absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 text-yellow-400 font-extrabold text-4xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-widest animate-bounce pointer-events-none z-50">
+            HEADSHOT!
+        </div>
+        <div id="hud" class="hidden">
+            <div class="mb-2">
+                <div class="text-xl font-bold text-white mb-1 drop-shadow-md">체력: <span id="healthValue">100</span></div>
+                <div class="w-64 h-6 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
+                    <div id="healthBar" class="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-200" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-blue-400 mt-2 bg-black bg-opacity-50 p-2 rounded inline-block border border-blue-900">
+                킬: <span id="killsValue">0</span>
+            </div>
+        </div>
+        <div id="spectator-ui" class="hidden bg-black bg-opacity-50 px-6 py-2 rounded-lg border-2 border-red-500">
+            사망했습니다.<br><span class="text-lg text-white">팀원 관전 중...</span>
+        </div>
+    </div>
+
+    <div id="blocker">
+        <h1 class="text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-red-500">WEB FPS</h1>
+        <p class="text-xl mb-6 text-gray-300">화면을 클릭하거나 아래의 버튼(또는 실제 Space 키)을 눌러 시작하세요</p>
+        
+        <!-- 스페이스바 모양으로 디자인된 시작 버튼 -->
+        <button id="startButton" class="mb-8 w-72 h-16 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl text-2xl tracking-widest shadow-[0_6px_0_rgb(156,163,175)] active:shadow-[0_0px_0_rgb(156,163,175)] active:translate-y-1.5 transition-all duration-100 flex items-center justify-center">
+            SPACE
+        </button>
+
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-600 text-center">
+            <h2 class="text-2xl font-bold mb-4">조작 방법</h2>
+            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">W</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">A</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">S</kbd> <kbd class="bg-gray-700 px-2 py-1 rounded">D</kbd> : 이동</p>
+            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">L Shift</kbd> : 달리기 (계속 누르기)</p>
+            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">Space</kbd> : 시작 / 부활 (사망 시)</p>
+            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">Q</kbd> : 체력 회복 (힐)</p>
+            <p class="mb-2"><kbd class="bg-gray-700 px-2 py-1 rounded">마우스</kbd> : 시점 이동 &nbsp;&nbsp; <kbd class="bg-gray-700 px-2 py-1 rounded">좌클릭</kbd> : 사격 &nbsp;&nbsp; <kbd class="bg-gray-700 px-2 py-1 rounded">우클릭</kbd> : 줌(확대)</p>
+            <p class="text-sm text-yellow-400 mt-4">* 파란색은 아군, 빨간색은 적입니다. (머리를 맞추면 헤드샷!)</p>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 기본 설정 및 전역 변수 ---
+        let camera, scene, renderer;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isRunning = false;
+        let isZoomed = false;
+        let headshotTimeout = null; // 헤드샷 UI 타이머 관리용 변수
+        const DEFAULT_FOV = 75;
+        const ZOOM_FOV = 30;
+        let prevTime = performance.now();
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        
+        let yawObject, pitchObject; // 카메라 컨트롤용
+        let raycaster;
+        let isLocked = false;
+        let mapObjects = [];
+        let bots = [];
+        let lasers = [];
+
+        // 게임 상태 변수
+        let playerState = {
+            health: 100,
+            kills: 0,
+            isDead: false,
+            spectatingBot: null
+        };
+
+        const TEAM_BLUE = 0; // 플레이어 팀
+        const TEAM_RED = 1;  // 적 팀
+
+        // Three.js 라이브러리가 완전히 로드되었는지 확인 후 실행 (로딩 에러 방지)
+        const checkThreeLoaded = setInterval(() => {
+            if (typeof THREE !== 'undefined') {
+                clearInterval(checkThreeLoaded);
+                init();
+                animate();
+            }
+        }, 100);
+
+        function init() {
+            // 씬 설정
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // 하늘색
+            scene.fog = new THREE.Fog(0x87CEEB, 0, 150);
+
+            // 카메라 설정
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // 커스텀 1인칭 컨트롤러 (PointerLock 기반)
+            pitchObject = new THREE.Object3D();
+            pitchObject.add(camera);
+            yawObject = new THREE.Object3D();
+            yawObject.position.y = 2; // 눈높이
+            yawObject.add(pitchObject);
+            scene.add(yawObject);
+
+            // 조명 설정
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            hemiLight.position.set(0, 200, 0);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(0, 50, -50);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // 렌더러 설정
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // 맵 생성
+            createMap();
+
+            // 봇 생성 (아군 3명, 적군 6명)
+            for(let i=0; i<3; i++) createBot(TEAM_BLUE);
+            for(let i=0; i<6; i++) createBot(TEAM_RED);
+
+            // 레이캐스터 (사격용)
+            raycaster = new THREE.Raycaster();
+
+            // 이벤트 리스너
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('contextmenu', (e) => e.preventDefault());
+            window.addEventListener('resize', onWindowResize);
+
+            setupPointerLock();
+        }
+
+        // --- 2. 맵 생성 ---
+        function createMap() {
+            // 바닥
+            const floorGeo = new THREE.PlaneGeometry(100, 100);
+            const floorMat = new THREE.MeshLambertMaterial({ color: 0x334433 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // 외벽
+            const wallMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+            const wallGeo = new THREE.BoxGeometry(100, 10, 2);
+            
+            const wall1 = new THREE.Mesh(wallGeo, wallMat);
+            wall1.position.set(0, 5, -50);
+            scene.add(wall1); mapObjects.push(wall1);
+            
+            const wall2 = new THREE.Mesh(wallGeo, wallMat);
+            wall2.position.set(0, 5, 50);
+            scene.add(wall2); mapObjects.push(wall2);
+
+            const wallGeoSide = new THREE.BoxGeometry(2, 10, 100);
+            const wall3 = new THREE.Mesh(wallGeoSide, wallMat);
+            wall3.position.set(-50, 5, 0);
+            scene.add(wall3); mapObjects.push(wall3);
+
+            const wall4 = new THREE.Mesh(wallGeoSide, wallMat);
+            wall4.position.set(50, 5, 0);
+            scene.add(wall4); mapObjects.push(wall4);
+
+            // 장애물 (상자들)
+            const boxGeo = new THREE.BoxGeometry(4, 4, 4);
+            const boxMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // 갈색
+            
+            for (let i = 0; i < 20; i++) {
+                const box = new THREE.Mesh(boxGeo, boxMat);
+                box.position.x = Math.floor(Math.random() * 20 - 10) * 4;
+                box.position.y = 2;
+                box.position.z = Math.floor(Math.random() * 20 - 10) * 4;
+                
+                // 스폰 지점(0,0)은 비우기
+                if(Math.abs(box.position.x) < 8 && Math.abs(box.position.z) < 8) continue;
+                
+                box.castShadow = true;
+                box.receiveShadow = true;
+                scene.add(box);
+                mapObjects.push(box);
+            }
+        }
+
+        // --- 3. 봇(AI) 클래스 및 로직 ---
+        class Bot {
+            constructor(team) {
+                this.team = team;
+                this.health = 50;
+                this.isDead = false;
+                this.speed = 4.0;
+                this.lastShootTime = 0;
+                
+                // 외형 생성 (사람 모형으로 변경)
+                this.color = team === TEAM_BLUE ? 0x2244ff : 0xff2222;
+                this.mesh = new THREE.Group(); // 여러 파츠를 묶기 위한 그룹
+                const mat = new THREE.MeshLambertMaterial({ color: this.color });
+                
+                // 머리
+                const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+                const head = new THREE.Mesh(headGeo, mat);
+                head.position.y = 3.2;
+                head.castShadow = true;
+                head.userData = { isHead: true }; // 헤드샷 판정용 데이터
+                this.mesh.add(head);
+
+                // 몸통
+                const bodyGeo = new THREE.BoxGeometry(1.2, 1.4, 0.6);
+                const body = new THREE.Mesh(bodyGeo, mat);
+                body.position.y = 2.1;
+                body.castShadow = true;
+                this.mesh.add(body);
+
+                // 양팔
+                const armGeo = new THREE.BoxGeometry(0.4, 1.4, 0.4);
+                const leftArm = new THREE.Mesh(armGeo, mat);
+                leftArm.position.set(-0.9, 2.1, 0);
+                leftArm.castShadow = true;
+                this.mesh.add(leftArm);
+
+                const rightArm = new THREE.Mesh(armGeo, mat);
+                rightArm.position.set(0.9, 2.1, 0);
+                rightArm.castShadow = true;
+                this.mesh.add(rightArm);
+
+                // 양다리
+                const legGeo = new THREE.BoxGeometry(0.5, 1.4, 0.5);
+                const leftLeg = new THREE.Mesh(legGeo, mat);
+                leftLeg.position.set(-0.35, 0.7, 0);
+                leftLeg.castShadow = true;
+                this.mesh.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(legGeo, mat);
+                rightLeg.position.set(0.35, 0.7, 0);
+                rightLeg.castShadow = true;
+                this.mesh.add(rightLeg);
+
+                // 총을 쐈을 때 맞추기 위해 모든 부위에 userData(본체 연결) 할당
+                this.mesh.children.forEach(child => {
+                    const isHead = child.userData && child.userData.isHead;
+                    child.userData = { bot: this, isHead: !!isHead };
+                });
+
+                // 맵 내 랜덤 위치 생성 (발바닥이 지면 y=0에 위치하도록 봇 그룹의 position.y는 0으로 고정)
+                this.targetPos = new THREE.Vector3();
+                this.respawn();
+                scene.add(this.mesh);
+            }
+
+            respawn() {
+                this.isDead = false;
+                this.health = 50;
+                this.mesh.rotation.x = 0; // 다시 일어서기
+                
+                // 맵 중앙 부근(-35 ~ 35)에 스폰되도록 설정하여 가시성 확보
+                const spawnX = (Math.random() - 0.5) * 70;
+                const spawnZ = (Math.random() - 0.5) * 70;
+                this.mesh.position.set(spawnX, 0, spawnZ);
+                
+                this.mesh.children.forEach(child => child.material.color.setHex(this.color));
+                this.pickNewTarget();
+            }
+
+            pickNewTarget() {
+                this.targetPos.set(
+                    (Math.random() - 0.5) * 70,
+                    0,
+                    (Math.random() - 0.5) * 70
+                );
+            }
+
+            takeDamage(amount, attackerIsPlayer) {
+                if(this.isDead) return;
+                this.health -= amount;
+                
+                // 피격 시 잠시 하얗게 깜빡임 효과 (모든 부위)
+                this.mesh.children.forEach(child => child.material.color.setHex(0xffffff));
+                setTimeout(() => { 
+                    if(!this.isDead) this.mesh.children.forEach(child => child.material.color.setHex(this.color)); 
+                }, 100);
+
+                if (this.health <= 0) {
+                    this.die(attackerIsPlayer);
+                }
+            }
+
+            die(attackerIsPlayer) {
+                this.isDead = true;
+                this.mesh.rotation.x = -Math.PI / 2; // 뒤로 눕히기(죽음 표현)
+                this.mesh.position.y = 0.5; // 살짝 띄움
+                this.mesh.children.forEach(child => child.material.color.setHex(0x333333)); // 회색으로 변경
+                
+                if (attackerIsPlayer && this.team === TEAM_RED) {
+                    playerState.kills++;
+                    document.getElementById('killsValue').innerText = playerState.kills;
+                }
+
+                // 관전 중인 봇이 죽으면 다른 봇을 찾음
+                if(playerState.spectatingBot === this) {
+                    findNewSpectateTarget();
+                }
+
+                // 리스폰 로직 (2초 후 부활)
+                setTimeout(() => {
+                    this.respawn();
+                }, 2000);
+            }
+
+            update(delta) {
+                if (this.isDead) return;
+
+                // 간단한 AI: 적 찾기
+                let nearestEnemy = null;
+                let minDist = 30; // 시야 거리
+
+                // 플레이어 확인 (적팀 봇일 경우)
+                if (this.team === TEAM_RED && !playerState.isDead) {
+                    const distToPlayer = this.mesh.position.distanceTo(yawObject.position);
+                    if (distToPlayer < minDist) {
+                        minDist = distToPlayer;
+                        nearestEnemy = yawObject;
+                    }
+                }
+
+                // 다른 봇 확인
+                bots.forEach(otherBot => {
+                    if (!otherBot.isDead && otherBot.team !== this.team) {
+                        const dist = this.mesh.position.distanceTo(otherBot.mesh.position);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearestEnemy = otherBot.mesh;
+                        }
+                    }
+                });
+
+                if (nearestEnemy) {
+                    // 적을 향해 바라보고 사격
+                    this.mesh.lookAt(nearestEnemy.position.x, this.mesh.position.y, nearestEnemy.position.z);
+                    
+                    const now = performance.now();
+                    if (now - this.lastShootTime > 1500) { // 1.5초마다 사격
+                        this.lastShootTime = now;
+                        this.shootTarget(nearestEnemy);
+                    }
+                } else {
+                    // 순찰 이동
+                    const distToTarget = this.mesh.position.distanceTo(this.targetPos);
+                    if (distToTarget < 2) {
+                        this.pickNewTarget();
+                    }
+                    
+                    this.mesh.lookAt(this.targetPos.x, this.mesh.position.y, this.targetPos.z);
+                    this.mesh.translateZ(this.speed * delta);
+                }
+            }
+
+            shootTarget(target) {
+                // 시각적 레이저 효과 (사람 모형의 가슴 높이인 2.5에서 발사)
+                const start = this.mesh.position.clone().setY(2.5);
+                const end = target.position.clone().setY(2);
+                createLaser(start, end, this.team === TEAM_RED ? 0xff0000 : 0x0044ff);
+
+                // 데미지 판정
+                if (target === yawObject && !playerState.isDead) {
+                    damagePlayer(10);
+                } else if (target.userData && target.userData.bot) {
+                    target.userData.bot.takeDamage(15, false);
+                }
+            }
+        }
+
+        function createBot(team) {
+            const bot = new Bot(team);
+            bots.push(bot);
+        }
+
+        // --- 4. 플레이어 기능 및 입력 ---
+        function setupPointerLock() {
+            const blocker = document.getElementById('blocker');
+            const crosshair = document.getElementById('crosshair');
+            const hud = document.getElementById('hud');
+            const startButton = document.getElementById('startButton');
+
+            const tryLock = () => {
+                if(!isLocked && !playerState.isDead) {
+                    try {
+                        document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+                        const promise = document.body.requestPointerLock();
+                        if (promise !== undefined) {
+                            promise.catch(e => {
+                                console.warn("마우스 잠금 에러:", e);
+                            });
+                        }
+                    } catch (e) {
+                        console.warn("Pointer Lock failed:", e);
+                    }
+                }
+            };
+
+            // 클릭 또는 버튼 수동 클릭 시 포인터 잠금 요청
+            blocker.addEventListener('click', tryLock);
+            startButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tryLock();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === document.body || document.mozPointerLockElement === document.body) {
+                    // 마우스 잠금 성공 (게임 재개)
+                    isLocked = true;
+                    blocker.style.display = 'none';
+                    if (!playerState.isDead) {
+                        crosshair.classList.remove('hidden');
+                        hud.classList.remove('hidden');
+                    }
+                } else {
+                    // 마우스 잠금 해제됨 (ESC 누름 -> 일시정지)
+                    isLocked = false;
+                    resetZoom();
+                    if (!playerState.isDead) {
+                        blocker.style.display = 'flex';
+                        crosshair.classList.add('hidden');
+                        hud.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        function onKeyDown(event) {
+            // 게임 시작 전(마우스 잠금 해제 상태)에 스페이스바를 누르면 시작 버튼 클릭 이벤트 유발
+            if (!isLocked && !playerState.isDead && event.code === 'Space') {
+                event.preventDefault();
+                document.getElementById('startButton').click();
+                return;
+            }
+
+            if(playerState.isDead) {
+                // 사망 상태일 때 스페이스바로 부활
+                if (event.code === 'Space') {
+                    playerRespawn();
+                }
+                return;
+            }
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'ShiftLeft': isRunning = true; break; // 왼쪽 쉬프트 누르면 달리기
+                case 'KeyQ': healPlayer(30); break; // Q 누르면 힐
+            }
+        }
+
+        function onKeyUp(event) {
+            if(playerState.isDead) return;
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+                case 'ShiftLeft': isRunning = false; break; // 쉬프트 떼면 걷기
+            }
+        }
+
+        const PI_2 = Math.PI / 2;
+        function onMouseMove(event) {
+            if (!isLocked || playerState.isDead) return;
+
+            const movementX = event.movementX || 0;
+            const movementY = event.movementY || 0;
+
+            yawObject.rotation.y -= movementX * 0.002;
+            pitchObject.rotation.x -= movementY * 0.002;
+
+            // 위아래 각도 제한
+            pitchObject.rotation.x = Math.max(-PI_2, Math.min(PI_2, pitchObject.rotation.x));
+        }
+
+        function onMouseDown(event) {
+            if (!isLocked || playerState.isDead) return;
+
+            if (event.button === 0) { // 마우스 좌클릭 (사격)
+                playerShoot();
+            } else if (event.button === 2) { // 마우스 우클릭 (줌)
+                setZoom(true);
+            }
+        }
+
+        function onMouseUp(event) {
+            if (event.button === 2) { // 마우스 우클릭 해제 (줌 해제)
+                setZoom(false);
+            }
+        }
+
+        function setZoom(zoomIn) {
+            isZoomed = zoomIn;
+            if (!camera) return;
+            camera.fov = isZoomed ? ZOOM_FOV : DEFAULT_FOV;
+            camera.updateProjectionMatrix();
+
+            // 줌 인시 조준선 크기 조절 효과
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair) {
+                if (isZoomed) {
+                    crosshair.style.fontSize = '16px';
+                    crosshair.style.color = '#00ff88';
+                } else {
+                    crosshair.style.fontSize = '24px';
+                    crosshair.style.color = 'rgba(255, 255, 255, 0.8)';
+                }
+            }
+        }
+
+        function resetZoom() {
+            setZoom(false);
+        }
+
+        function showHeadshotUI() {
+            const hsText = document.getElementById('headshot-text');
+            if (!hsText) return;
+
+            // 기존 진행 중인 타이머가 있다면 취소하여 중첩 방지
+            if (headshotTimeout) {
+                clearTimeout(headshotTimeout);
+            }
+
+            hsText.classList.remove('hidden');
+
+            // 0.8초 후 확실하게 숨기기
+            headshotTimeout = setTimeout(() => {
+                hsText.classList.add('hidden');
+                headshotTimeout = null;
+            }, 800);
+        }
+
+        function playerShoot() {
+            // 화면 중앙(카메라 중심)에서 레이캐스트
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            
+            // 봇들의 모든 파츠 Mesh 수집
+            const botMeshes = bots.flatMap(b => b.mesh.children);
+            const intersects = raycaster.intersectObjects([...botMeshes, ...mapObjects]);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                
+                // 시각적 레이저
+                const start = yawObject.position.clone().setY(2);
+                const end = hit.point;
+                createLaser(start, end, 0xffff00); // 플레이어 사격은 노란색
+
+                // 데미지 처리
+                if (hit.object.userData && hit.object.userData.bot) {
+                    const hitBot = hit.object.userData.bot;
+                    if(hitBot.team === TEAM_RED) { // 적군만 데미지
+                        const isHeadshot = hit.object.userData.isHead;
+                        if (isHeadshot) {
+                            showHeadshotUI();
+                            hitBot.takeDamage(999, true); // 헤드샷 원샷원킬
+                        } else {
+                            hitBot.takeDamage(20, true);
+                        }
+                    }
+                }
+            } else {
+                // 허공에 쐈을 때의 시각적 효과
+                const start = yawObject.position.clone().setY(2);
+                const end = raycaster.ray.at(50, new THREE.Vector3());
+                createLaser(start, end, 0xffff00);
+            }
+        }
+
+        function damagePlayer(amount) {
+            if(playerState.isDead) return;
+            
+            playerState.health -= amount;
+            
+            // 화면 붉은색 깜빡임 효과
+            const prevBg = document.body.style.backgroundColor;
+            document.body.style.backgroundColor = '#aa0000';
+            setTimeout(() => document.body.style.backgroundColor = prevBg, 100);
+
+            if (playerState.health <= 0) {
+                playerState.health = 0;
+                playerDie();
+            }
+            document.getElementById('healthValue').innerText = playerState.health;
+            document.getElementById('healthBar').style.width = playerState.health + '%';
+        }
+
+        function healPlayer(amount) {
+            if(playerState.isDead) return;
+            
+            playerState.health += amount;
+            if(playerState.health > 100) playerState.health = 100;
+            
+            // 화면 초록색 깜빡임 효과 (회복 시각 효과)
+            const prevBg = document.body.style.backgroundColor;
+            document.body.style.backgroundColor = '#005500';
+            setTimeout(() => document.body.style.backgroundColor = prevBg, 100);
+
+            // UI 업데이트
+            document.getElementById('healthValue').innerText = playerState.health;
+            document.getElementById('healthBar').style.width = playerState.health + '%';
+        }
+
+        // --- 5. 사망 및 관전 모드 ---
+        function playerDie() {
+            playerState.isDead = true;
+            
+            // 브라우저/환경에 따라 exitPointerLock이 제한되어 튕기는 현상 방지
+            if (document.exitPointerLock) {
+                document.exitPointerLock();
+            }
+            
+            // UI 업데이트
+            document.getElementById('crosshair').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            
+            document.getElementById('spectator-ui').innerHTML = `사망했습니다.<br><span class="text-lg text-white">팀원 관전 중...<br>스페이스바(Space)를 눌러 부활하세요!</span>`;
+            document.getElementById('spectator-ui').classList.remove('hidden');
+
+            findNewSpectateTarget();
+        }
+
+        function playerRespawn() {
+            playerState.isDead = false;
+            playerState.health = 100;
+            playerState.spectatingBot = null;
+            resetZoom();
+
+            // 부활 시 헤드샷 UI 및 타이머 클린업
+            if (headshotTimeout) {
+                clearTimeout(headshotTimeout);
+                headshotTimeout = null;
+            }
+            const hsText = document.getElementById('headshot-text');
+            if (hsText) hsText.classList.add('hidden');
+            
+            // 이동 키 입력 및 관성(속도) 완벽 초기화
+            moveForward = false; moveBackward = false; moveLeft = false; moveRight = false; isRunning = false;
+            velocity.set(0, 0, 0);
+            
+            // 스폰 위치 및 시점(회전값) 완벽 초기화
+            yawObject.position.set(0, 2, 0);
+            yawObject.rotation.set(0, 0, 0); // 좌우 회전 초기화
+            pitchObject.rotation.set(0, 0, 0); // 상하 회전 초기화
+            
+            // UI 업데이트
+            document.getElementById('healthValue').innerText = playerState.health;
+            document.getElementById('healthBar').style.width = playerState.health + '%';
+            document.getElementById('spectator-ui').classList.add('hidden');
+            
+            // 다시 게임에 진입하도록 시작(일시정지) 화면 표시
+            const blocker = document.getElementById('blocker');
+            blocker.style.display = 'flex';
+            document.querySelector('#blocker p').innerText = "부활했습니다! 화면을 클릭하거나 SPACE를 눌러 다시 참전하세요.";
+        }
+
+        function findNewSpectateTarget() {
+            // 살아있는 아군 찾기
+            const aliveBlueBots = bots.filter(b => b.team === TEAM_BLUE && !b.isDead);
+            
+            if (aliveBlueBots.length > 0) {
+                // 첫 번째 아군을 관전 대상으로 지정
+                playerState.spectatingBot = aliveBlueBots[0];
+            } else {
+                // 살아있는 아군이 없으면 죽은 자리에서 쓰러진 시점 유지
+                playerState.spectatingBot = null;
+                yawObject.position.y = 0.5;
+                pitchObject.rotation.x = -Math.PI / 4;
+            }
+        }
+
+        // --- 6. 시각 효과 (레이저 궤적) ---
+        function createLaser(start, end, colorHex) {
+            const material = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 2 });
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            
+            lasers.push({
+                mesh: line,
+                life: 1.0 // 수명 (1초)
+            });
+        }
+
+        // --- 7. 메인 게임 루프 ---
+        function onWindowResize() {
+            if (!camera || !renderer) return; // 게임 로드 전 화면 크기 변경 시 에러 방지
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = performance.now();
+            // 델타 타임 계산 및 제한 (탭 전환 시 물리 엔진 폭주 방지용 max 0.1초)
+            const delta = Math.min((time - prevTime) / 1000, 0.1);
+            prevTime = time;
+
+            // 1. 봇 업데이트
+            bots.forEach(bot => bot.update(delta));
+
+            // 2. 레이저(총알 궤적) 페이드아웃 효과
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                lasers[i].life -= delta * 5; // 빠르게 사라짐
+                lasers[i].mesh.material.opacity = lasers[i].life;
+                lasers[i].mesh.material.transparent = true;
+                
+                if (lasers[i].life <= 0) {
+                    scene.remove(lasers[i].mesh);
+                    lasers.splice(i, 1);
+                }
+            }
+
+            // 3. 플레이어 로직 및 카메라 제어
+            if (playerState.isDead) {
+                // 관전 모드 카메라 업데이트
+                if (playerState.spectatingBot && !playerState.spectatingBot.isDead) {
+                    const target = playerState.spectatingBot.mesh;
+                    // 카메라를 봇 약간 뒤/위로 부드럽게 이동 (사람 모형 높이에 맞춰 Y축 +3.5로 수정)
+                    yawObject.position.lerp(
+                        new THREE.Vector3(target.position.x, target.position.y + 3.5, target.position.z), 
+                        0.1
+                    );
+                    
+                    // 봇이 바라보는 방향 구하기
+                    const dir = new THREE.Vector3(0, 0, 1);
+                    dir.applyQuaternion(target.quaternion);
+                    
+                    const lookTarget = target.position.clone().add(dir.multiplyScalar(5));
+                    yawObject.lookAt(lookTarget);
+                    pitchObject.rotation.set(0,0,0); // pitch 초기화
+                }
+            } else if (isLocked) {
+                // 플레이어 이동 물리 (관성 포함)
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveLeft) - Number(moveRight); // 좌우 반전 버그 수정
+                direction.normalize();
+
+                // Shift 누르고 있을 때 달리기 속도 적용 (기본 40 -> 달리기 90)
+                const speed = isRunning ? 90.0 : 40.0;
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+
+                yawObject.translateX(velocity.x * delta);
+                yawObject.translateZ(velocity.z * delta);
+
+                // 매우 간단한 맵 이탈 방지 (벽 충돌)
+                if(yawObject.position.x < -48) yawObject.position.x = -48;
+                if(yawObject.position.x > 48) yawObject.position.x = 48;
+                if(yawObject.position.z < -48) yawObject.position.z = -48;
+                if(yawObject.position.z > 48) yawObject.position.z = 48;
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

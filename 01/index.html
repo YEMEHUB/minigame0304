@@ -1,0 +1,302 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>반응속도 테스트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            touch-action: manipulation; /* 모바일에서 더블 탭 확대 방지 */
+            -webkit-tap-highlight-color: transparent; /* 모바일 터치 하이라이트 제거 */
+        }
+        
+        /* 상태별 색상 */
+        .bg-state-start { background-color: #3b82f6; } /* Blue */
+        .bg-state-wait { background-color: #ef4444; }  /* Red */
+        .bg-state-go { background-color: #22c55e; }    /* Green */
+        .bg-state-result { background-color: #6366f1; } /* Indigo */
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
+        
+        <!-- 헤더 -->
+        <div class="p-6 text-center border-b border-gray-100">
+            <h1 class="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1">⚡ 반응속도 테스트</h1>
+            <p class="text-gray-500 text-sm">빨간색이 초록색으로 바뀌면 최대한 빨리 누르세요! (총 5회)</p>
+        </div>
+
+        <!-- 게임 영역 (클릭/터치 영역) -->
+        <div id="click-area" class="w-full h-80 md:h-96 bg-state-start cursor-pointer flex flex-col items-center justify-center text-white select-none relative">
+            
+            <div id="progress-badge" class="absolute top-4 right-4 bg-black/20 px-3 py-1 rounded-full text-sm font-semibold hidden">
+                0 / 5
+            </div>
+
+            <div class="text-center px-4">
+                <h2 id="main-text" class="text-4xl md:text-5xl font-bold mb-4 drop-shadow-md">시작하기</h2>
+                <p id="sub-text" class="text-lg md:text-xl opacity-90 font-medium">화면을 클릭하거나 스페이스바를 누르세요</p>
+            </div>
+            
+            <!-- 아이콘 영역 -->
+            <div id="icon-area" class="mt-8 text-6xl opacity-80">
+                🖱️
+            </div>
+        </div>
+
+        <!-- 결과 리스트 영역 -->
+        <div class="p-6 bg-gray-50">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-gray-700 font-bold text-lg">기록</h3>
+                <span id="average-text" class="text-blue-600 font-bold"></span>
+            </div>
+            
+            <div class="grid grid-cols-5 gap-2 md:gap-4" id="history-grid">
+                <!-- 빈 기록 슬롯 5개 -->
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-16 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-16 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-16 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-16 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-16 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+            </div>
+        </div>
+
+        <!-- 전체 게임 평균 기록 영역 -->
+        <div class="p-6 bg-gray-100 border-t border-gray-200">
+            <h3 class="text-gray-700 font-bold text-lg mb-4">최근 5게임 평균 기록</h3>
+            <div class="grid grid-cols-5 gap-2 md:gap-4" id="average-history-grid">
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-12 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-12 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-12 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-12 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+                <div class="bg-white border-2 border-gray-200 rounded-xl h-12 flex items-center justify-center text-gray-400 font-mono text-sm md:text-base font-semibold">-</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 게임 상태: 'START', 'WAITING', 'GO', 'RESULT', 'FINISHED'
+        let currentState = 'START';
+        let records = [];
+        let gameAverages = []; // 최근 게임 평균 기록을 저장할 배열
+        const MAX_ROUNDS = 5;
+        
+        let timeoutId = null;
+        let startTime = 0;
+
+        // DOM 요소
+        const clickArea = document.getElementById('click-area');
+        const mainText = document.getElementById('main-text');
+        const subText = document.getElementById('sub-text');
+        const iconArea = document.getElementById('icon-area');
+        const progressBadge = document.getElementById('progress-badge');
+        const historyGrid = document.getElementById('history-grid');
+        const averageText = document.getElementById('average-text');
+        const averageHistoryGrid = document.getElementById('average-history-grid');
+
+        // 상태 전환 및 화면 업데이트 함수
+        function setState(newState, message = null, subMessage = null) {
+            currentState = newState;
+            
+            // 기존 클래스 제거
+            clickArea.classList.remove('bg-state-start', 'bg-state-wait', 'bg-state-go', 'bg-state-result');
+
+            switch (newState) {
+                case 'START':
+                    clickArea.classList.add('bg-state-start');
+                    mainText.textContent = '반응속도 테스트';
+                    subText.textContent = '화면을 클릭하여 시작하세요';
+                    iconArea.textContent = '⚡';
+                    progressBadge.classList.add('hidden');
+                    resetGame();
+                    break;
+
+                case 'WAITING': // 빨간색 대기 화면
+                    clickArea.classList.add('bg-state-wait');
+                    mainText.textContent = '기다리세요...';
+                    subText.textContent = '초록색으로 바뀌면 클릭!';
+                    iconArea.textContent = '🛑';
+                    progressBadge.classList.remove('hidden');
+                    progressBadge.textContent = `${records.length + 1} / ${MAX_ROUNDS}`;
+                    break;
+
+                case 'GO': // 초록색 클릭 화면
+                    clickArea.classList.add('bg-state-go');
+                    mainText.textContent = '지금 클릭!';
+                    subText.textContent = '';
+                    iconArea.textContent = '🟢';
+                    break;
+
+                case 'RESULT': // 중간 결과 화면 (파란색) 또는 너무 빨리 누른 경우
+                    clickArea.classList.add('bg-state-result');
+                    mainText.textContent = message;
+                    subText.textContent = subMessage;
+                    iconArea.textContent = '⏱️';
+                    break;
+
+                case 'FINISHED': // 모든 라운드 종료
+                    clickArea.classList.add('bg-state-start');
+                    mainText.textContent = message;
+                    subText.textContent = subMessage;
+                    iconArea.textContent = '🎉';
+                    break;
+            }
+        }
+
+        // 전체 게임 초기화
+        function resetGame() {
+            records = [];
+            averageText.textContent = '';
+            renderHistory();
+        }
+
+        // 라운드 시작
+        function startRound() {
+            setState('WAITING');
+            
+            // 2초(2000ms) ~ 5초(5000ms) 사이의 랜덤 시간 설정
+            const randomDelay = Math.floor(Math.random() * 3000) + 2000;
+            
+            timeoutId = setTimeout(() => {
+                setState('GO');
+                startTime = performance.now();
+            }, randomDelay);
+        }
+
+        // 클릭 이벤트 핸들러
+        function handleClick(e) {
+            // 스페이스바가 화면을 스크롤하지 않도록 방지
+            if (e && e.type === 'keydown') {
+                if (e.code !== 'Space') return;
+                e.preventDefault(); 
+                if (e.repeat) return; // 꾹 누르고 있을 때 무시
+            }
+
+            if (currentState === 'START') {
+                startRound();
+            } 
+            else if (currentState === 'WAITING') {
+                // 초록색이 되기 전에 누름 (너무 빨리 누름)
+                clearTimeout(timeoutId);
+                setState('RESULT', '너무 빨리 눌렀습니다!', '클릭하여 다시 시도하세요');
+            } 
+            else if (currentState === 'GO') {
+                // 초록색일 때 누름 (정상 측정)
+                const endTime = performance.now();
+                const reactionTime = Math.round(endTime - startTime);
+                
+                records.push(reactionTime);
+                renderHistory();
+
+                if (records.length < MAX_ROUNDS) {
+                    setState('RESULT', `${reactionTime} ms`, '클릭하여 다음 라운드 진행');
+                } else {
+                    finishGame();
+                }
+            } 
+            else if (currentState === 'RESULT') {
+                // 결과 화면에서 클릭하면 다음 라운드 시작
+                startRound();
+            }
+            else if (currentState === 'FINISHED') {
+                // 끝나고 다시 시작
+                setState('START');
+            }
+        }
+
+        // 게임 종료 및 평균 계산
+        function finishGame() {
+            const sum = records.reduce((a, b) => a + b, 0);
+            const average = Math.round(sum / records.length);
+            
+            averageText.textContent = `최종 평균: ${average} ms`;
+            
+            // 누적 평균 기록 저장 (최대 5개 유지)
+            gameAverages.push(average);
+            if (gameAverages.length > 5) {
+                gameAverages.shift(); // 가장 오래된 기록 삭제
+            }
+            renderAverageHistory();
+
+            let message = '';
+            if (average < 200) message = '엄청난 반응속도!';
+            else if (average < 250) message = '매우 빠릅니다!';
+            else if (average < 300) message = '평균적인 속도입니다.';
+            else message = '조금 느리군요. 다시 도전?';
+
+            setState('FINISHED', `${average} ms`, `${message} (클릭하여 처음부터)`);
+        }
+
+        // 하단 기록 렌더링
+        function renderHistory() {
+            historyGrid.innerHTML = '';
+            
+            for (let i = 0; i < MAX_ROUNDS; i++) {
+                const div = document.createElement('div');
+                div.className = 'bg-white border-2 rounded-xl h-16 flex items-center justify-center font-mono text-sm md:text-base font-semibold transition-all duration-300';
+                
+                if (i < records.length) {
+                    div.textContent = `${records[i]} ms`;
+                    div.classList.add('border-blue-400', 'text-blue-700', 'shadow-sm');
+                } else {
+                    div.textContent = '-';
+                    div.classList.add('border-gray-200', 'text-gray-400');
+                }
+                
+                // 현재 진행할 라운드 강조
+                if (i === records.length && currentState !== 'FINISHED') {
+                    div.classList.add('border-dashed', 'border-gray-400', 'bg-gray-50');
+                }
+                
+                historyGrid.appendChild(div);
+            }
+
+            // 실시간 평균 업데이트
+            if (records.length > 0) {
+                const sum = records.reduce((a, b) => a + b, 0);
+                const average = Math.round(sum / records.length);
+                if (currentState !== 'FINISHED') {
+                    averageText.textContent = `현재 평균: ${average} ms`;
+                }
+            } else {
+                averageText.textContent = '';
+            }
+        }
+
+        // 전체 게임 평균 기록 렌더링
+        function renderAverageHistory() {
+            averageHistoryGrid.innerHTML = '';
+            
+            for (let i = 0; i < 5; i++) {
+                const div = document.createElement('div');
+                div.className = 'bg-white border-2 rounded-xl h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold transition-all duration-300';
+                
+                if (i < gameAverages.length) {
+                    div.textContent = `${gameAverages[i]} ms`;
+                    div.classList.add('border-indigo-400', 'text-indigo-700', 'bg-indigo-50', 'shadow-sm');
+                } else {
+                    div.textContent = '-';
+                    div.classList.add('border-gray-200', 'text-gray-400');
+                }
+                
+                averageHistoryGrid.appendChild(div);
+            }
+        }
+
+        // 이벤트 리스너 등록
+        // 포인터다운을 사용하여 터치/클릭 딜레이를 최소화
+        clickArea.addEventListener('pointerdown', handleClick);
+        document.addEventListener('keydown', handleClick);
+
+        // 초기 상태 설정
+        setState('START');
+
+    </script>
+</body>
+</html>

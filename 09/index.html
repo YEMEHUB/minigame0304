@@ -1,0 +1,873 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>원카드 (One Card)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: radial-gradient(circle at center, #1b5e20, #0a2f10);
+            color: white;
+            overflow: hidden;
+            touch-action: none; /* Prevent pinch zoom */
+        }
+
+        /* Card Styling */
+        .playing-card {
+            width: 80px;
+            height: 120px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 6px;
+            font-weight: bold;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            user-select: none;
+            flex-shrink: 0;
+            margin-right: -40px; /* Overlap cards */
+        }
+        
+        .playing-card:last-child {
+            margin-right: 0;
+        }
+
+        .playing-card:hover {
+            transform: translateY(-15px);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.5);
+            z-index: 10 !important;
+        }
+
+        .playing-card.disabled {
+            filter: brightness(0.7);
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .playing-card.facedown {
+            background: repeating-linear-gradient(
+                45deg,
+                #b91c1c,
+                #b91c1c 10px,
+                #991b1b 10px,
+                #991b1b 20px
+            );
+            border: 4px solid white;
+            cursor: default;
+        }
+        
+        .playing-card.facedown:hover {
+            transform: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .card-red { color: #dc2626; }
+        .card-black { color: #171717; }
+
+        .card-top-left { font-size: 14px; text-align: left; line-height: 1; }
+        .card-center { font-size: 32px; text-align: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .card-bottom-right { font-size: 14px; text-align: right; transform: rotate(180deg); line-height: 1; }
+
+        /* Hand Layouts */
+        .hand-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            max-width: 90vw;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .hand-container::-webkit-scrollbar { display: none; }
+
+        .player-hand { bottom: 20px; left: 50%; transform: translateX(-50%); position: absolute; z-index: 20; }
+        .top-hand { top: 20px; left: 50%; transform: translateX(-50%) rotate(180deg); position: absolute; }
+        .left-hand { left: -40px; top: 50%; transform: translateY(-50%) rotate(90deg); position: absolute; }
+        .right-hand { right: -40px; top: 50%; transform: translateY(-50%) rotate(-90deg); position: absolute; }
+
+        .center-pile {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .deck { cursor: pointer; transition: transform 0.1s; }
+        .deck:active { transform: scale(0.95); }
+
+        /* Turn Indicator */
+        .turn-indicator {
+            box-shadow: 0 0 15px 5px rgba(250, 204, 21, 0.6);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Animations */
+        @keyframes pop {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: pop 0.4s ease-out forwards; }
+        
+        @keyframes floatText {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        .floating-text {
+            position: absolute;
+            color: #fbbf24;
+            font-weight: 900;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px black;
+            pointer-events: none;
+            animation: floatText 1.5s ease-out forwards;
+            z-index: 50;
+        }
+        
+        .uno-button {
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+            border: 2px solid white;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+            text-shadow: 1px 1px 2px black;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 10px rgba(239, 68, 68, 0.8); }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(239, 68, 68, 1); }
+            100% { transform: scale(1); box-shadow: 0 0 10px rgba(239, 68, 68, 0.8); }
+        }
+
+        /* Custom Scrollbar for Tutorial */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body>
+
+    <!-- Tutorial Screen (Initial Screen) -->
+    <div id="tutorial-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-[60] p-4 md:p-8">
+        <div class="bg-gray-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col h-full max-h-[85vh] border border-gray-700">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-2xl">
+                <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600">🃏 원카드 튜토리얼</h1>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 space-y-6 text-gray-200 custom-scrollbar">
+                <section>
+                    <h2 class="text-xl font-bold text-yellow-400 mb-2 flex items-center gap-2">🎯 게임 목표</h2>
+                    <p class="leading-relaxed">가장 먼저 손에 있는 <strong>모든 카드를 내려놓는 사람</strong>이 승리하는 게임입니다.</p>
+                </section>
+                
+                <section>
+                    <h2 class="text-xl font-bold text-green-400 mb-2 flex items-center gap-2">🎲 기본 진행 방법</h2>
+                    <ul class="list-disc pl-5 space-y-2 leading-relaxed">
+                        <li>게임이 시작되면 각 플레이어는 <strong>7장</strong>의 카드를 받습니다.</li>
+                        <li>바닥에 놓인 카드와 <strong>같은 문양(♠, ♥, ♦, ♣)</strong>이거나 <strong>같은 숫자/알파벳</strong>인 카드만 낼 수 있습니다.</li>
+                        <li>낼 수 있는 카드가 없다면(내기 싫다면) 덱에서 카드를 <strong>1장 뽑고</strong> 차례를 넘깁니다.</li>
+                        <li>카드가 딱 1장 남았을 때는 반드시 <strong>"원카드!"</strong>를 외쳐야 합니다. (현재 게임에서는 자동으로 외칩니다)</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2 class="text-xl font-bold text-red-400 mb-2 flex items-center gap-2">⚔️ 공격 카드</h2>
+                    <p class="text-sm text-gray-400 mb-2">다음 사람에게 카드를 강제로 먹입니다. 공격을 받으면 <strong>같은 종류나 더 강한 공격 카드</strong>로 방어하며 공격을 누적시킬 수 있습니다.</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm text-center">
+                        <div class="bg-gray-700 p-3 rounded-lg"><span class="font-black text-lg">2</span><br>2장 공격</div>
+                        <div class="bg-gray-700 p-3 rounded-lg"><span class="font-black text-lg">A</span><br>3장 공격</div>
+                        <div class="bg-gray-700 p-3 rounded-lg"><span class="font-black text-lg">흑백 조커</span><br>5장 공격</div>
+                        <div class="bg-gray-700 p-3 rounded-lg text-red-300"><span class="font-black text-lg">컬러 조커</span><br>7장 공격 (최강)</div>
+                    </div>
+                </section>
+
+                <section>
+                    <h2 class="text-xl font-bold text-blue-400 mb-2 flex items-center gap-2">🔄 액션 카드</h2>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center gap-3 bg-gray-700 p-3 rounded-lg"><span class="font-black text-xl w-6 text-center text-yellow-300">7</span> 바닥의 문양을 원하는 문양으로 변경합니다.</div>
+                        <div class="flex items-center gap-3 bg-gray-700 p-3 rounded-lg"><span class="font-black text-xl w-6 text-center text-yellow-300">J</span> 다음 사람의 차례를 건너뜁니다. (Jump)</div>
+                        <div class="flex items-center gap-3 bg-gray-700 p-3 rounded-lg"><span class="font-black text-xl w-6 text-center text-yellow-300">Q</span> 게임 진행 방향이 반대로 바뀝니다. (Queen)</div>
+                        <div class="flex items-center gap-3 bg-gray-700 p-3 rounded-lg"><span class="font-black text-xl w-6 text-center text-yellow-300">K</span> 카드를 한 번 더 낼 수 있습니다. (King)</div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="p-4 border-t border-gray-700 bg-gray-800 rounded-b-2xl">
+                <button id="btn-finish-tutorial" class="w-full py-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white text-xl font-black rounded-xl shadow-lg transform transition hover:scale-[1.02] active:scale-95">이해했습니다! (게임 설정하기)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-90 z-50 hidden">
+        <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2 filter drop-shadow-lg">ONE CARD</h1>
+        <p class="text-gray-300 mb-10 text-lg">최고의 원카드 게임</p>
+
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-80 md:w-96 text-center border border-gray-700">
+            <h2 class="text-xl font-bold mb-4 text-white">게임 모드</h2>
+            <div class="flex gap-2 mb-6">
+                <button id="btn-mode-ai" class="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition">AI와 하기</button>
+                <button id="btn-mode-local" class="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition">같이 하기</button>
+            </div>
+
+            <h2 class="text-xl font-bold mb-4 text-white">인원 수</h2>
+            <div class="flex gap-2 mb-8">
+                <button id="btn-players-2" class="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition">2인</button>
+                <button id="btn-players-3" class="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition">3인</button>
+                <button id="btn-players-4" class="flex-1 py-2 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition">4인</button>
+            </div>
+
+            <div class="flex gap-2">
+                <button id="btn-show-tutorial" class="w-1/3 py-4 bg-gray-700 hover:bg-gray-600 text-white text-base font-bold rounded-xl shadow-lg transition">게임 방법</button>
+                <button id="btn-start" class="w-2/3 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black text-xl font-black rounded-xl shadow-lg transform transition hover:scale-105 active:scale-95">게임 시작</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Board -->
+    <div id="game-board" class="hidden w-full h-screen relative">
+        
+        <!-- UI Overlay -->
+        <div class="absolute top-4 left-4 z-40 text-white opacity-80 pointer-events-none">
+            <div id="direction-indicator" class="text-xl font-bold mb-1">방향: ➡️</div>
+            <div id="attack-indicator" class="text-red-400 font-bold text-lg hidden">누적 공격: <span id="attack-count">0</span>장!</div>
+        </div>
+
+        <button id="btn-quit" class="absolute top-4 right-4 z-40 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition">포기하기</button>
+        
+        <!-- Opponents Hands -->
+        <div id="player-top" class="top-hand hand-container"></div>
+        <div id="player-left" class="left-hand hand-container"></div>
+        <div id="player-right" class="right-hand hand-container"></div>
+
+        <!-- Center Area -->
+        <div class="center-pile">
+            <!-- Draw Deck -->
+            <div id="draw-deck" class="playing-card facedown deck relative" onclick="drawCardAction()">
+                <div class="absolute -top-6 w-full text-center text-sm font-bold text-gray-300">남은카드:<br><span id="deck-count">0</span></div>
+            </div>
+            <!-- Discard Pile -->
+            <div class="relative">
+                <div id="discard-pile"></div>
+                <div id="current-suit-indicator" class="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 px-3 py-1 rounded-full text-lg border border-gray-600 hidden shadow-lg z-10"></div>
+            </div>
+        </div>
+
+        <!-- Player Hand -->
+        <div id="player-bottom" class="player-hand hand-container"></div>
+
+        <!-- One Card Button (Manual call) -->
+        <button id="btn-onecard" class="uno-button absolute bottom-36 left-1/2 transform -translate-x-1/2 z-40 text-white px-6 py-3 rounded-full font-black text-xl hidden transition-all">원카드!</button>
+
+        <!-- Player Info Tags -->
+        <div id="info-bottom" class="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-60 px-4 py-1 rounded-full text-sm font-bold z-30">나</div>
+        <div id="info-top" class="absolute top-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-60 px-4 py-1 rounded-full text-sm font-bold z-30 hidden">Player 3</div>
+        <div id="info-left" class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-60 px-4 py-1 rounded-full text-sm font-bold z-30 hidden">Player 2</div>
+        <div id="info-right" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-60 px-4 py-1 rounded-full text-sm font-bold z-30 hidden">Player 4</div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Suit Selection Modal (For 7 Card) -->
+    <div id="modal-suit" class="modal-overlay absolute inset-0 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 text-center shadow-2xl transform scale-100 animate-pop">
+            <h2 class="text-2xl font-black text-black mb-4">문양을 선택하세요 (7)</h2>
+            <div class="flex gap-4 justify-center">
+                <button class="suit-btn text-4xl text-black hover:bg-gray-200 p-4 rounded-lg transition" data-suit="♠">♠</button>
+                <button class="suit-btn text-4xl text-red-500 hover:bg-red-50 p-4 rounded-lg transition" data-suit="♥">♥</button>
+                <button class="suit-btn text-4xl text-red-500 hover:bg-red-50 p-4 rounded-lg transition" data-suit="♦">♦</button>
+                <button class="suit-btn text-4xl text-black hover:bg-gray-200 p-4 rounded-lg transition" data-suit="♣">♣</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pass & Play Overlay (For Local Multiplayer) -->
+    <div id="modal-pass" class="modal-overlay absolute inset-0 hidden flex flex-col items-center justify-center z-50">
+        <h2 id="pass-player-name" class="text-4xl font-black text-white mb-6">Player X의 차례입니다</h2>
+        <p class="text-gray-300 mb-8">화면을 보지 못하게 기기를 넘겨주세요.</p>
+        <button id="btn-ready" class="px-8 py-4 bg-green-600 hover:bg-green-500 rounded-xl font-bold text-xl shadow-lg transition">준비 완료</button>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="modal-gameover" class="modal-overlay absolute inset-0 hidden flex flex-col items-center justify-center z-50">
+        <div class="bg-gray-900 border-2 border-yellow-500 p-10 rounded-2xl text-center shadow-2xl animate-pop">
+            <h1 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-2">게임 종료!</h1>
+            <h2 id="winner-name" class="text-3xl font-bold text-white mb-8 mt-4">Player X 승리!</h2>
+            <button onclick="showMenu()" class="px-8 py-3 bg-white text-black hover:bg-gray-200 rounded-lg font-bold text-lg transition shadow-lg">메인 메뉴로</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants & Config ---
+        const SUITS = ['♠', '♥', '♦', '♣'];
+        const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const SPECIAL_EFFECTS = {
+            'A': { attack: 3 },
+            '2': { attack: 2 },
+            '7': { changeSuit: true },
+            'J': { skip: true },
+            'Q': { reverse: true },
+            'K': { extraTurn: true }
+        };
+        const JOKER_BLACK = { suit: 'JOKER', rank: 'BLACK', attack: 5, color: 'black', symbol: '★' };
+        const JOKER_COLOR = { suit: 'JOKER', rank: 'COLOR', attack: 7, color: 'red', symbol: '★' };
+
+        let config = {
+            mode: 'AI', // 'AI' or 'LOCAL'
+            players: 4
+        };
+
+        // --- Game State ---
+        let deck = [];
+        let discardPile = [];
+        let players = [];
+        let currentPlayerIndex = 0;
+        let direction = 1; // 1 for clockwise, -1 for counter-clockwise
+        let attackStack = 0;
+        let currentSuit = '';
+        let isGameRunning = false;
+        let oneCardCalled = false;
+        let timeoutId = null;
+
+        // --- UI Elements ---
+        const uiBtnModeAI = document.getElementById('btn-mode-ai');
+        const uiBtnModeLocal = document.getElementById('btn-mode-local');
+        const uiBtnPlayers = [
+            document.getElementById('btn-players-2'),
+            document.getElementById('btn-players-3'),
+            document.getElementById('btn-players-4')
+        ];
+        
+        // --- Menu Logic ---
+        function selectMode(mode) {
+            config.mode = mode;
+            uiBtnModeAI.classList.toggle('bg-green-600', mode === 'AI');
+            uiBtnModeAI.classList.toggle('bg-gray-700', mode !== 'AI');
+            uiBtnModeLocal.classList.toggle('bg-green-600', mode === 'LOCAL');
+            uiBtnModeLocal.classList.toggle('bg-gray-700', mode !== 'LOCAL');
+        }
+
+        function selectPlayers(count) {
+            config.players = count;
+            uiBtnPlayers.forEach((btn, idx) => {
+                const isSelected = (idx + 2) === count;
+                btn.classList.toggle('bg-green-600', isSelected);
+                btn.classList.toggle('bg-gray-700', !isSelected);
+            });
+        }
+
+        uiBtnModeAI.onclick = () => selectMode('AI');
+        uiBtnModeLocal.onclick = () => selectMode('LOCAL');
+        uiBtnPlayers[0].onclick = () => selectPlayers(2);
+        uiBtnPlayers[1].onclick = () => selectPlayers(3);
+        uiBtnPlayers[2].onclick = () => selectPlayers(4);
+        
+        // Tutorial & Menu Actions
+        document.getElementById('btn-finish-tutorial').onclick = () => {
+            document.getElementById('tutorial-screen').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-show-tutorial').onclick = () => {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('tutorial-screen').classList.remove('hidden');
+        };
+
+        document.getElementById('btn-start').onclick = startGame;
+        document.getElementById('btn-quit').onclick = showMenu;
+        document.getElementById('btn-ready').onclick = revealLocalTurn;
+
+        // --- Core Game Functions ---
+
+        function createDeck() {
+            let newDeck = [];
+            for (let suit of SUITS) {
+                for (let rank of RANKS) {
+                    newDeck.push({ suit, rank, color: (suit === '♥' || suit === '♦') ? 'red' : 'black' });
+                }
+            }
+            newDeck.push(JOKER_BLACK);
+            newDeck.push(JOKER_COLOR);
+            return shuffle(newDeck);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function getCardHTML(card, isHidden = false, isDisabled = false, index = null) {
+            if (isHidden) {
+                return `<div class="playing-card facedown"></div>`;
+            }
+
+            let colorClass = card.color === 'red' ? 'card-red' : 'card-black';
+            let topText, centerText, bottomText;
+
+            if (card.suit === 'JOKER') {
+                topText = 'JOKER';
+                centerText = card.symbol;
+                bottomText = 'JOKER';
+            } else {
+                topText = `${card.suit} ${card.rank}`;
+                centerText = card.suit;
+                bottomText = `${card.suit} ${card.rank}`;
+            }
+
+            let onClickAttr = (index !== null && !isDisabled) ? `onclick="playCardAction(${index})"` : '';
+            let disabledClass = isDisabled ? 'disabled' : '';
+
+            return `
+                <div class="playing-card ${colorClass} ${disabledClass}" ${onClickAttr} style="z-index: ${index !== null ? index : 1};">
+                    <div class="card-top-left">${topText}</div>
+                    <div class="card-center">${centerText}</div>
+                    <div class="card-bottom-right">${bottomText}</div>
+                </div>
+            `;
+        }
+
+        function startGame() {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('game-board').classList.remove('hidden');
+            document.getElementById('modal-gameover').classList.add('hidden');
+            clearTimeout(timeoutId);
+
+            deck = createDeck();
+            discardPile = [];
+            players = [];
+            attackStack = 0;
+            direction = 1;
+            currentPlayerIndex = 0;
+            isGameRunning = true;
+            oneCardCalled = false;
+
+            // Setup players
+            for (let i = 0; i < config.players; i++) {
+                players.push({
+                    id: i,
+                    name: i === 0 && config.mode === 'AI' ? '나 (Player 1)' : `Player ${i + 1}`,
+                    hand: [],
+                    isAI: config.mode === 'AI' && i !== 0
+                });
+            }
+
+            // Deal 7 cards
+            for (let i = 0; i < 7; i++) {
+                for (let p of players) p.hand.push(deck.pop());
+            }
+
+            // First card to discard pile (Ensure it's not a Joker for simplicity initially)
+            let firstCard = deck.pop();
+            while(firstCard.suit === 'JOKER') {
+                deck.unshift(firstCard);
+                firstCard = deck.pop();
+            }
+            discardPile.push(firstCard);
+            currentSuit = firstCard.suit;
+
+            updateUI();
+            processTurn();
+        }
+
+        function showMenu() {
+            isGameRunning = false;
+            clearTimeout(timeoutId);
+            document.getElementById('main-menu').classList.remove('hidden');
+            document.getElementById('game-board').classList.add('hidden');
+            document.getElementById('modal-gameover').classList.add('hidden');
+            document.getElementById('modal-pass').classList.add('hidden');
+            document.getElementById('modal-suit').classList.add('hidden');
+        }
+
+        // --- Validation Logic ---
+
+        function getCardAttackValue(card) {
+            if (card.suit === 'JOKER') return card.rank === 'COLOR' ? 7 : 5;
+            if (SPECIAL_EFFECTS[card.rank]?.attack) return SPECIAL_EFFECTS[card.rank].attack;
+            return 0;
+        }
+
+        function canPlayCard(card) {
+            let topCard = discardPile[discardPile.length - 1];
+            
+            // If there's an attack stack, must defend
+            if (attackStack > 0) {
+                let cardAttack = getCardAttackValue(card);
+                let topAttack = getCardAttackValue(topCard);
+                
+                if (cardAttack === 0) return false; // Must play attack card
+                if (card.suit === 'JOKER') return true; // Joker can defend anything
+                if (topCard.suit === 'JOKER') {
+                    // Only Joker can defend Joker (Color > Black, or same)
+                    return card.suit === 'JOKER' && cardAttack >= topAttack;
+                }
+                // Same rank attack (e.g. A on A, 2 on 2) or higher attack value (A on 2)
+                return cardAttack >= topAttack || card.rank === topCard.rank;
+            }
+
+            // Normal play
+            if (card.suit === 'JOKER') return true; // Jokers playable anytime
+            if (card.suit === currentSuit) return true; // Match suit
+            if (card.rank === topCard.rank) return true; // Match rank
+
+            return false;
+        }
+
+        // --- Actions ---
+
+        function drawCardAction() {
+            if (!isGameRunning) return;
+            let p = players[currentPlayerIndex];
+            
+            // Check if it's human turn (in Local mode, must be revealed. In AI mode, index 0)
+            if (p.isAI) return;
+            if (config.mode === 'LOCAL' && !document.getElementById('modal-pass').classList.contains('hidden')) return;
+
+            executeDraw(p);
+        }
+
+        function executeDraw(player) {
+            let drawCount = attackStack > 0 ? attackStack : 1;
+            attackStack = 0; // Reset stack after drawing
+
+            for (let i = 0; i < drawCount; i++) {
+                if (deck.length === 0) reshuffleDeck();
+                if (deck.length > 0) player.hand.push(deck.pop());
+            }
+
+            showFloatingText(`+${drawCount}장`, getPlayerPositionInfo(player.id));
+            
+            updateUI();
+            finishTurn();
+        }
+
+        function playCardAction(handIndex) {
+            if (!isGameRunning) return;
+            let player = players[currentPlayerIndex];
+            
+            if (player.isAI) return; // Ignore clicks if AI
+            if (config.mode === 'LOCAL' && !document.getElementById('modal-pass').classList.contains('hidden')) return;
+
+            let card = player.hand[handIndex];
+            if (!canPlayCard(card)) {
+                // Shake effect on card could go here
+                return;
+            }
+
+            executePlayCard(player, handIndex);
+        }
+
+        function executePlayCard(player, handIndex) {
+            let card = player.hand.splice(handIndex, 1)[0];
+            discardPile.push(card);
+            
+            if (card.suit !== 'JOKER') currentSuit = card.suit;
+
+            // Handle One Card Call
+            if (player.hand.length === 1) {
+                // Auto call for simplicity in this implementation, but visually indicate it
+                oneCardCalled = true;
+                showFloatingText("원카드!!", getPlayerPositionInfo(player.id));
+            }
+
+            if (player.hand.length === 0) {
+                updateUI();
+                endGame(player);
+                return;
+            }
+
+            applyCardEffects(card, player);
+        }
+
+        function applyCardEffects(card, player) {
+            let effectApplied = false;
+
+            if (card.suit === 'JOKER') {
+                attackStack += card.rank === 'COLOR' ? 7 : 5;
+                // Joker suit defaults to red or black for next matching
+                currentSuit = card.color === 'red' ? '♥' : '♠'; 
+                effectApplied = true;
+            } else if (SPECIAL_EFFECTS[card.rank]) {
+                let fx = SPECIAL_EFFECTS[card.rank];
+                
+                if (fx.attack) {
+                    attackStack += fx.attack;
+                }
+                if (fx.reverse) {
+                    direction *= -1;
+                    showFloatingText("방향 전환!", "center");
+                }
+                if (fx.skip) {
+                    showFloatingText("건너뛰기!", "center");
+                    advanceTurn(); // Skip one extra
+                }
+                if (fx.extraTurn) {
+                    showFloatingText("한 번 더!", getPlayerPositionInfo(player.id));
+                    // Don't advance turn
+                    updateUI();
+                    processTurn();
+                    return; 
+                }
+                if (fx.changeSuit) {
+                    if (player.isAI) {
+                        // AI randomly picks a suit they have most of
+                        let suitsCount = { '♠':0, '♥':0, '♦':0, '♣':0 };
+                        player.hand.forEach(c => { if(c.suit !== 'JOKER') suitsCount[c.suit]++; });
+                        let bestSuit = Object.keys(suitsCount).reduce((a, b) => suitsCount[a] > suitsCount[b] ? a : b);
+                        if (suitsCount[bestSuit] === 0) bestSuit = SUITS[Math.floor(Math.random() * 4)];
+                        
+                        currentSuit = bestSuit;
+                        showFloatingText(`${currentSuit}로 변경!`, "center");
+                        finishTurn();
+                    } else {
+                        // Show modal for human
+                        document.getElementById('modal-suit').classList.remove('hidden');
+                        document.querySelectorAll('.suit-btn').forEach(btn => {
+                            btn.onclick = function() {
+                                currentSuit = this.getAttribute('data-suit');
+                                document.getElementById('modal-suit').classList.add('hidden');
+                                showFloatingText(`${currentSuit}로 변경!`, "center");
+                                finishTurn();
+                            }
+                        });
+                        updateUI();
+                        return; // Wait for input
+                    }
+                    effectApplied = true;
+                }
+            }
+
+            if (attackStack > 0) {
+                showFloatingText(`공격 ${attackStack}!`, "center");
+            }
+
+            if (card.rank !== '7') {
+                finishTurn();
+            }
+        }
+
+        function finishTurn() {
+            advanceTurn();
+            updateUI();
+            processTurn();
+        }
+
+        function advanceTurn() {
+            currentPlayerIndex = (currentPlayerIndex + direction + config.players) % config.players;
+        }
+
+        function processTurn() {
+            if (!isGameRunning) return;
+            let p = players[currentPlayerIndex];
+
+            // Local Multiplayer Pass Screen
+            if (config.mode === 'LOCAL') {
+                document.getElementById('pass-player-name').innerText = p.name;
+                document.getElementById('modal-pass').classList.remove('hidden');
+                // Hide hands while passing
+                updateUI(true); 
+                return;
+            }
+
+            // AI Turn
+            if (p.isAI) {
+                timeoutId = setTimeout(() => {
+                    playAI(p);
+                }, 1200);
+            }
+        }
+
+        function revealLocalTurn() {
+            document.getElementById('modal-pass').classList.add('hidden');
+            updateUI();
+        }
+
+        function playAI(player) {
+            if (!isGameRunning) return;
+
+            let playableIndices = [];
+            for (let i = 0; i < player.hand.length; i++) {
+                if (canPlayCard(player.hand[i])) {
+                    playableIndices.push(i);
+                }
+            }
+
+            if (playableIndices.length > 0) {
+                // AI Strategy: Play highest value if attacked, else play normal, save special for later if possible.
+                // Simple logic: just pick a random valid card for now.
+                let chosenIndex = playableIndices[Math.floor(Math.random() * playableIndices.length)];
+                executePlayCard(player, chosenIndex);
+            } else {
+                executeDraw(player);
+            }
+        }
+
+        function reshuffleDeck() {
+            if (discardPile.length <= 1) return;
+            let topCard = discardPile.pop();
+            deck = shuffle(discardPile);
+            discardPile = [topCard];
+        }
+
+        function endGame(winner) {
+            isGameRunning = false;
+            document.getElementById('winner-name').innerText = `${winner.name} 승리!`;
+            document.getElementById('modal-gameover').classList.remove('hidden');
+        }
+
+        // --- UI Rendering ---
+
+        function updateUI(hideAllHands = false) {
+            document.getElementById('deck-count').innerText = deck.length;
+            
+            // Discard Pile
+            let discardHTML = '';
+            // Show only top 3 cards for performance and visual stacking
+            let startIdx = Math.max(0, discardPile.length - 3);
+            for (let i = startIdx; i < discardPile.length; i++) {
+                let isTop = i === discardPile.length - 1;
+                let rotate = (i * 13) % 20 - 10; // Random slight rotation
+                let cardHtml = getCardHTML(discardPile[i]);
+                // Wrap and position
+                discardHTML += `<div style="position:absolute; top:0; left:0; transform: translate(-50%, -50%) rotate(${rotate}deg);" ${isTop ? 'class="animate-pop"' : ''}>${cardHtml}</div>`;
+            }
+            document.getElementById('discard-pile').innerHTML = discardHTML;
+
+            // Attack/Direction Info
+            document.getElementById('direction-indicator').innerText = `방향: ${direction === 1 ? '➡️ (시계)' : '⬅️ (반시계)'}`;
+            
+            let atkIndicator = document.getElementById('attack-indicator');
+            if (attackStack > 0) {
+                atkIndicator.classList.remove('hidden');
+                document.getElementById('attack-count').innerText = attackStack;
+            } else {
+                atkIndicator.classList.add('hidden');
+            }
+
+            // Current Suit Indicator (useful if Joker or 7 changes it to something different than top card appearance)
+            let suitInd = document.getElementById('current-suit-indicator');
+            let topCard = discardPile[discardPile.length-1];
+            if (topCard && (topCard.suit === 'JOKER' || topCard.rank === '7')) {
+                suitInd.innerText = `현재 문양: ${currentSuit}`;
+                suitInd.classList.remove('hidden');
+                suitInd.style.color = (currentSuit === '♥' || currentSuit === '♦') ? '#ef4444' : 'white';
+            } else {
+                suitInd.classList.add('hidden');
+            }
+
+            // Render Hands
+            // Position mapping based on player count and current viewing player
+            // In AI mode: Player 0 is bottom. Player 1 is left, 2 is top, 3 is right (if 4 players)
+            // In Local mode: Current player is bottom. Others distributed.
+            
+            let viewBaseIdx = config.mode === 'AI' ? 0 : currentPlayerIndex;
+
+            const positions = ['player-bottom', 'player-left', 'player-top', 'player-right'];
+            const infos = ['info-bottom', 'info-left', 'info-top', 'info-right'];
+            
+            // Clear containers and hide infos
+            positions.forEach(id => document.getElementById(id).innerHTML = '');
+            infos.forEach(id => {
+                let el = document.getElementById(id);
+                el.classList.add('hidden');
+                el.classList.remove('turn-indicator');
+            });
+
+            for (let i = 0; i < config.players; i++) {
+                let p = players[i];
+                // Determine layout position relative to viewBaseIdx
+                let relPos = (i - viewBaseIdx + config.players) % config.players;
+                
+                // Map relPos to UI position based on player count to keep it balanced
+                let uiPosIndex = 0;
+                if (config.players === 2) { uiPosIndex = relPos === 0 ? 0 : 2; } // Bottom, Top
+                else if (config.players === 3) { uiPosIndex = relPos === 0 ? 0 : (relPos === 1 ? 1 : 3); } // Bottom, Left, Right
+                else { uiPosIndex = relPos; } // 4 players: Bottom, Left, Top, Right
+                
+                let container = document.getElementById(positions[uiPosIndex]);
+                let info = document.getElementById(infos[uiPosIndex]);
+                
+                info.innerText = `${p.name} (${p.hand.length}장)`;
+                info.classList.remove('hidden');
+                if (i === currentPlayerIndex) info.classList.add('turn-indicator');
+
+                let isCurrentPlayerTurn = i === currentPlayerIndex;
+                let showFaceUp = !hideAllHands && (
+                    (config.mode === 'AI' && i === 0) || 
+                    (config.mode === 'LOCAL' && isCurrentPlayerTurn)
+                );
+
+                let html = '';
+                p.hand.forEach((card, hIdx) => {
+                    let isPlayable = isCurrentPlayerTurn && canPlayCard(card);
+                    html += getCardHTML(card, !showFaceUp, showFaceUp && !isPlayable, hIdx);
+                });
+                container.innerHTML = html;
+            }
+        }
+
+        // --- Utilities ---
+        
+        function getPlayerPositionInfo(playerId) {
+            let viewBaseIdx = config.mode === 'AI' ? 0 : currentPlayerIndex;
+            let relPos = (playerId - viewBaseIdx + config.players) % config.players;
+            
+            if (config.players === 2) return relPos === 0 ? 'bottom' : 'top';
+            if (config.players === 3) return relPos === 0 ? 'bottom' : (relPos === 1 ? 'left' : 'right');
+            return relPos === 0 ? 'bottom' : (relPos === 1 ? 'left' : (relPos === 2 ? 'top' : 'right'));
+        }
+
+        function showFloatingText(text, positionType) {
+            let el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            
+            document.getElementById('game-board').appendChild(el);
+            
+            // Positioning
+            let rect = document.body.getBoundingClientRect();
+            if (positionType === 'center') {
+                el.style.left = '50%'; el.style.top = '40%';
+                el.style.transform = 'translate(-50%, -50%)';
+            } else if (positionType === 'bottom') {
+                el.style.left = '50%'; el.style.bottom = '150px';
+                el.style.transform = 'translateX(-50%)';
+            } else if (positionType === 'top') {
+                el.style.left = '50%'; el.style.top = '150px';
+                el.style.transform = 'translateX(-50%)';
+            } else if (positionType === 'left') {
+                el.style.left = '150px'; el.style.top = '50%';
+                el.style.transform = 'translateY(-50%)';
+            } else if (positionType === 'right') {
+                el.style.right = '150px'; el.style.top = '50%';
+                el.style.transform = 'translateY(-50%)';
+            }
+
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 1500);
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,584 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CraftCraft 3D - 1인칭 마인크래프트 게임</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #000;
+        }
+        .pixel-font {
+            font-family: 'Press Start 2P', monospace;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 2px rgba(0,0,0,0.8);
+        }
+        #crosshair::before {
+            top: 9px;
+            left: 0;
+            width: 20px;
+            height: 2px;
+        }
+        #crosshair::after {
+            top: 0;
+            left: 9px;
+            width: 2px;
+            height: 20px;
+        }
+        .hotbar-slot {
+            background: rgba(0, 0, 0, 0.6);
+            border: 4px solid #8b8b8b;
+            box-shadow: inset -2px -2px 0px #373737, inset 2px 2px 0px #ffffff;
+            transition: all 0.1s ease;
+        }
+        .hotbar-slot.active {
+            border-color: #ffffff;
+            box-shadow: inset -2px -2px 0px #555555, inset 2px 2px 0px #ffffff, 0 0 10px rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative overflow-hidden text-white" oncontextmenu="return false;">
+
+    <!-- Crosshair -->
+    <div id="crosshair"></div>
+
+    <!-- UI Overlay: Instructions & Start Menu -->
+    <div id="startOverlay" class="absolute inset-0 bg-black/80 backdrop-blur-md z-30 flex flex-col items-center justify-center p-6 text-center">
+        <div class="max-w-md w-full bg-slate-900 border-4 border-amber-600 rounded-3xl p-8 shadow-2xl">
+            <h1 class="pixel-font text-3xl text-amber-400 mb-2 leading-relaxed">CRAFT CRAFT</h1>
+            <p class="text-slate-300 text-xs mb-6">3D 마인크래프트 스타일 샌드박스 웹게임</p>
+
+            <div class="bg-slate-800/90 p-4 rounded-xl text-left space-y-2 mb-6 border border-slate-700 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">W, A, S, D</span>
+                    <span class="text-slate-300">이동</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">마우스 이동</span>
+                    <span class="text-slate-300">시점 회전</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">마우스 좌클릭</span>
+                    <span class="text-slate-300">블록 파괴</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">마우스 우클릭</span>
+                    <span class="text-slate-300">블록 설치</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">Space</span>
+                    <span class="text-slate-300">점프</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">Shift</span>
+                    <span class="text-slate-300">달리기</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-amber-300 font-bold">숫자키 1 ~ 5</span>
+                    <span class="text-slate-300">블록 종류 선택</span>
+                </div>
+            </div>
+
+            <button id="playBtn" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 font-black text-white rounded-xl shadow-lg active:scale-95 transition-all text-lg border-b-4 border-emerald-800">
+                게임 시작하기 (화면 클릭)
+            </button>
+        </div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
+        <!-- Top Stats Info -->
+        <div class="flex justify-between items-start">
+            <div class="bg-black/60 backdrop-blur border border-white/20 p-3 rounded-xl">
+                <p class="text-xs text-amber-400 font-bold">좌표 (X, Y, Z)</p>
+                <p id="posDisplay" class="pixel-font text-xs text-white mt-1">0, 0, 0</p>
+            </div>
+            <div class="bg-black/60 backdrop-blur border border-white/20 px-4 py-2 rounded-xl text-right">
+                <p class="text-xs text-slate-300">조작 팁: <span class="text-amber-300 font-bold">ESC</span>를 누르면 마우스 커서가 해제됩니다.</p>
+            </div>
+        </div>
+
+        <!-- Bottom Hotbar -->
+        <div class="self-center flex space-x-2 bg-black/50 p-2 rounded-2xl border border-white/20 backdrop-blur">
+            <div id="slot-1" class="hotbar-slot active w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
+                <div class="w-6 h-6 rounded bg-emerald-600 border border-emerald-300"></div>
+                <span class="text-[10px] text-white font-bold mt-1">잔디 (1)</span>
+            </div>
+            <div id="slot-2" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
+                <div class="w-6 h-6 rounded bg-amber-800 border border-amber-600"></div>
+                <span class="text-[10px] text-white font-bold mt-1">흙 (2)</span>
+            </div>
+            <div id="slot-3" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
+                <div class="w-6 h-6 rounded bg-stone-500 border border-stone-300"></div>
+                <span class="text-[10px] text-white font-bold mt-1">돌 (3)</span>
+            </div>
+            <div id="slot-4" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
+                <div class="w-6 h-6 rounded bg-amber-900 border border-amber-700"></div>
+                <span class="text-[10px] text-white font-bold mt-1">나무 (4)</span>
+            </div>
+            <div id="slot-5" class="hotbar-slot w-14 h-14 rounded-xl flex flex-col items-center justify-center relative">
+                <div class="w-6 h-6 rounded bg-emerald-800 border border-emerald-500"></div>
+                <span class="text-[10px] text-white font-bold mt-1">나뭇잎 (5)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container" class="w-full h-full"></div>
+
+    <script>
+        // --- GAME CONSTANTS & BLOCK TYPES ---
+        const BLOCK_SIZE = 1;
+        const WORLD_SIZE = 24; // 24x24 Ground Area
+
+        const BLOCK_TYPES = {
+            1: { name: 'Grass', color: 0x4aa02c, topColor: 0x55ba33 },
+            2: { name: 'Dirt', color: 0x8b5a2b },
+            3: { name: 'Stone', color: 0x7d8491 },
+            4: { name: 'Wood', color: 0x5c4033 },
+            5: { name: 'Leaves', color: 0x2d6a4f, transparent: true, opacity: 0.85 }
+        };
+
+        let selectedBlockType = 1;
+
+        // --- THREE.JS SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky blue
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 12);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        sunLight.position.set(30, 50, 20);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 150;
+        const d = 30;
+        sunLight.shadow.camera.left = -d;
+        sunLight.shadow.camera.right = d;
+        sunLight.shadow.camera.top = d;
+        sunLight.shadow.camera.bottom = -d;
+        scene.add(sunLight);
+
+        // --- WORLD GENERATION & BLOCK MAP ---
+        const blocks = new Map(); // Key: "x,y,z", Value: Mesh
+
+        const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+        function getBlockKey(x, y, z) {
+            return `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+        }
+
+        function createBlockMaterial(typeId) {
+            const config = BLOCK_TYPES[typeId];
+            return new THREE.MeshStandardMaterial({
+                color: config.color,
+                roughness: 0.8,
+                metalness: 0.1,
+                transparent: config.transparent || false,
+                opacity: config.opacity || 1.0
+            });
+        }
+
+        function addBlock(x, y, z, typeId) {
+            const key = getBlockKey(x, y, z);
+            if (blocks.has(key)) return;
+
+            const mat = createBlockMaterial(typeId);
+            const mesh = new THREE.Mesh(blockGeometry, mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData = { typeId, key };
+
+            scene.add(mesh);
+            blocks.set(key, mesh);
+        }
+
+        function removeBlock(x, y, z) {
+            const key = getBlockKey(x, y, z);
+            const mesh = blocks.get(key);
+            if (mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach(m => m.dispose());
+                } else {
+                    mesh.material.dispose();
+                }
+                blocks.delete(key);
+            }
+        }
+
+        // Generate Procedural Terrain (Mountains, Trees, Grass)
+        function generateTerrain() {
+            const half = Math.floor(WORLD_SIZE / 2);
+            for (let x = -half; x < half; x++) {
+                for (let z = -half; z < half; z++) {
+                    // Simple Perlin-like height formula
+                    const height = Math.floor(Math.sin(x * 0.3) * Math.cos(z * 0.3) * 2) + 2;
+
+                    // Bedrock & Stone
+                    for (let y = 0; y < height - 1; y++) {
+                        addBlock(x, y, z, 3); // Stone
+                    }
+                    // Dirt
+                    if (height > 0) {
+                        addBlock(x, height - 1, z, 2); // Dirt
+                    }
+                    // Grass Top
+                    addBlock(x, height, z, 1); // Grass
+
+                    // Random Tree Spawning
+                    if (x > -half + 3 && x < half - 3 && z > -half + 3 && z < half - 3) {
+                        if (Math.random() < 0.02 && height >= 1) {
+                            spawnTree(x, height + 1, z);
+                        }
+                    }
+                }
+            }
+        }
+
+        function spawnTree(trunkX, startY, trunkZ) {
+            const trunkHeight = 4 + Math.floor(Math.random() * 2);
+            // Trunk
+            for (let y = 0; y < trunkHeight; y++) {
+                addBlock(trunkX, startY + y, trunkZ, 4);
+            }
+            // Leaves
+            const leafTop = startY + trunkHeight;
+            for (let lx = -2; lx <= 2; lx++) {
+                for (let lz = -2; lz <= 2; lz++) {
+                    for (let ly = -1; ly <= 1; ly++) {
+                        if (Math.abs(lx) === 2 && Math.abs(lz) === 2) continue;
+                        const bx = trunkX + lx;
+                        const by = leafTop + ly;
+                        const bz = trunkZ + lz;
+                        if (!blocks.has(getBlockKey(bx, by, bz))) {
+                            addBlock(bx, by, bz, 5);
+                        }
+                    }
+                }
+            }
+        }
+
+        generateTerrain();
+
+        // Target Outline Mesh for Raycasting
+        const outlineGeo = new THREE.BoxGeometry(1.02, 1.02, 1.02);
+        const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true });
+        const targetOutline = new THREE.Mesh(outlineGeo, outlineMat);
+        targetOutline.visible = false;
+        scene.add(targetOutline);
+
+        // --- PLAYER PHYSICS & COLLISION CONSTANTS ---
+        const GRAVITY = 32.0;           // 중력 가속도
+        const JUMP_FORCE = 10.5;         // 점프 힘
+        const PLAYER_HEIGHT = 1.6;      // 플레이어 키 (눈높이 기준)
+        const PLAYER_RADIUS = 0.3;      // 플레이어 충돌 반경
+
+        let isLocked = false;
+        let isGrounded = false;          // 땅에 닿아있는지 여부
+        let isSprinting = false;
+
+        const moveState = { forward: false, backward: false, left: false, right: false, jump: false };
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        // Pointer Lock Setup
+        const startOverlay = document.getElementById('startOverlay');
+        const playBtn = document.getElementById('playBtn');
+
+        playBtn.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement === document.body) {
+                isLocked = true;
+                startOverlay.classList.add('hidden');
+            } else {
+                isLocked = false;
+                startOverlay.classList.remove('hidden');
+            }
+        });
+
+        // Camera Look Rotation Logic
+        let pitch = 0; // Vertical angle
+        let yaw = 0;   // Horizontal angle
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isLocked) return;
+
+            const sensitivity = 0.0025;
+            yaw -= e.movementX * sensitivity;
+            pitch -= e.movementY * sensitivity;
+
+            // Clamp pitch to avoid flipping
+            pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+
+            // Update camera orientation
+            const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+            euler.x = pitch;
+            euler.y = yaw;
+            camera.quaternion.setFromEuler(euler);
+        });
+
+        // Keyboard Controls
+        window.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveState.forward = true; break;
+                case 'KeyS': moveState.backward = true; break;
+                case 'KeyA': moveState.left = true; break;
+                case 'KeyD': moveState.right = true; break;
+                case 'Space': 
+                    if (isGrounded) {
+                        velocity.y = JUMP_FORCE;
+                        isGrounded = false;
+                    }
+                    moveState.jump = true;
+                    break;
+                case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
+                case 'Digit1': selectHotbarSlot(1); break;
+                case 'Digit2': selectHotbarSlot(2); break;
+                case 'Digit3': selectHotbarSlot(3); break;
+                case 'Digit4': selectHotbarSlot(4); break;
+                case 'Digit5': selectHotbarSlot(5); break;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'KeyW': moveState.forward = false; break;
+                case 'KeyS': moveState.backward = false; break;
+                case 'KeyA': moveState.left = false; break;
+                case 'KeyD': moveState.right = false; break;
+                case 'Space': moveState.jump = false; break;
+                case 'ShiftLeft': case 'ShiftRight': isSprinting = false; break;
+            }
+        });
+
+        function selectHotbarSlot(slotNum) {
+            selectedBlockType = slotNum;
+            document.querySelectorAll('.hotbar-slot').forEach(el => el.classList.remove('active'));
+            document.getElementById(`slot-${slotNum}`).classList.add('active');
+        }
+
+        // --- AABB COLLISION DETECTION & RESOLUTION ---
+        function checkCollisionAt(pos) {
+            // 플레이어 bounding box 검사
+            const minX = Math.floor(pos.x - PLAYER_RADIUS);
+            const maxX = Math.ceil(pos.x + PLAYER_RADIUS);
+            const minY = Math.floor(pos.y - PLAYER_HEIGHT);
+            const maxY = Math.ceil(pos.y);
+            const minZ = Math.floor(pos.z - PLAYER_RADIUS);
+            const maxZ = Math.ceil(pos.z + PLAYER_RADIUS);
+
+            for (let x = minX; x < maxX; x++) {
+                for (let y = minY; y < maxY; y++) {
+                    for (let z = minZ; z < maxZ; z++) {
+                        const key = getBlockKey(x, y, z);
+                        if (blocks.has(key)) {
+                            // 단순 박스 충돌 연산
+                            const bx = x, by = y, bz = z;
+                            if (pos.x + PLAYER_RADIUS > bx - 0.5 && pos.x - PLAYER_RADIUS < bx + 0.5 &&
+                                pos.y > by - 0.5 && pos.y - PLAYER_HEIGHT < by + 0.5 &&
+                                pos.z + PLAYER_RADIUS > bz - 0.5 && pos.z - PLAYER_RADIUS < bz + 0.5) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // --- RAYCASTING FOR BLOCK BREAK / PLACE ---
+        const raycaster = new THREE.Raycaster();
+        let currentTarget = null; // Stores target block and face normal
+
+        function updateRaycast() {
+            if (!isLocked) {
+                targetOutline.visible = false;
+                return;
+            }
+
+            raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+            const blockMeshes = Array.from(blocks.values());
+            const intersects = raycaster.intersectObjects(blockMeshes);
+
+            if (intersects.length > 0 && intersects[0].distance <= 6) {
+                const hit = intersects[0];
+                targetOutline.position.copy(hit.object.position);
+                targetOutline.visible = true;
+
+                currentTarget = {
+                    mesh: hit.object,
+                    point: hit.point,
+                    normal: hit.face.normal,
+                    pos: hit.object.position.clone()
+                };
+            } else {
+                targetOutline.visible = false;
+                currentTarget = null;
+            }
+        }
+
+        // Mouse Click Block Actions
+        window.addEventListener('mousedown', (e) => {
+            if (!isLocked || !currentTarget) return;
+
+            if (e.button === 0) { // Left Click: Break Block
+                removeBlock(currentTarget.pos.x, currentTarget.pos.y, currentTarget.pos.z);
+            } else if (e.button === 2) { // Right Click: Place Block
+                const placePos = currentTarget.pos.clone().add(currentTarget.normal);
+                
+                // 플레이어 신체와 겹치는지 체크 후 설치
+                const playerFeetY = camera.position.y - PLAYER_HEIGHT;
+                const distXZ = Math.hypot(camera.position.x - placePos.x, camera.position.z - placePos.z);
+                const overlapY = (placePos.y + 0.5 > playerFeetY) && (placePos.y - 0.5 < camera.position.y);
+
+                if (!(distXZ < 0.7 && overlapY)) {
+                    addBlock(placePos.x, placePos.y, placePos.z, selectedBlockType);
+                }
+            }
+        });
+
+        // --- GAME LOOP WITH PHYSICS ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            if (isLocked) {
+                // 1. 중력 적용
+                velocity.y -= GRAVITY * delta;
+
+                // 2. 수평 수직 이동 속도 계산
+                const moveSpeed = isSprinting ? 8.0 : 5.0;
+
+                // 입력 방향 벡터 구하기
+                direction.z = Number(moveState.forward) - Number(moveState.backward);
+                direction.x = Number(moveState.right) - Number(moveState.left);
+                direction.normalize();
+
+                // 카메라 회전 기준 이동 방향 계산
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                forward.y = 0;
+                forward.normalize();
+
+                const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+                right.y = 0;
+                right.normalize();
+
+                const moveVector = new THREE.Vector3();
+                if (moveState.forward || moveState.backward) moveVector.addScaledVector(forward, direction.z);
+                if (moveState.left || moveState.right) moveVector.addScaledVector(right, direction.x);
+                if (moveVector.lengthSq() > 0) moveVector.normalize();
+
+                // 3. 축별 축분리 충돌 처리 (X -> Z -> Y 순서)
+                
+                // X 축 이동 및 충돌
+                camera.position.x += moveVector.x * moveSpeed * delta;
+                if (checkCollisionAt(camera.position)) {
+                    camera.position.x -= moveVector.x * moveSpeed * delta;
+                }
+
+                // Z 축 이동 및 충돌
+                camera.position.z += moveVector.z * moveSpeed * delta;
+                if (checkCollisionAt(camera.position)) {
+                    camera.position.z -= moveVector.z * moveSpeed * delta;
+                }
+
+                // Y 축(높이) 이동 및 충돌 (중력/점프 적용)
+                camera.position.y += velocity.y * delta;
+                if (checkCollisionAt(camera.position)) {
+                    // 아래로 떨어지는 중 바닥과 충돌한 경우
+                    if (velocity.y < 0) {
+                        camera.position.y -= velocity.y * delta;
+                        velocity.y = 0;
+                        isGrounded = true;
+                    } 
+                    // 위로 점프 중 천장과 충돌한 경우
+                    else if (velocity.y > 0) {
+                        camera.position.y -= velocity.y * delta;
+                        velocity.y = 0;
+                    }
+                } else {
+                    isGrounded = false;
+                }
+
+                // 공허(낙사) 방지 처리
+                if (camera.position.y < -30) {
+                    camera.position.set(0, 10, 0);
+                    velocity.set(0, 0, 0);
+                }
+
+                // HUD Position Update
+                const p = camera.position;
+                document.getElementById('posDisplay').textContent = `${Math.round(p.x)}, ${Math.round(p.y - PLAYER_HEIGHT)}, ${Math.round(p.z)}`;
+
+                updateRaycast();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Responsive Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start Loop
+        animate();
+    </script>
+</body>
+</html>

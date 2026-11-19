@@ -1,1057 +1,1133 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 건 슈팅 서바이벌</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D 네온 러너 (3D Neon Runner)</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js (3D 렌더링) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Tone.js (효과음 생성) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #090d16;
             user-select: none;
-            background-color: #7dd3fc;
+            -webkit-touch-callout: none;
+            touch-action: none;
         }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            pointer-events: none;
-            z-index: 20;
+
+        .font-cyber {
+            font-family: 'Orbitron', sans-serif;
         }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background-color: rgba(15, 23, 42, 0.9);
+
+        #game-container {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
         }
-        #crosshair::before {
-            top: 9px;
-            left: 0;
-            width: 20px;
-            height: 2px;
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
         }
-        #crosshair::after {
-            top: 0;
-            left: 9px;
-            width: 2px;
-            height: 20px;
+
+        /* 네온 글로우 버튼 효과 */
+        .neon-btn {
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.5), 0 6px 0 #1d4ed8;
+            transition: all 0.15s ease;
         }
-        .crosshair-recoil {
-            transform: translate(-50%, -50%) scale(1.4) !important;
-            transition: transform 0.05s ease-out;
+        .neon-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.4), 0 2px 0 #1d4ed8;
         }
-        .damage-flash {
-            animation: flash 0.3s ease-out;
-        }
-        @keyframes flash {
-            0% { background-color: rgba(239, 68, 68, 0.5); }
-            100% { background-color: rgba(239, 68, 68, 0); }
+
+        .key-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            border-radius: 6px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #38bdf8;
+            box-shadow: 0 2px 0 rgba(56, 189, 248, 0.3);
         }
     </style>
 </head>
-<body class="w-screen h-screen relative bg-sky-300 overflow-hidden">
+<body>
 
-    <!-- Damage Screen Overlay -->
-    <div id="damageOverlay" class="absolute inset-0 pointer-events-none z-10 transition-colors duration-100"></div>
+    <!-- 3D 캔버스 컨테이너 -->
+    <div id="game-container"></div>
 
-    <!-- HUD Overlay -->
-    <div id="hud" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-6 hidden">
-        <!-- Top Info -->
-        <div class="flex justify-between items-start">
-            <!-- Health & Armor Bar -->
-            <div class="bg-slate-900/80 backdrop-blur border border-slate-700/60 p-4 rounded-2xl w-64 shadow-2xl">
-                <div class="flex justify-between items-center mb-1.5">
-                    <span class="text-xs font-black tracking-wider text-slate-300">HEALTH</span>
-                    <span id="healthText" class="text-sm font-bold text-emerald-400">100 / 100</span>
-                </div>
-                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5 border border-slate-700">
-                    <div id="healthBar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-200" style="width: 100%;"></div>
-                </div>
-            </div>
-
-            <!-- Radar / Minimap Overlay -->
-            <div class="bg-slate-900/80 backdrop-blur border border-slate-700/60 p-2 rounded-2xl shadow-2xl flex flex-col items-center">
-                <div class="text-[9px] font-extrabold text-amber-400 mb-1 tracking-wider">RADAR</div>
-                <canvas id="radarCanvas" width="100" height="100" class="rounded-xl bg-slate-950 border border-slate-800"></canvas>
-            </div>
-
-            <!-- Wave & Score -->
-            <div class="flex gap-4">
-                <div class="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-5 py-3 rounded-2xl text-center shadow-2xl">
-                    <div class="text-[10px] font-extrabold text-amber-400 tracking-wider">WAVE</div>
-                    <div id="waveText" class="text-2xl font-black text-white">1</div>
-                </div>
-                <div class="bg-slate-900/80 backdrop-blur border border-slate-700/60 px-5 py-3 rounded-2xl text-center shadow-2xl">
-                    <div class="text-[10px] font-extrabold text-orange-400 tracking-wider">SCORE</div>
-                    <div id="scoreText" class="text-2xl font-black text-white">0</div>
-                </div>
+    <!-- 상단 HUD (점수, 속도, 최고기록, 사운드) -->
+    <div class="fixed top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-start pointer-events-none z-20">
+        <!-- 점수 및 속도 -->
+        <div class="bg-slate-900/75 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-3 sm:p-4 text-white shadow-lg">
+            <div class="text-xs text-cyan-400 font-bold tracking-wider">DISTANCE / SCORE</div>
+            <div id="score-display" class="font-cyber text-2xl sm:text-4xl font-black text-white tracking-wider">0</div>
+            <div class="flex items-center gap-3 mt-1 text-xs text-slate-300">
+                <span>속도: <strong id="speed-display" class="font-cyber text-amber-400">1.0x</strong></span>
+                <span>최고: <strong id="high-score-display" class="font-cyber text-emerald-400">0</strong></span>
             </div>
         </div>
 
-        <!-- Center Crosshair -->
-        <div id="crosshair"></div>
-
-        <!-- Bottom Ammo & Reload Warning -->
-        <div class="flex justify-between items-end">
-            <div id="reloadMsg" class="hidden text-amber-300 font-extrabold text-lg animate-bounce bg-slate-900/90 px-4 py-2 rounded-xl border border-amber-500/50 shadow-lg">
-                ⚠️ [R] 키를 눌러 재장전하세요!
-            </div>
-            
-            <div class="bg-slate-900/80 backdrop-blur border border-slate-700/60 p-4 rounded-2xl shadow-2xl ml-auto flex items-center gap-4">
-                <i class="fa-solid fa-gun text-2xl text-amber-400"></i>
-                <div>
-                    <div class="text-[10px] font-extrabold text-slate-300 tracking-wider">AMMO</div>
-                    <div class="text-3xl font-black text-white font-mono">
-                        <span id="ammoCurrent" class="text-amber-400">30</span>
-                        <span class="text-slate-500 text-xl">/</span>
-                        <span id="ammoMax" class="text-slate-400 text-lg">30</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Start / Game Over Screen Overlay -->
-    <div id="menuOverlay" class="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center">
-        <div class="max-w-md w-full bg-slate-900/90 border border-slate-700 p-8 rounded-3xl shadow-2xl">
-            <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl border border-amber-500/30">
-                <i class="fa-solid fa-city"></i>
-            </div>
-            <h1 id="menuTitle" class="text-3xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-amber-500">
-                폐허 도시: 건 서바이벌
-            </h1>
-            <p id="menuSub" class="text-xs text-slate-300 mb-6">밝은 햇살 아래 황량한 폐허 도시에서 밀려오는 적들을 격퇴하세요!</p>
-
-            <div id="finalStats" class="hidden my-4 p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-left">
-                <div class="flex justify-between text-sm py-1 border-b border-slate-800">
-                    <span class="text-slate-400">최종 스코어:</span>
-                    <span id="finalScore" class="font-bold text-amber-400">0</span>
-                </div>
-                <div class="flex justify-between text-sm py-1">
-                    <span class="text-slate-400">버틴 웨이브:</span>
-                    <span id="finalWave" class="font-bold text-orange-400">1</span>
-                </div>
-            </div>
-
-            <!-- Control Guide -->
-            <div class="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 mb-6 text-left text-xs space-y-2 text-slate-300">
-                <div class="font-bold text-amber-400 mb-1">조작 방법</div>
-                <div class="flex justify-between"><span>이동:</span> <span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">W A S D</span></div>
-                <div class="flex justify-between"><span>시점 조작:</span> <span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">마우스 이동</span></div>
-                <div class="flex justify-between"><span>사격:</span> <span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">마우스 좌클릭</span></div>
-                <div class="flex justify-between"><span>재장전:</span> <span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">R</span></div>
-            </div>
-
-            <button id="startBtn" onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold text-lg rounded-2xl shadow-lg shadow-orange-500/30 transition-all duration-150 active:scale-95">
-                게임 시작 (클릭)
+        <!-- 우측 컨트롤 (사운드 & 카메라 리셋) -->
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="camera-reset-btn" title="카메라 시점 초기화" class="p-3 rounded-xl bg-slate-900/75 backdrop-blur-md border border-slate-700 hover:border-cyan-400 text-slate-200 transition shadow-lg text-xs font-bold">
+                🎥 시점 초기화
+            </button>
+            <button id="sound-btn" aria-label="소리 토글" class="p-3 rounded-xl bg-slate-900/75 backdrop-blur-md border border-slate-700 hover:border-cyan-400 text-slate-200 transition shadow-lg">
+                🔊
             </button>
         </div>
     </div>
 
-    <!-- Web Audio API Synthesizer -->
+    <!-- 보스 습격 경고 배너 (5,000점 배수마다 표시) -->
+    <div id="boss-warning" class="hidden fixed top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center w-full max-w-md px-4">
+        <div class="bg-rose-950/90 border-2 border-rose-500 text-rose-100 px-5 py-2.5 rounded-2xl shadow-[0_0_25px_rgba(244,63,94,0.8)] animate-pulse">
+            <div class="font-cyber text-sm sm:text-base font-black tracking-widest text-rose-400">⚠️ WARNING: BOSS ATTACK ⚠️</div>
+            <div id="boss-subtext" class="text-xs sm:text-sm font-bold mt-0.5">악당이 에너지탄을 발사합니다! 피하세요!</div>
+        </div>
+    </div>
+
+    <!-- 시작 / 게임오버 오버레이 모달 -->
+    <div id="overlay-screen" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 z-30">
+        <div class="max-w-md w-full bg-slate-900/90 border border-cyan-500/40 rounded-3xl p-6 sm:p-8 text-center shadow-2xl">
+            <div id="overlay-badge" class="inline-block px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold mb-3 border border-cyan-500/30">
+                3D ENDLESS RUNNER
+            </div>
+            <h1 id="overlay-title" class="font-cyber text-3xl sm:text-4xl font-black text-white mb-2 tracking-wide">
+                NEON RUNNER
+            </h1>
+            <p id="overlay-subtitle" class="text-slate-300 text-sm mb-6">
+                점점 빨라지는 도로 위에서 장애물을 피하세요!
+            </p>
+
+            <!-- 게임 오버 시 최종 점수 표시 영역 -->
+            <div id="final-stats" class="hidden bg-slate-950/80 border border-slate-800 rounded-2xl p-4 mb-6">
+                <div class="text-xs text-slate-400">최종 기록</div>
+                <div id="final-score" class="font-cyber text-3xl font-black text-cyan-400 my-1">0</div>
+                <div id="new-record-badge" class="hidden text-xs font-bold text-amber-400 animate-bounce mt-1">
+                    🎉 신기록 달성! 🎉
+                </div>
+            </div>
+
+            <!-- 조작법 안내 -->
+            <div class="bg-slate-950/60 rounded-2xl p-4 mb-6 border border-slate-800/80 text-left">
+                <div class="text-xs font-bold text-slate-400 mb-3 text-center">조작 방법 (키보드 / 모바일 스와이프)</div>
+                <div class="grid grid-cols-2 gap-2.5 text-xs sm:text-sm text-slate-200">
+                    <div class="flex items-center gap-2">
+                        <span class="key-badge">W</span> <span>점프 (블록 넘기)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="key-badge">S</span> <span>슬라이딩 (높은 바 통과)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="key-badge">A</span> <span>왼쪽 레인 이동</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="key-badge">D</span> <span>오른쪽 레인 이동</span>
+                    </div>
+                </div>
+                <div class="mt-2.5 pt-2 border-t border-slate-800/80 text-xs text-rose-400 font-bold text-center">
+                    👾 5,000점마다 악당이 등장해 에너지탄 공격을 합니다!
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400 text-center">
+                    💡 마우스를 드래그하면 카메라 각도를 조절할 수 있습니다.
+                </div>
+            </div>
+
+            <button id="start-btn" class="w-full py-4 rounded-2xl font-extrabold text-lg sm:text-xl text-white neon-btn cursor-pointer">
+                게임 시작 (START)
+            </button>
+        </div>
+    </div>
+
+    <!-- 모바일 터치 컨트롤 패드 (작은 화면에서 직관적 조작 보조) -->
+    <div class="fixed bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none z-20 sm:hidden">
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-left" class="w-14 h-14 rounded-2xl bg-slate-900/80 border border-cyan-500/40 text-white font-cyber text-xl font-bold active:bg-cyan-600">A</button>
+            <button id="btn-right" class="w-14 h-14 rounded-2xl bg-slate-900/80 border border-cyan-500/40 text-white font-cyber text-xl font-bold active:bg-cyan-600">D</button>
+        </div>
+        <div class="flex gap-2 pointer-events-auto">
+            <button id="btn-slide" class="w-14 h-14 rounded-2xl bg-slate-900/80 border border-amber-500/40 text-white font-cyber text-xl font-bold active:bg-amber-600">S</button>
+            <button id="btn-jump" class="w-14 h-14 rounded-2xl bg-slate-900/80 border border-emerald-500/40 text-white font-cyber text-xl font-bold active:bg-emerald-600">W</button>
+        </div>
+    </div>
+
     <script>
-        class SoundSystem {
-            constructor() {
-                this.ctx = null;
-            }
+        /**
+         * 3D 네온 무한 러너 게임 (Three.js + Tone.js)
+         * - 3개 레인(-2.5, 0, +2.5) 기반 이동
+         * - W: 점프, A: 왼쪽, S: 슬라이딩, D: 오른쪽
+         * - 장애물 종류: 낮은 블록(점프 회피), 높은 바리케이드(슬라이딩 회피), 자동차(레인 이동/점프 회피), 대형 트럭(레인 이동 회피)
+         */
 
-            init() {
-                if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-            }
+        // --- 게임 설정 상수 ---
+        const LANES = [-2.6, 0, 2.6]; // 3개 차선 X 좌표
+        const BASE_SPEED = 24;        // 초기 전진 속도
+        const MAX_SPEED = 68;         // 최대 속도 제한
+        const SPEED_ACCEL = 0.65;     // 초당 가속도
+        const GRAVITY = -58;          // 중력 가속도
+        const JUMP_VELOCITY = 21;     // 점프 초기 속도
+        const SLIDE_DURATION = 0.65;  // 슬라이딩 지속 시간(초)
 
-            playShoot() {
-                this.init();
-                const now = this.ctx.currentTime;
-                
-                // Gunshot Noise
-                const bufferSize = this.ctx.sampleRate * 0.12;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = buffer;
-
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(4000, now);
-                filter.frequency.exponentialRampToValueAtTime(150, now + 0.12);
-
-                const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.5, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-
-                noise.start(now);
-            }
-
-            playEnemyShoot() {
-                this.init();
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(300, now);
-                osc.frequency.exponentialRampToValueAtTime(80, now + 0.1);
-
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            }
-
-            playHit() {
-                this.init();
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(200, now);
-                osc.frequency.exponentialRampToValueAtTime(50, now + 0.08);
-
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.08);
-            }
-
-            playKill() {
-                this.init();
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, now);
-                osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.15);
-            }
-
-            playReload() {
-                this.init();
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400, now);
-                osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
-
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.15);
-            }
-
-            playPlayerHit() {
-                this.init();
-                const now = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(120, now);
-                osc.frequency.linearRampToValueAtTime(30, now + 0.25);
-
-                gain.gain.setValueAtTime(0.6, now);
-                gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(now);
-                osc.stop(now + 0.25);
-            }
-        }
-
-        const audio = new SoundSystem();
-    </script>
-
-    <!-- Game Logic -->
-    <script>
-        let scene, camera, renderer;
-        let player = {
-            hp: 100,
-            maxHp: 100,
-            speed: 0.14,
-            ammo: 30,
-            maxAmmo: 30,
-            isReloading: false
-        };
-
-        let keys = {};
-        let mouseSensitivity = 0.002;
-        let pitch = 0, yaw = 0;
-        let isGameRunning = false;
-
-        let bullets = [];
-        let enemyBullets = [];
-        let enemies = [];
-        let particles = [];
-
-        let wave = 1;
+        // --- 게임 상태 변수 ---
+        let isPlaying = false;
+        let currentLane = 1;          // 0: 왼쪽, 1: 중앙, 2: 오른쪽
+        let targetX = LANES[1];
+        let speed = BASE_SPEED;
         let score = 0;
-        let enemiesToSpawn = 5;
-        let spawnInterval = null;
+        let highScore = parseInt(localStorage.getItem('neonRunner3DHighScore') || '0', 10);
+        let soundEnabled = true;
 
-        let gunMesh, muzzleFlashMesh;
+        // 플레이어 물리 상태
+        let playerY = 0;
+        let velocityY = 0;
+        let isJumping = false;
+        let isSliding = false;
+        let slideTimer = 0;
+        let runCycle = 0;
 
-        // Initialize Three.js Scene
-        function init3D() {
-            scene = new THREE.Scene();
-            // Bright Day Ruined City Skybox Color & Fog
-            scene.background = new THREE.Color(0xbfe3f7);
-            scene.fog = new THREE.FogExp2(0xcbe5f5, 0.012);
+        // 카메라 회전 오프셋 (마우스 드래그 제어)
+        let camYaw = 0;
+        let camPitch = 0;
+        let isDraggingCamera = false;
+        let prevMouseX = 0;
+        let prevMouseY = 0;
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 1.6, 0);
+        // --- DOM 요소 ---
+        const container = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score-display');
+        const speedDisplay = document.getElementById('speed-display');
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const overlayScreen = document.getElementById('overlay-screen');
+        const overlayBadge = document.getElementById('overlay-badge');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlaySubtitle = document.getElementById('overlay-subtitle');
+        const finalStats = document.getElementById('final-stats');
+        const finalScore = document.getElementById('final-score');
+        const newRecordBadge = document.getElementById('new-record-badge');
+        const startBtn = document.getElementById('start-btn');
+        const soundBtn = document.getElementById('sound-btn');
+        const cameraResetBtn = document.getElementById('camera-reset-btn');
+        const bossWarning = document.getElementById('boss-warning');
+        const bossSubtext = document.getElementById('boss-subtext');
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.body.appendChild(renderer.domElement);
+        highScoreDisplay.textContent = highScore;
 
-            // Bright Sunlight & Ambient Lighting
-            const ambientLight = new THREE.AmbientLight(0xfff5ea, 0.85);
-            scene.add(ambientLight);
-
-            const sunLight = new THREE.DirectionalLight(0xfffaed, 1.4);
-            sunLight.position.set(40, 70, 30);
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 2048;
-            sunLight.shadow.mapSize.height = 2048;
-            sunLight.shadow.camera.near = 0.5;
-            sunLight.shadow.camera.far = 180;
-            sunLight.shadow.camera.left = -60;
-            sunLight.shadow.camera.right = 60;
-            sunLight.shadow.camera.top = 60;
-            sunLight.shadow.camera.bottom = -60;
-            scene.add(sunLight);
-
-            // Subtle Sky Fill Light
-            const fillLight = new THREE.DirectionalLight(0x90c2e7, 0.4);
-            fillLight.position.set(-30, 20, -30);
-            scene.add(fillLight);
-
-            // Ruined Asphalt Ground
-            const floorGeo = new THREE.PlaneGeometry(140, 140);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x5a5f66, roughness: 0.95, metalness: 0.05 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            // Broken Road Markings & Ground Patches
-            createGroundDetails();
-
-            // Ruined City Buildings & Environment Debris
-            createRuinedCity();
-
-            // Create High-Quality Gun
-            createGun();
-
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function createGroundDetails() {
-            // Cracked Asphalt & Dirt Patches
-            const patchMat = new THREE.MeshStandardMaterial({ color: 0x3d3732, roughness: 1.0 });
-            for (let i = 0; i < 15; i++) {
-                const patchGeo = new THREE.PlaneGeometry(6 + Math.random() * 8, 6 + Math.random() * 8);
-                const patch = new THREE.Mesh(patchGeo, patchMat);
-                patch.rotation.x = -Math.PI / 2;
-                patch.position.set((Math.random() - 0.5) * 100, 0.01, (Math.random() - 0.5) * 100);
-                patch.rotation.z = Math.random() * Math.PI;
-                patch.receiveShadow = true;
-                scene.add(patch);
+        // --- 사운드 시스템 (Tone.js) ---
+        let synth = null;
+        function initSound() {
+            if (!synth && typeof Tone !== 'undefined') {
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.2 }
+                }).toDestination();
+                synth.volume.value = -8;
+            }
+            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                Tone.start();
             }
         }
 
-        function createRuinedCity() {
-            // Concrete Wall & Pillar Materials for Ruined Buildings
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x8c8f94, roughness: 0.9, metalness: 0.1 });
-            const rustMat = new THREE.MeshStandardMaterial({ color: 0x7c3f2d, roughness: 0.8, metalness: 0.5 });
-            const darkConcreteMat = new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.9 });
-            const glassMat = new THREE.MeshStandardMaterial({ color: 0x78909c, transparent: true, opacity: 0.4, roughness: 0.2 });
-
-            // Building Layout Specs
-            const buildings = [
-                { x: -22, z: -22, w: 12, h: 22, d: 12 },
-                { x: 22, z: -22, w: 14, h: 28, d: 10 },
-                { x: -25, z: 20, w: 10, h: 18, d: 14 },
-                { x: 24, z: 22, w: 12, h: 24, d: 12 },
-                { x: 0, z: -32, w: 20, h: 16, d: 10 },
-                { x: -35, z: 0, w: 10, h: 20, d: 20 },
-                { x: 35, z: 0, w: 10, h: 26, d: 18 }
-            ];
-
-            buildings.forEach(b => {
-                const group = new THREE.Group();
-
-                // Main Building Shell
-                const mainGeo = new THREE.BoxGeometry(b.w, b.h, b.d);
-                const building = new THREE.Mesh(mainGeo, wallMat);
-                building.position.set(0, b.h / 2, 0);
-                building.castShadow = true;
-                building.receiveShadow = true;
-                group.add(building);
-
-                // Broken Upper Section (Ruined Gap)
-                const ruinGeo = new THREE.BoxGeometry(b.w * 0.7, b.h * 0.3, b.d * 0.7);
-                const ruinCut = new THREE.Mesh(ruinGeo, darkConcreteMat);
-                ruinCut.position.set((Math.random() - 0.5) * 2, b.h * 0.8, (Math.random() - 0.5) * 2);
-                ruinCut.rotation.y = Math.random() * 0.5;
-                ruinCut.castShadow = true;
-                group.add(ruinCut);
-
-                // Ruined Window Grids
-                const winCount = Math.floor(b.h / 4);
-                for (let level = 1; level < winCount; level++) {
-                    if (Math.random() > 0.3) {
-                        const winGeo = new THREE.BoxGeometry(b.w + 0.1, 1.8, b.d - 2);
-                        const win = new THREE.Mesh(winGeo, glassMat);
-                        win.position.set(0, level * 3.8, 0);
-                        group.add(win);
-                    }
+        function playSfx(type) {
+            if (!soundEnabled) return;
+            try {
+                initSound();
+                if (!synth) return;
+                const now = Tone.now();
+                if (type === 'move') {
+                    synth.triggerAttackRelease('G4', '32n', now);
+                } else if (type === 'jump') {
+                    synth.triggerAttackRelease('C5', '16n', now);
+                    synth.triggerAttackRelease('G5', '16n', now + 0.05);
+                } else if (type === 'slide') {
+                    synth.triggerAttackRelease('D4', '16n', now);
+                    synth.triggerAttackRelease('A3', '16n', now + 0.05);
+                } else if (type === 'crash') {
+                    synth.triggerAttackRelease(['C3', 'C#3', 'G2'], '4n', now);
+                } else if (type === 'start') {
+                    synth.triggerAttackRelease(['C5', 'E5', 'G5'], '16n', now);
+                } else if (type === 'boss_warn') {
+                    synth.triggerAttackRelease(['A4', 'Eb5'], '8n', now);
+                    synth.triggerAttackRelease(['A4', 'Eb5'], '8n', now + 0.18);
+                } else if (type === 'boss_shoot') {
+                    synth.triggerAttackRelease('F5', '32n', now);
+                    synth.triggerAttackRelease('C4', '16n', now + 0.03);
                 }
+            } catch (e) {
+                // 오디오 오류 무시
+            }
+        }
 
-                // Exposed Steel Beams
-                for (let i = 0; i < 3; i++) {
-                    const beamGeo = new THREE.BoxGeometry(0.3, 3 + Math.random() * 3, 0.3);
-                    const beam = new THREE.Mesh(beamGeo, rustMat);
-                    beam.position.set((Math.random() - 0.5) * b.w, b.h + 1, (Math.random() - 0.5) * b.d);
-                    beam.rotation.set(Math.random() * 0.4, Math.random() * 0.4, Math.random() * 0.4);
-                    group.add(beam);
-                }
+        soundBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundBtn.textContent = soundEnabled ? '🔊' : '🔇';
+        });
 
-                group.position.set(b.x, 0, b.z);
-                scene.add(group);
+        // --- Three.js 씬, 카메라, 렌더러 설정 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x090d16);
+        scene.fog = new THREE.FogExp2(0x090d16, 0.013); // 원거리 안개 효과
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 150);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- 조명 설정 ---
+        const ambientLight = new THREE.AmbientLight(0x88aaff, 0.75);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+        dirLight.position.set(12, 25, 15);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 80;
+        const d = 18;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        // --- 도로 및 배경 환경 구축 ---
+        const roadGroup = new THREE.Group();
+        scene.add(roadGroup);
+
+        // 아스팔트 도로 바닥
+        const roadGeo = new THREE.PlaneGeometry(10, 240);
+        const roadMat = new THREE.MeshStandardMaterial({
+            color: 0x131b2e,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+        roadMesh.rotation.x = -Math.PI / 2;
+        roadMesh.position.z = -90;
+        roadMesh.receiveShadow = true;
+        roadGroup.add(roadMesh);
+
+        // 도로 양쪽 네온 가드레일
+        const railGeo = new THREE.BoxGeometry(0.3, 0.6, 240);
+        const railMat = new THREE.MeshStandardMaterial({
+            color: 0x06b6d4,
+            emissive: 0x06b6d4,
+            emissiveIntensity: 0.7
+        });
+        const leftRail = new THREE.Mesh(railGeo, railMat);
+        leftRail.position.set(-4.8, 0.3, -90);
+        roadGroup.add(leftRail);
+
+        const rightRail = new THREE.Mesh(railGeo, railMat);
+        rightRail.position.set(4.8, 0.3, -90);
+        roadGroup.add(rightRail);
+
+        // 움직이는 차선 점선 및 도로 옆 기둥 풀(Pool)
+        const roadLines = [];
+        const sidePillars = [];
+        const lineGeo = new THREE.PlaneGeometry(0.16, 3.2);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+        const pillarGeo = new THREE.BoxGeometry(0.5, 4.5, 0.5);
+        const pillarMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            emissive: 0x3b82f6,
+            emissiveIntensity: 0.25
+        });
+
+        for (let i = 0; i < 20; i++) {
+            const zPos = 15 - i * 10;
+            // 왼쪽/오른쪽 차선 구분선
+            [-1.3, 1.3].forEach(xPos => {
+                const line = new THREE.Mesh(lineGeo, lineMat);
+                line.rotation.x = -Math.PI / 2;
+                line.position.set(xPos, 0.02, zPos);
+                scene.add(line);
+                roadLines.push(line);
             });
 
-            // Urban Debris: Destroyed Cars, Concrete Blocks & Barriers
-            createDebris(wallMat, rustMat, darkConcreteMat);
-        }
-
-        function createDebris(wallMat, rustMat, darkMat) {
-            const positions = [
-                [-8, 0, -10], [10, 0, -8], [-12, 0, 8], [8, 0, 12],
-                [0, 0, -15], [-15, 0, -2], [15, 0, 2], [0, 0, 16]
-            ];
-
-            positions.forEach((pos, idx) => {
-                if (idx % 2 === 0) {
-                    // Wrecked Vehicle Shell
-                    const carGroup = new THREE.Group();
-                    const carBodyGeo = new THREE.BoxGeometry(2.4, 1.2, 4.2);
-                    const carBody = new THREE.Mesh(carBodyGeo, rustMat);
-                    carBody.position.y = 0.6;
-                    carBody.castShadow = true;
-                    carGroup.add(carBody);
-
-                    const cabinGeo = new THREE.BoxGeometry(2.0, 0.9, 2.2);
-                    const cabin = new THREE.Mesh(cabinGeo, darkMat);
-                    cabin.position.set(0, 1.5, -0.3);
-                    cabin.rotation.z = (Math.random() - 0.5) * 0.15;
-                    cabin.castShadow = true;
-                    carGroup.add(cabin);
-
-                    carGroup.position.set(pos[0], 0, pos[2]);
-                    carGroup.rotation.y = Math.random() * Math.PI;
-                    scene.add(carGroup);
-                } else {
-                    // Concrete Barrier & Rubble Pile
-                    const barrierGeo = new THREE.BoxGeometry(3.5, 1.4, 1.2);
-                    const barrier = new THREE.Mesh(barrierGeo, wallMat);
-                    barrier.position.set(pos[0], 0.7, pos[2]);
-                    barrier.rotation.y = Math.random() * Math.PI;
-                    barrier.castShadow = true;
-                    barrier.receiveShadow = true;
-                    scene.add(barrier);
-
-                    // Scattered Rubble Blocks
-                    for (let r = 0; r < 4; r++) {
-                        const rubGeo = new THREE.BoxGeometry(0.6 + Math.random() * 0.8, 0.5, 0.6 + Math.random() * 0.8);
-                        const rub = new THREE.Mesh(rubGeo, darkMat);
-                        rub.position.set(pos[0] + (Math.random() - 0.5) * 3, 0.25, pos[2] + (Math.random() - 0.5) * 3);
-                        rub.rotation.set(Math.random(), Math.random(), Math.random());
-                        rub.castShadow = true;
-                        scene.add(rub);
-                    }
-                }
+            // 도로 바깥쪽 사이버 기둥
+            [-6.5, 6.5].forEach(xPos => {
+                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                pillar.position.set(xPos, 2.25, zPos);
+                scene.add(pillar);
+                sidePillars.push(pillar);
             });
         }
 
-        function createGun() {
-            gunMesh = new THREE.Group();
+        // --- 3D 플레이어 캐릭터 구축 ---
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
 
-            // Main Gun Receiver
-            const bodyGeo = new THREE.BoxGeometry(0.08, 0.12, 0.35);
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x27272a, metalness: 0.8, roughness: 0.2 });
-            const body = new THREE.Mesh(bodyGeo, bodyMat);
+        // 몸통
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.4 });
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+        const visorMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xf43f5e, emissiveIntensity: 0.8 });
+        const limbMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
 
-            // Barrel
-            const barrelGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 12);
-            const barrelMat = new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.9, roughness: 0.1 });
-            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
-            barrel.rotation.x = Math.PI / 2;
-            barrel.position.set(0, 0.03, -0.28);
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.95, 0.5), bodyMat);
+        torso.position.y = 1.15;
+        torso.castShadow = true;
+        playerGroup.add(torso);
 
-            // Tactical Sight
-            const scopeGeo = new THREE.BoxGeometry(0.04, 0.04, 0.12);
-            const scopeMat = new THREE.MeshStandardMaterial({ color: 0x52525b, metalness: 0.7 });
-            const scope = new THREE.Mesh(scopeGeo, scopeMat);
-            scope.position.set(0, 0.08, -0.05);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), headMat);
+        head.position.y = 1.98;
+        head.castShadow = true;
+        playerGroup.add(head);
 
-            // Desert/Military Accent Line
-            const laserGeo = new THREE.BoxGeometry(0.01, 0.01, 0.2);
-            const laserMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-            const laser = new THREE.Mesh(laserGeo, laserMat);
-            laser.position.set(0.045, 0.02, -0.1);
+        // 고글 바이저 (앞쪽 -Z 방향)
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.2, 0.1), visorMat);
+        visor.position.set(0, 2.0, -0.32);
+        playerGroup.add(visor);
 
-            // Muzzle Flash
-            const flashGeo = new THREE.OctahedronGeometry(0.08, 0);
-            const flashMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0 });
-            muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
-            muzzleFlashMesh.position.set(0, 0.03, -0.45);
+        // 팔과 다리 (달리기 애니메이션용)
+        const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.7, 0.28), limbMat);
+        leftLeg.position.set(-0.24, 0.35, 0);
+        leftLeg.castShadow = true;
+        playerGroup.add(leftLeg);
 
-            gunMesh.add(body);
-            gunMesh.add(barrel);
-            gunMesh.add(scope);
-            gunMesh.add(laser);
-            gunMesh.add(muzzleFlashMesh);
+        const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.7, 0.28), limbMat);
+        rightLeg.position.set(0.24, 0.35, 0);
+        rightLeg.castShadow = true;
+        playerGroup.add(rightLeg);
 
-            gunMesh.position.set(0.22, -0.18, -0.38);
-            camera.add(gunMesh);
-            scene.add(camera);
+        const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), limbMat);
+        leftArm.position.set(-0.58, 1.15, 0);
+        playerGroup.add(leftArm);
+
+        const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.75, 0.24), limbMat);
+        rightArm.position.set(0.58, 1.15, 0);
+        playerGroup.add(rightArm);
+
+        // --- 장애물 시스템 (블록, 바리케이드, 자동차, 트럭) ---
+        let obstacles = [];
+        let nextSpawnZ = -35;
+
+        // --- 악당(보스) 시스템 (5000점 배수마다 출현) ---
+        let nextBossMilestone = 5000;
+        let isBossActive = false;
+        let bossAttacksRemaining = 0;
+        let bossAttackCooldown = 0;
+        let bossTargetY = 12; // 대기 시 하늘 높이
+        let bossProjectiles = [];
+
+        // 3D 악당(사이버 드론 보스) 메쉬 생성
+        const bossGroup = new THREE.Group();
+        bossGroup.position.set(0, 12, -26);
+        scene.add(bossGroup);
+
+        const bossCore = new THREE.Mesh(
+            new THREE.OctahedronGeometry(1.7, 1),
+            new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.2, metalness: 0.8 })
+        );
+        bossGroup.add(bossCore);
+
+        const bossEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.65, 16, 16),
+            new THREE.MeshBasicMaterial({ color: 0xf43f5e })
+        );
+        bossEye.position.set(0, 0, 1.35);
+        bossGroup.add(bossEye);
+
+        const bossRing = new THREE.Mesh(
+            new THREE.TorusGeometry(2.3, 0.15, 8, 24),
+            new THREE.MeshBasicMaterial({ color: 0xe11d48 })
+        );
+        bossGroup.add(bossRing);
+
+        const bossWingGeo = new THREE.BoxGeometry(1.4, 0.3, 0.8);
+        const bossWingMat = new THREE.MeshStandardMaterial({ color: 0xbe123c, emissive: 0x881337, emissiveIntensity: 0.6 });
+        const leftWing = new THREE.Mesh(bossWingGeo, bossWingMat);
+        leftWing.position.set(-2.3, 0.2, 0);
+        leftWing.rotation.z = 0.25;
+        bossGroup.add(leftWing);
+
+        const rightWing = new THREE.Mesh(bossWingGeo, bossWingMat);
+        rightWing.position.set(2.3, 0.2, 0);
+        rightWing.rotation.z = -0.25;
+        bossGroup.add(rightWing);
+
+        // 보스 이벤트 시작 (5,000점 배수 도달 시)
+        function triggerBossEvent(milestone) {
+            isBossActive = true;
+            // 난이도에 따라 4~6회 연속 공격
+            bossAttacksRemaining = Math.min(6, 3 + Math.floor(milestone / 5000));
+            bossAttackCooldown = 1.2; // 등장 후 첫 발사까지 대기 시간
+            bossTargetY = 4.2;
+
+            bossSubtext.textContent = `${milestone.toLocaleString()}점 돌파! 악당의 에너지탄을 피하세요!`;
+            bossWarning.classList.remove('hidden');
+            playSfx('boss_warn');
         }
 
-        // Create Humanoid (Person) Enemy Model
-        function createHumanoidMesh() {
-            const enemyGroup = new THREE.Group();
+        // 보스가 플레이어를 향해 에너지탄 발사 (지상탄: 점프 회피 / 공중탄: 슬라이딩 회피)
+        function fireBossProjectile() {
+            // 2개 레인을 동시에 공격하고 1개 레인은 비워두거나 점프/슬라이딩으로 회피 가능하게 설계
+            const lanes = [0, 1, 2];
+            for (let i = lanes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
+            }
+            const targetLanes = lanes.slice(0, 2); // 2개 레인 공격
 
-            const urbanArmorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.5 });
-            const redGlowMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-            const visorMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+            targetLanes.forEach(laneIdx => {
+                // true면 높은 탄(슬라이딩 회피), false면 낮은 탄(점프 회피)
+                const isHighShot = Math.random() < 0.45;
+                const projY = isHighShot ? 1.55 : 0.65;
 
-            // Head
-            const headGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
-            const head = new THREE.Mesh(headGeo, urbanArmorMat);
-            head.position.y = 1.7;
-            head.castShadow = true;
+                const projGroup = new THREE.Group();
+                const core = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.55, 12, 12),
+                    new THREE.MeshBasicMaterial({ color: isHighShot ? 0xd946ef : 0xf43f5e })
+                );
+                const halo = new THREE.Mesh(
+                    new THREE.RingGeometry(0.6, 0.85, 16),
+                    new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide })
+                );
+                projGroup.add(core);
+                projGroup.add(halo);
 
-            // Visor (Glow Effect)
-            const visorGeo = new THREE.BoxGeometry(0.28, 0.08, 0.05);
-            const visor = new THREE.Mesh(visorGeo, visorMat);
-            visor.position.set(0, 1.72, -0.18);
+                projGroup.position.set(LANES[laneIdx], projY, bossGroup.position.z + 1.5);
+                scene.add(projGroup);
 
-            // Torso (Body)
-            const torsoGeo = new THREE.BoxGeometry(0.6, 0.7, 0.35);
-            const torso = new THREE.Mesh(torsoGeo, urbanArmorMat);
-            torso.position.y = 1.15;
-            torso.castShadow = true;
+                bossProjectiles.push({
+                    mesh: projGroup,
+                    lane: laneIdx,
+                    isHigh: isHighShot,
+                    minX: LANES[laneIdx] - 0.65,
+                    maxX: LANES[laneIdx] + 0.65,
+                    minY: isHighShot ? 1.15 : 0.0,
+                    maxY: isHighShot ? 2.15 : 1.05,
+                    halfZ: 0.55
+                });
+            });
 
-            // Core Light on Chest
-            const coreGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.05, 8);
-            const core = new THREE.Mesh(coreGeo, redGlowMat);
-            core.rotation.x = Math.PI / 2;
-            core.position.set(0, 1.25, -0.18);
+            playSfx('boss_shoot');
+        }
 
-            // Arms
-            const armGeo = new THREE.BoxGeometry(0.16, 0.6, 0.16);
+        // 1. 일반 블록 장애물 (점프로 넘거나 피할 수 있음)
+        function createBlockObstacle(laneIndex, zPos) {
+            const group = new THREE.Group();
+            const geo = new THREE.BoxGeometry(1.9, 1.15, 1.4);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xf59e0b,
+                roughness: 0.3,
+                metalness: 0.2
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = 0.575;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
 
-            const leftArm = new THREE.Mesh(armGeo, urbanArmorMat);
-            leftArm.position.set(-0.4, 1.15, 0);
-            leftArm.castShadow = true;
+            // 네온 경고 테두리
+            const stripe = new THREE.Mesh(
+                new THREE.BoxGeometry(1.95, 0.2, 1.45),
+                new THREE.MeshBasicMaterial({ color: 0xfef08a })
+            );
+            stripe.position.y = 0.95;
+            group.add(stripe);
 
-            const rightArm = new THREE.Mesh(armGeo, urbanArmorMat);
-            rightArm.position.set(0.4, 1.15, 0);
-            rightArm.castShadow = true;
-
-            // Enemy Rifle Attachment on Right Arm
-            const rifleGeo = new THREE.BoxGeometry(0.1, 0.1, 0.5);
-            const rifleMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
-            const rifle = new THREE.Mesh(rifleGeo, rifleMat);
-            rifle.position.set(0.4, 1.0, -0.2);
-            rifle.castShadow = true;
-
-            // Legs
-            const legGeo = new THREE.BoxGeometry(0.2, 0.7, 0.2);
-
-            const leftLeg = new THREE.Mesh(legGeo, urbanArmorMat);
-            leftLeg.position.set(-0.18, 0.35, 0);
-            leftLeg.castShadow = true;
-
-            const rightLeg = new THREE.Mesh(legGeo, urbanArmorMat);
-            rightLeg.position.set(0.18, 0.35, 0);
-            rightLeg.castShadow = true;
-
-            // Assemble Humanoid
-            enemyGroup.add(head);
-            enemyGroup.add(visor);
-            enemyGroup.add(torso);
-            enemyGroup.add(core);
-            enemyGroup.add(leftArm);
-            enemyGroup.add(rightArm);
-            enemyGroup.add(rifle);
-            enemyGroup.add(leftLeg);
-            enemyGroup.add(rightLeg);
+            group.position.set(LANES[laneIndex], 0, zPos);
+            scene.add(group);
 
             return {
-                group: enemyGroup,
-                limbs: { leftArm, rightArm, leftLeg, rightLeg }
+                mesh: group,
+                type: 'block',
+                lane: laneIndex,
+                // 충돌 박스 크기 (약간 관대하게 설정하여 쾌적한 플레이 제공)
+                minX: LANES[laneIndex] - 0.75,
+                maxX: LANES[laneIndex] + 0.75,
+                minY: 0,
+                maxY: 1.05,
+                halfZ: 0.65,
+                speedOffset: 0
             };
         }
 
-        function startGame() {
-            audio.init();
+        // 2. 높은 바리케이드 장애물 (S 슬라이딩으로 아래 통과 가능!)
+        function createHighBarrierObstacle(laneIndex, zPos) {
+            const group = new THREE.Group();
+            const postMat = new THREE.MeshStandardMaterial({ color: 0x64748b });
+            const barMat = new THREE.MeshStandardMaterial({
+                color: 0xec4899,
+                emissive: 0xec4899,
+                emissiveIntensity: 0.5
+            });
 
-            // Reset States
-            player.hp = 100;
-            player.ammo = player.maxAmmo;
-            player.isReloading = false;
-            score = 0;
-            wave = 1;
+            // 양쪽 기둥
+            const leftPost = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.3), postMat);
+            leftPost.position.set(-0.9, 1.25, 0);
+            group.add(leftPost);
 
-            enemies.forEach(e => scene.remove(e.mesh));
-            bullets.forEach(b => scene.remove(b.mesh));
-            enemyBullets.forEach(eb => scene.remove(eb.mesh));
-            particles.forEach(p => scene.remove(p.mesh));
-            enemies = [];
-            bullets = [];
-            enemyBullets = [];
-            particles = [];
+            const rightPost = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.5, 0.3), postMat);
+            rightPost.position.set(0.9, 1.25, 0);
+            group.add(rightPost);
 
-            camera.position.set(0, 1.6, 0);
-            pitch = 0;
-            yaw = 0;
+            // 상단 가로막 (높이 1.15 ~ 2.4 위치 -> 서 있으면 부딪히고 슬라이딩하면 통과)
+            const topBar = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.1, 0.45), barMat);
+            topBar.position.set(0, 1.75, 0);
+            topBar.castShadow = true;
+            group.add(topBar);
 
-            updateHUD();
+            group.position.set(LANES[laneIndex], 0, zPos);
+            scene.add(group);
 
-            document.getElementById('menuOverlay').classList.add('hidden');
-            document.getElementById('hud').classList.remove('hidden');
-
-            document.body.requestPointerLock();
-
-            isGameRunning = true;
-            startWave();
+            return {
+                mesh: group,
+                type: 'barrier',
+                lane: laneIndex,
+                minX: LANES[laneIndex] - 0.8,
+                maxX: LANES[laneIndex] + 0.8,
+                minY: 1.18, // 슬라이딩 시 플레이어 높이는 0.95이므로 통과 가능!
+                maxY: 2.4,
+                halfZ: 0.3,
+                speedOffset: 0
+            };
         }
 
-        function startWave() {
-            enemiesToSpawn = 6 + wave * 5;
-            let spawned = 0;
+        // 3. 3D 자동차 장애물 (도로를 향해 달려오는 스포츠카/세단)
+        function createCarObstacle(laneIndex, zPos, isTruck = false) {
+            const group = new THREE.Group();
+            const carColors = [0xef4444, 0x3b82f6, 0x10b981, 0xa855f7, 0xf97316];
+            const color = carColors[Math.floor(Math.random() * carColors.length)];
 
-            if (spawnInterval) clearInterval(spawnInterval);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: isTruck ? 0xe2e8f0 : color,
+                roughness: 0.25,
+                metalness: 0.5
+            });
+            const cabinMat = new THREE.MeshStandardMaterial({
+                color: 0x0f172a,
+                roughness: 0.1,
+                metalness: 0.8
+            });
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827 });
 
-            spawnInterval = setInterval(() => {
-                if (!isGameRunning) return;
-                if (spawned < enemiesToSpawn) {
-                    spawnEnemy();
-                    spawned++;
+            const length = isTruck ? 4.4 : 3.2;
+            const height = isTruck ? 1.85 : 0.85;
+
+            // 차체 하부
+            const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.85, height, length), bodyMat);
+            chassis.position.y = height / 2 + 0.35;
+            chassis.castShadow = true;
+            chassis.receiveShadow = true;
+            group.add(chassis);
+
+            // 운전석 캐빈
+            if (!isTruck) {
+                const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.65, 1.7), cabinMat);
+                cabin.position.set(0, 1.4, -0.1);
+                cabin.castShadow = true;
+                group.add(cabin);
+            } else {
+                const cab = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.5, 1.1), new THREE.MeshStandardMaterial({ color: color }));
+                cab.position.set(0, 1.1, length / 2 - 0.55);
+                group.add(cab);
+            }
+
+            // 헤드라이트 (플레이어 방향인 +Z 쪽을 향함)
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+            const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.1), lightMat);
+            hl1.position.set(-0.6, 0.75, length / 2 + 0.02);
+            group.add(hl1);
+
+            const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.1), lightMat);
+            hl2.position.set(0.6, 0.75, length / 2 + 0.02);
+            group.add(hl2);
+
+            // 바퀴 4개
+            const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.28, 12);
+            wheelGeo.rotateZ(Math.PI / 2);
+            const wheelZ = length * 0.32;
+            [
+                [-0.92, 0.38, wheelZ],
+                [0.92, 0.38, wheelZ],
+                [-0.92, 0.38, -wheelZ],
+                [0.92, 0.38, -wheelZ]
+            ].forEach(pos => {
+                const w = new THREE.Mesh(wheelGeo, wheelMat);
+                w.position.set(...pos);
+                group.add(w);
+            });
+
+            group.position.set(LANES[laneIndex], 0, zPos);
+            scene.add(group);
+
+            return {
+                mesh: group,
+                type: isTruck ? 'truck' : 'car',
+                lane: laneIndex,
+                minX: LANES[laneIndex] - 0.8,
+                maxX: LANES[laneIndex] + 0.8,
+                minY: 0,
+                maxY: isTruck ? 2.15 : 1.55,
+                halfZ: length / 2 - 0.15,
+                speedOffset: isTruck ? 5 : 8 // 자동차는 플레이어 쪽으로 달려옴
+            };
+        }
+
+        // 웨이브 단위로 장애물 생성 (항상 피할 수 있는 빈 레인 1개 이상 보장)
+        function spawnObstacleWave(zPos) {
+            const availableLanes = [0, 1, 2];
+            // 장애물 빈도 및 밀도 상향: 75% 확률로 2개 레인에 장애물 배치
+            const count = Math.random() < 0.75 ? 2 : 1;
+
+            // 레인 셔플
+            for (let i = availableLanes.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [availableLanes[i], availableLanes[j]] = [availableLanes[j], availableLanes[i]];
+            }
+
+            const chosenLanes = availableLanes.slice(0, count);
+            chosenLanes.forEach(lane => {
+                const r = Math.random();
+                if (r < 0.30) {
+                    obstacles.push(createBlockObstacle(lane, zPos));
+                } else if (r < 0.55) {
+                    obstacles.push(createHighBarrierObstacle(lane, zPos));
+                } else if (r < 0.85) {
+                    obstacles.push(createCarObstacle(lane, zPos, false));
                 } else {
-                    clearInterval(spawnInterval);
+                    obstacles.push(createCarObstacle(lane, zPos, true));
                 }
-            }, Math.max(200, 500 - wave * 40));
-
-            document.getElementById('waveText').innerText = wave;
-        }
-
-        function spawnEnemy() {
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 22 + Math.random() * 12;
-            const x = Math.sin(angle) * radius;
-            const z = Math.cos(angle) * radius;
-
-            const humanoid = createHumanoidMesh();
-            humanoid.group.position.set(x, 0, z);
-            scene.add(humanoid.group);
-
-            enemies.push({
-                mesh: humanoid.group,
-                limbs: humanoid.limbs,
-                hp: 40 + wave * 8,
-                maxHp: 40 + wave * 8,
-                speed: 0.055 + Math.min(wave * 0.005, 0.06),
-                lastShot: Date.now() + Math.random() * 600,
-                animOffset: Math.random() * Math.PI * 2
             });
         }
 
-        // Event Listeners for Controls
-        document.addEventListener('keydown', (e) => {
-            keys[e.code] = true;
-            if (e.code === 'KeyR') reloadAmmo();
-        });
-
-        document.addEventListener('keyup', (e) => {
-            keys[e.code] = false;
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement === document.body && isGameRunning) {
-                yaw -= e.movementX * mouseSensitivity;
-                pitch -= e.movementY * mouseSensitivity;
-                pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+        // --- 플레이어 조작 액션 함수 ---
+        function moveLeft() {
+            if (!isPlaying) return;
+            if (currentLane > 0) {
+                currentLane--;
+                targetX = LANES[currentLane];
+                playSfx('move');
             }
-        });
-
-        document.addEventListener('mousedown', (e) => {
-            if (e.button === 0 && isGameRunning) {
-                if (document.pointerLockElement !== document.body) {
-                    document.body.requestPointerLock();
-                } else {
-                    shootGun();
-                }
-            }
-        });
-
-        function reloadAmmo() {
-            if (player.isReloading || player.ammo === player.maxAmmo) return;
-            player.isReloading = true;
-            audio.playReload();
-            document.getElementById('reloadMsg').innerText = "⏳ 재장전 중...";
-            document.getElementById('reloadMsg').classList.remove('hidden');
-
-            setTimeout(() => {
-                player.ammo = player.maxAmmo;
-                player.isReloading = false;
-                document.getElementById('reloadMsg').classList.add('hidden');
-                updateHUD();
-            }, 1100);
         }
 
-        function shootGun() {
-            if (player.isReloading) return;
-            if (player.ammo <= 0) {
-                document.getElementById('reloadMsg').innerText = "⚠️ [R] 키를 눌러 재장전하세요!";
-                document.getElementById('reloadMsg').classList.remove('hidden');
+        function moveRight() {
+            if (!isPlaying) return;
+            if (currentLane < 2) {
+                currentLane++;
+                targetX = LANES[currentLane];
+                playSfx('move');
+            }
+        }
+
+        function jump() {
+            if (!isPlaying) return;
+            if (!isJumping) {
+                isJumping = true;
+                velocityY = JUMP_VELOCITY;
+                // 슬라이딩 중 점프하면 즉시 슬라이딩 해제
+                if (isSliding) {
+                    isSliding = false;
+                    slideTimer = 0;
+                }
+                playSfx('jump');
+            }
+        }
+
+        function slide() {
+            if (!isPlaying) return;
+            if (isJumping) {
+                // 공중에서 S를 누르면 빠르게 하강(패스트 폴) 후 슬라이딩
+                velocityY = -38;
+            }
+            isSliding = true;
+            slideTimer = SLIDE_DURATION;
+            playSfx('slide');
+        }
+
+        // --- 키보드 이벤트 (WASD 및 방향키 지원) ---
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (!isPlaying && (e.code === 'Space' || e.code === 'Enter')) {
+                startGame();
                 return;
             }
-
-            player.ammo--;
-            updateHUD();
-            audio.playShoot();
-
-            // Crosshair Recoil Effect
-            const ch = document.getElementById('crosshair');
-            ch.classList.add('crosshair-recoil');
-            setTimeout(() => ch.classList.remove('crosshair-recoil'), 50);
-
-            // Muzzle Flash
-            muzzleFlashMesh.material.opacity = 0.9;
-            muzzleFlashMesh.scale.setScalar(1 + Math.random() * 0.5);
-            setTimeout(() => { muzzleFlashMesh.material.opacity = 0; }, 40);
-
-            // Gun Recoil Animation
-            gunMesh.position.z = -0.26;
-            gunMesh.rotation.x = 0.15;
-            setTimeout(() => { 
-                gunMesh.position.z = -0.38; 
-                gunMesh.rotation.x = 0;
-            }, 70);
-
-            // Player Bullet
-            const bulletGeo = new THREE.SphereGeometry(0.09, 8, 8);
-            const bulletMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-            const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-
-            bullet.position.copy(camera.position).add(dir.clone().multiplyScalar(0.6));
-            scene.add(bullet);
-
-            bullets.push({
-                mesh: bullet,
-                dir: dir,
-                speed: 1.5,
-                life: 50
-            });
-        }
-
-        function enemyShoot(enemy) {
-            audio.playEnemyShoot();
-
-            const bulletGeo = new THREE.SphereGeometry(0.12, 8, 8);
-            const bulletMat = new THREE.MeshBasicMaterial({ color: 0xd97706 });
-            const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-
-            const dir = new THREE.Vector3();
-            dir.subVectors(camera.position, enemy.mesh.position).normalize();
-
-            bullet.position.copy(enemy.mesh.position).add(new THREE.Vector3(0, 1.2, 0));
-            scene.add(bullet);
-
-            enemyBullets.push({
-                mesh: bullet,
-                dir: dir,
-                speed: 0.45 + wave * 0.04,
-                life: 90
-            });
-        }
-
-        function updateHUD() {
-            document.getElementById('healthText').innerText = `${Math.max(0, Math.ceil(player.hp))} / ${player.maxHp}`;
-            document.getElementById('healthBar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
-            document.getElementById('ammoCurrent').innerText = player.ammo;
-            document.getElementById('scoreText').innerText = score;
-        }
-
-        function drawRadar() {
-            const canvas = document.getElementById('radarCanvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, 100, 100);
-
-            // Center (Player)
-            ctx.fillStyle = '#f59e0b';
-            ctx.beginPath();
-            ctx.arc(50, 50, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Enemies on Radar
-            ctx.fillStyle = '#ef4444';
-            enemies.forEach(enemy => {
-                const relX = (enemy.mesh.position.x - camera.position.x) * 1.3;
-                const relZ = (enemy.mesh.position.z - camera.position.z) * 1.3;
-
-                const radarX = 50 + relX;
-                const radarY = 50 + relZ;
-
-                if (radarX >= 2 && radarX <= 98 && radarY >= 2 && radarY <= 98) {
-                    ctx.beginPath();
-                    ctx.arc(radarX, radarY, 2.5, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            });
-        }
-
-        function createHitParticles(pos, color = 0xef4444, count = 10) {
-            for (let i = 0; i < count; i++) {
-                const pGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-                const pMat = new THREE.MeshBasicMaterial({ color: color });
-                const p = new THREE.Mesh(pGeo, pMat);
-                p.position.copy(pos);
-                scene.add(p);
-
-                particles.push({
-                    mesh: p,
-                    vel: new THREE.Vector3(
-                        (Math.random() - 0.5) * 0.3,
-                        Math.random() * 0.25,
-                        (Math.random() - 0.5) * 0.3
-                    ),
-                    life: 25
-                });
+            if (key === 'w' || e.code === 'ArrowUp') {
+                jump();
+            } else if (key === 'a' || e.code === 'ArrowLeft') {
+                moveLeft();
+            } else if (key === 's' || e.code === 'ArrowDown') {
+                slide();
+            } else if (key === 'd' || e.code === 'ArrowRight') {
+                moveRight();
             }
-        }
+        });
 
-        function playerTakeDamage(amount) {
-            player.hp -= amount;
-            audio.playPlayerHit();
-            updateHUD();
+        // --- 모바일 터치 스와이프 및 온스크린 버튼 이벤트 ---
+        let touchStartX = 0;
+        let touchStartY = 0;
 
-            const overlay = document.getElementById('damageOverlay');
-            overlay.classList.add('damage-flash');
-            setTimeout(() => overlay.classList.remove('damage-flash'), 300);
-
-            if (player.hp <= 0) {
-                gameOver();
+        window.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
             }
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isPlaying || e.changedTouches.length === 0) return;
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            const dy = e.changedTouches[0].clientY - touchStartY;
+
+            if (Math.abs(dx) < 25 && Math.abs(dy) < 25) return; // 단순 탭 무시
+
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > 0) moveRight();
+                else moveLeft();
+            } else {
+                if (dy < 0) jump();
+                else slide();
+            }
+        }, { passive: true });
+
+        document.getElementById('btn-left').addEventListener('click', moveLeft);
+        document.getElementById('btn-right').addEventListener('click', moveRight);
+        document.getElementById('btn-jump').addEventListener('click', jump);
+        document.getElementById('btn-slide').addEventListener('click', slide);
+
+        // --- 마우스 드래그 카메라 각도 조절 ---
+        renderer.domElement.addEventListener('mousedown', (e) => {
+            isDraggingCamera = true;
+            prevMouseX = e.clientX;
+            prevMouseY = e.clientY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingCamera) return;
+            const deltaX = e.clientX - prevMouseX;
+            const deltaY = e.clientY - prevMouseY;
+            prevMouseX = e.clientX;
+            prevMouseY = e.clientY;
+
+            camYaw = Math.max(-0.8, Math.min(0.8, camYaw - deltaX * 0.005));
+            camPitch = Math.max(-0.3, Math.min(0.5, camPitch + deltaY * 0.004));
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDraggingCamera = false;
+        });
+
+        cameraResetBtn.addEventListener('click', () => {
+            camYaw = 0;
+            camPitch = 0;
+        });
+
+        // --- 게임 시작 및 종료 관리 ---
+        function startGame() {
+            // 기존 장애물 및 보스 투사체 제거
+            obstacles.forEach(obs => scene.remove(obs.mesh));
+            obstacles = [];
+            bossProjectiles.forEach(p => scene.remove(p.mesh));
+            bossProjectiles = [];
+
+            // 보스 상태 초기화
+            nextBossMilestone = 5000;
+            isBossActive = false;
+            bossAttacksRemaining = 0;
+            bossTargetY = 14;
+            bossGroup.position.set(0, 14, -26);
+            bossWarning.classList.add('hidden');
+
+            // 상태 초기화
+            isPlaying = true;
+            currentLane = 1;
+            targetX = LANES[1];
+            playerGroup.position.set(0, 0, 0);
+            playerGroup.scale.set(1, 1, 1);
+            playerGroup.rotation.set(0, 0, 0);
+
+            speed = BASE_SPEED;
+            score = 0;
+            playerY = 0;
+            velocityY = 0;
+            isJumping = false;
+            isSliding = false;
+            slideTimer = 0;
+            nextSpawnZ = -40;
+
+            // 초기 장애물 미리 배치 (간격을 17로 좁혀 더 자주 등장)
+            for (let z = -40; z >= -142; z -= 17) {
+                spawnObstacleWave(z);
+                nextSpawnZ = z - 17;
+            }
+
+            overlayScreen.classList.add('hidden');
+            playSfx('start');
         }
 
         function gameOver() {
-            isGameRunning = false;
-            document.exitPointerLock();
+            isPlaying = false;
+            playSfx('crash');
 
-            document.getElementById('hud').classList.add('hidden');
-            document.getElementById('menuOverlay').classList.remove('hidden');
+            const finalIntScore = Math.floor(score);
+            let isNewRecord = false;
+            if (finalIntScore > highScore) {
+                highScore = finalIntScore;
+                localStorage.setItem('neonRunner3DHighScore', highScore.toString());
+                highScoreDisplay.textContent = highScore;
+                isNewRecord = true;
+            }
 
-            document.getElementById('menuTitle').innerText = "GAME OVER";
-            document.getElementById('menuSub').innerText = "폐허 도시에서 적들의 공격을 이기지 못했습니다.";
-            document.getElementById('finalStats').classList.remove('hidden');
-            document.getElementById('finalScore').innerText = score;
-            document.getElementById('finalWave').innerText = wave;
-            document.getElementById('startBtn').innerText = "다시 도전하기";
+            overlayBadge.textContent = 'CRASHED!';
+            overlayBadge.className = 'inline-block px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 text-xs font-bold mb-3 border border-rose-500/40';
+            overlayTitle.textContent = 'GAME OVER';
+            overlaySubtitle.textContent = '장애물과 충돌했습니다. 다시 도전해보세요!';
+            
+            finalStats.classList.remove('hidden');
+            finalScore.textContent = finalIntScore;
+            if (isNewRecord) {
+                newRecordBadge.classList.remove('hidden');
+            } else {
+                newRecordBadge.classList.add('hidden');
+            }
+
+            startBtn.textContent = '다시 플레이 (RETRY)';
+            overlayScreen.classList.remove('hidden');
         }
 
-        // Game Loop
-        function animate() {
+        startBtn.addEventListener('click', startGame);
+
+        // --- 창 크기 조절 대응 ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 메인 애니메이션 루프 ---
+        let lastTime = performance.now();
+
+        function animate(now) {
             requestAnimationFrame(animate);
 
-            if (isGameRunning) {
-                const time = Date.now() * 0.005;
+            const dt = Math.min((now - lastTime) / 1000, 0.05); // 프레임 드랍 방어
+            lastTime = now;
 
-                // Update Camera Rotation
-                camera.rotation.order = "YXZ";
-                camera.rotation.y = yaw;
-                camera.rotation.x = pitch;
+            if (isPlaying) {
+                // 1. 속도 점진적 증가 및 점수 업데이트
+                speed = Math.min(MAX_SPEED, speed + SPEED_ACCEL * dt);
+                score += speed * dt * 1.5;
 
-                // Player Movement
-                const moveDir = new THREE.Vector3();
-                if (keys['KeyW']) moveDir.z -= 1;
-                if (keys['KeyS']) moveDir.z += 1;
-                if (keys['KeyA']) moveDir.x -= 1;
-                if (keys['KeyD']) moveDir.x += 1;
+                scoreDisplay.textContent = Math.floor(score);
+                speedDisplay.textContent = (speed / BASE_SPEED).toFixed(1) + 'x';
 
-                moveDir.normalize();
-                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-                camera.position.addScaledVector(moveDir, player.speed);
-
-                // Gun Bobbing Effect when Walking
-                if (moveDir.length() > 0) {
-                    gunMesh.position.y = -0.18 + Math.sin(time * 2) * 0.015;
-                    gunMesh.position.x = 0.22 + Math.cos(time) * 0.01;
+                // 5,000점 배수 도달 체크 -> 악당 보스 습격 발동!
+                if (score >= nextBossMilestone) {
+                    triggerBossEvent(nextBossMilestone);
+                    nextBossMilestone += 5000;
                 }
 
-                // Keep Player inside boundary
-                camera.position.x = Math.max(-60, Math.min(60, camera.position.x));
-                camera.position.z = Math.max(-60, Math.min(60, camera.position.z));
-                camera.position.y = 1.6;
+                // 2. 플레이어 좌우 레인 부드러운 이동
+                playerGroup.position.x += (targetX - playerGroup.position.x) * Math.min(1, dt * 15);
+                // 이동 시 살짝 몸 기울이기
+                const tiltZ = (playerGroup.position.x - targetX) * 0.12;
+                playerGroup.rotation.z = tiltZ;
 
-                // Update Player Bullets
-                for (let i = bullets.length - 1; i >= 0; i--) {
-                    const b = bullets[i];
-                    b.mesh.position.addScaledVector(b.dir, b.speed);
-                    b.life--;
-
-                    // Hit Detection with Humanoid Enemies
-                    let hit = false;
-                    for (let j = enemies.length - 1; j >= 0; j--) {
-                        const enemy = enemies[j];
-                        const enemyCenter = enemy.mesh.position.clone().add(new THREE.Vector3(0, 1.0, 0));
-                        const dist = b.mesh.position.distanceTo(enemyCenter);
-
-                        if (dist < 0.9) {
-                            enemy.hp -= 25;
-                            audio.playHit();
-                            createHitParticles(b.mesh.position, 0xef4444, 6);
-
-                            if (enemy.hp <= 0) {
-                                audio.playKill();
-                                createHitParticles(enemyCenter, 0xf59e0b, 18);
-                                scene.remove(enemy.mesh);
-                                enemies.splice(j, 1);
-                                score += 150;
-                                updateHUD();
-                            }
-
-                            hit = true;
-                            break;
-                        }
-                    }
-
-                    if (hit || b.life <= 0) {
-                        scene.remove(b.mesh);
-                        bullets.splice(i, 1);
+                // 3. 점프 물리 처리
+                if (isJumping) {
+                    playerY += velocityY * dt;
+                    velocityY += GRAVITY * dt;
+                    if (playerY <= 0) {
+                        playerY = 0;
+                        velocityY = 0;
+                        isJumping = false;
                     }
                 }
+                playerGroup.position.y = playerY;
 
-                // Update Enemy Bullets
-                for (let i = enemyBullets.length - 1; i >= 0; i--) {
-                    const eb = enemyBullets[i];
-                    eb.mesh.position.addScaledVector(eb.dir, eb.speed);
-                    eb.life--;
-
-                    const distToPlayer = eb.mesh.position.distanceTo(camera.position);
-                    if (distToPlayer < 0.7) {
-                        playerTakeDamage(12);
-                        scene.remove(eb.mesh);
-                        enemyBullets.splice(i, 1);
-                        continue;
+                // 4. 슬라이딩 상태 및 애니메이션 처리
+                if (isSliding) {
+                    slideTimer -= dt;
+                    // 슬라이딩 자세 (납작하게 엎드림)
+                    playerGroup.scale.y += (0.45 - playerGroup.scale.y) * Math.min(1, dt * 20);
+                    playerGroup.rotation.x += (0.75 - playerGroup.rotation.x) * Math.min(1, dt * 20);
+                    if (slideTimer <= 0) {
+                        isSliding = false;
                     }
-
-                    if (eb.life <= 0) {
-                        scene.remove(eb.mesh);
-                        enemyBullets.splice(i, 1);
-                    }
+                } else {
+                    playerGroup.scale.y += (1.0 - playerGroup.scale.y) * Math.min(1, dt * 18);
+                    playerGroup.rotation.x += (0 - playerGroup.rotation.x) * Math.min(1, dt * 18);
                 }
 
-                // Update Enemies AI, Limb Walking Animation & Movement
-                enemies.forEach((enemy, idx) => {
-                    // Face Player
-                    enemy.mesh.lookAt(camera.position.x, enemy.mesh.position.y, camera.position.z);
+                // 5. 달리기 팔다리 스윙 애니메이션
+                if (!isJumping && !isSliding) {
+                    runCycle += dt * speed * 0.65;
+                    leftLeg.rotation.x = Math.sin(runCycle) * 0.8;
+                    rightLeg.rotation.x = -Math.sin(runCycle) * 0.8;
+                    leftArm.rotation.x = -Math.sin(runCycle) * 0.7;
+                    rightArm.rotation.x = Math.sin(runCycle) * 0.7;
+                } else if (isJumping) {
+                    leftLeg.rotation.x = 0.5;
+                    rightLeg.rotation.x = -0.4;
+                    leftArm.rotation.x = -0.8;
+                    rightArm.rotation.x = -0.8;
+                }
 
-                    // Move towards Player
-                    const dist = enemy.mesh.position.distanceTo(camera.position);
-                    if (dist > 2.5) {
-                        const dir = new THREE.Vector3().subVectors(camera.position, enemy.mesh.position).normalize();
-                        enemy.mesh.position.addScaledVector(dir, enemy.speed);
-
-                        // Humanoid Walking Animation (Legs & Arms Swing)
-                        const swing = Math.sin(time * 2.5 + enemy.animOffset) * 0.6;
-                        enemy.limbs.leftLeg.rotation.x = swing;
-                        enemy.limbs.rightLeg.rotation.x = -swing;
-                        enemy.limbs.leftArm.rotation.x = -swing;
-                        enemy.limbs.rightArm.rotation.x = swing;
-                    }
-
-                    // Enemy Shooting AI
-                    if (Date.now() - enemy.lastShot > 1000 && dist < 30) {
-                        enemyShoot(enemy);
-                        enemy.lastShot = Date.now() + Math.random() * 500;
-                    }
+                // 6. 도로 차선 및 배경 기둥 스크롤
+                const moveDist = speed * dt;
+                roadLines.forEach(line => {
+                    line.position.z += moveDist;
+                    if (line.position.z > 15) line.position.z -= 200;
+                });
+                sidePillars.forEach(pillar => {
+                    pillar.position.z += moveDist;
+                    if (pillar.position.z > 15) pillar.position.z -= 200;
                 });
 
-                // Wave Progress Check
-                if (enemies.length === 0 && enemiesToSpawn <= 0) {
-                    wave++;
-                    score += 600;
-                    startWave();
+                // 7. 장애물 이동, 생성 및 정밀 충돌 판정
+                nextSpawnZ += moveDist;
+                // 장애물 간격을 기존보다 촘촘하게 설정하여 빈도수 증가
+                const spawnGap = Math.max(14.5, speed * 0.52);
+                if (nextSpawnZ >= -130) {
+                    // 보스 공격 중에는 도로 장애물을 잠시 줄여 보스 탄막 회피에 집중할 수 있게 배려
+                    if (!isBossActive || Math.random() < 0.35) {
+                        spawnObstacleWave(-155);
+                    }
+                    nextSpawnZ = -155 - spawnGap;
                 }
 
-                // Update Particles
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    const p = particles[i];
-                    p.mesh.position.add(p.vel);
-                    p.life--;
-                    if (p.life <= 0) {
-                        scene.remove(p.mesh);
-                        particles.splice(i, 1);
+                // 플레이어 현재 히트박스 계산
+                const pX = playerGroup.position.x;
+                const pMinX = pX - 0.35;
+                const pMaxX = pX + 0.35;
+                const pMinY = playerY;
+                const pMaxY = playerY + (isSliding ? 0.95 : 2.15);
+                const pMinZ = -0.3;
+                const pMaxZ = 0.3;
+
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    const obs = obstacles[i];
+                    obs.mesh.position.z += (speed + obs.speedOffset) * dt;
+
+                    const obsZ = obs.mesh.position.z;
+                    const oMinZ = obsZ - obs.halfZ;
+                    const oMaxZ = obsZ + obs.halfZ;
+
+                    // AABB 3D 충돌 검사
+                    const overlapX = pMaxX > obs.minX && pMinX < obs.maxX;
+                    const overlapY = pMaxY > obs.minY && pMinY < obs.maxY;
+                    const overlapZ = pMaxZ > oMinZ && pMinZ < oMaxZ;
+
+                    if (overlapX && overlapY && overlapZ) {
+                        gameOver();
+                        break;
+                    }
+
+                    // 화면 뒤로 지나간 장애물 제거
+                    if (obsZ > 15) {
+                        scene.remove(obs.mesh);
+                        obstacles.splice(i, 1);
                     }
                 }
 
-                // Draw Radar
-                drawRadar();
+                // 8. 악당(보스) 움직임 및 에너지탄 공격 처리
+                bossGroup.position.y += (bossTargetY - bossGroup.position.y) * Math.min(1, dt * 4);
+                bossRing.rotation.z += dt * 3;
+                bossCore.rotation.y += dt * 2;
+
+                if (isBossActive) {
+                    // 플레이어 레인을 살짝 따라다니며 위협
+                    bossGroup.position.x += (playerGroup.position.x * 0.7 - bossGroup.position.x) * Math.min(1, dt * 3);
+                    bossAttackCooldown -= dt;
+
+                    if (bossAttackCooldown <= 0 && bossAttacksRemaining > 0) {
+                        fireBossProjectile();
+                        bossAttacksRemaining--;
+                        // 속도에 맞춰 다음 발사 간격 조정
+                        bossAttackCooldown = Math.max(0.75, 1.15 - (speed - BASE_SPEED) * 0.008);
+
+                        if (bossAttacksRemaining === 0) {
+                            // 모든 공격 완료 후 하늘 위로 퇴각
+                            setTimeout(() => {
+                                isBossActive = false;
+                                bossTargetY = 14;
+                                bossWarning.classList.add('hidden');
+                            }, 900);
+                        }
+                    }
+                } else {
+                    bossGroup.position.x += (0 - bossGroup.position.x) * Math.min(1, dt * 2);
+                }
+
+                // 보스 에너지탄 이동 및 충돌 검사
+                const projSpeed = speed * 1.15 + 14;
+                for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+                    const proj = bossProjectiles[i];
+                    proj.mesh.position.z += projSpeed * dt;
+                    proj.mesh.children[1].rotation.z += dt * 8; // 회전 이펙트
+
+                    const pz = proj.mesh.position.z;
+                    const overlapX = pMaxX > proj.minX && pMinX < proj.maxX;
+                    const overlapY = pMaxY > proj.minY && pMinY < proj.maxY;
+                    const overlapZ = pMaxZ > (pz - proj.halfZ) && pMinZ < (pz + proj.halfZ);
+
+                    if (overlapX && overlapY && overlapZ) {
+                        gameOver();
+                        break;
+                    }
+
+                    if (pz > 15) {
+                        scene.remove(proj.mesh);
+                        bossProjectiles.splice(i, 1);
+                    }
+                }
+            } else {
+                // 대기 화면일 때 배경이 천천히 흐르는 데모 연출
+                roadLines.forEach(line => {
+                    line.position.z += 10 * dt;
+                    if (line.position.z > 15) line.position.z -= 200;
+                });
+                sidePillars.forEach(pillar => {
+                    pillar.position.z += 10 * dt;
+                    if (pillar.position.z > 15) pillar.position.z -= 200;
+                });
             }
+
+            // 8. 카메라 위치 및 시점 업데이트 (플레이어를 부드럽게 추적 + 마우스 회전 반영)
+            const baseCamX = playerGroup.position.x * 0.45;
+            const baseCamY = 4.6 + playerY * 0.25;
+            const baseCamZ = 7.8;
+
+            const offsetX = Math.sin(camYaw) * 8;
+            const offsetY = Math.sin(camPitch) * 5;
+
+            camera.position.x += (baseCamX + offsetX - camera.position.x) * 0.12;
+            camera.position.y += (baseCamY + offsetY - camera.position.y) * 0.12;
+            camera.position.z = baseCamZ;
+            camera.lookAt(playerGroup.position.x * 0.6, 1.4, -12);
 
             renderer.render(scene, camera);
         }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.onload = () => {
-            init3D();
-            animate();
+        // 윈도우 로드 시 애니메이션 루프 시작
+        window.onload = function () {
+            animate(performance.now());
         };
     </script>
 </body>

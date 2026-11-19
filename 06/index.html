@@ -1,1510 +1,1018 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VALORANT 3D Web FPS</title>
-    <!-- Tailwind CSS -->
+    <title>Hearts2Hearts × H2H Friends Tamagotchi</title>
+    <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Tone.js for Audio FX -->
+    <!-- Tone.js 로드 (사운드 효과용) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Noto+Sans+KR:wght@400;600;700;900&family=Playfair+Display:ital,wght@1,600;1,800&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@500;700&family=Pretendard:wght@400;700;900&display=swap');
-        
         body {
-            font-family: 'Pretendard', sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #fae8ff 50%, #ffe4e6 100%);
+            color: #1e293b;
             user-select: none;
-            overflow: hidden;
-            background-color: #0f1923;
-            color: #ece8e1;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
         }
-
-        .val-font {
-            font-family: 'Teko', sans-serif;
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
         }
-
-        #flashOverlay {
-            transition: opacity 0.12s ease-out;
+        .pixel-font {
+            font-family: 'Silkscreen', cursive;
         }
-
-        /* Dynamic Crosshair */
-        .crosshair-line {
-            position: absolute;
-            background-color: #00ffaa;
-            box-shadow: 0 0 3px rgba(0,255,170,0.8);
-            transition: all 0.05s ease-out;
+        .serif-italic {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
         }
-
-        /* ADS Scope Vignette Frame */
-        #adsScope {
-            transition: opacity 0.15s ease-out;
-            background: radial-gradient(circle, transparent 38%, rgba(0, 0, 0, 0.88) 72%, black 100%);
-            border: 2px solid rgba(0, 255, 170, 0.35);
+        /* 다마고치 쉘 (라벤더 & 로즈 핑크 그라데이션 본체) */
+        .tama-shell {
+            background: linear-gradient(145deg, #fbcfe8 0%, #ddd6fe 100%);
+            box-shadow: 
+                0 25px 60px rgba(192, 132, 252, 0.35),
+                inset 0 4px 12px rgba(255, 255, 255, 0.9),
+                inset 0 -8px 20px rgba(236, 72, 153, 0.25);
+            border: 4px solid rgba(255, 255, 255, 0.9);
         }
-
-        /* Buy Menu Glassmorphism */
-        .buy-card {
-            background: linear-gradient(135deg, rgba(15, 25, 35, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(16px);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        /* LCD 액정 */
+        .lcd-screen {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 4px solid #065f46;
+            box-shadow: inset 0 4px 12px rgba(6, 95, 70, 0.15);
         }
-        .buy-card:hover {
-            border-color: #ff4655;
-            transform: translateY(-4px);
-            box-shadow: 0 10px 25px -5px rgba(255, 70, 85, 0.4);
+        /* 불 꺼졌을 때 */
+        .lights-off {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%) !important;
+            border-color: #312e81 !important;
         }
-
-        /* Kill Banner Graphic & Ace Effects */
-        .kill-banner {
-            animation: killBannerPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        /* 캐릭터 바운스 애니메이션 */
+        @keyframes tamaBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-4px) scale(1.02); }
         }
-        @keyframes killBannerPop {
-            0% { transform: scale(0.4); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+        .animate-tama {
+            animation: tamaBounce 1.6s ease-in-out infinite;
         }
-
-        .hard-glow {
-            box-shadow: 0 0 25px rgba(244, 63, 94, 0.6), inset 0 0 15px rgba(244, 63, 94, 0.4);
-            border-color: #f43f5e !important;
+        /* 알 살짝 흔들림 애니메이션 */
+        @keyframes eggShake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-6deg); }
+            75% { transform: rotate(6deg); }
         }
-
-        /* Minimap Canvas */
-        #minimapCanvas {
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            background: rgba(15, 23, 42, 0.85);
-            border-radius: 50%;
+        .animate-egg {
+            animation: eggShake 1.2s ease-in-out infinite;
+        }
+        /* 젤리 버튼 */
+        .tama-btn {
+            transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 6px 12px rgba(107, 33, 168, 0.25), inset 0 2px 3px rgba(255, 255, 255, 0.8);
+        }
+        .tama-btn:hover {
+            transform: translateY(-2px);
+        }
+        .tama-btn:active {
+            transform: scale(0.94) translateY(2px);
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #f472b6;
+            border-radius: 10px;
         }
     </style>
 </head>
-<body class="relative w-screen h-screen">
+<body class="min-h-screen flex flex-col items-center justify-center p-3 sm:p-4">
 
-    <!-- 3D Render Canvas Container -->
-    <div id="gameCanvas" class="w-full h-full absolute inset-0"></div>
+    <!-- 상단 타이틀 -->
+    <div class="text-center mb-3">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold bg-white/85 text-purple-600 rounded-full border border-white shadow-2xs mb-1">
+            <span>✨ Hearts2Hearts Tamagotchi Universe</span>
+        </div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight flex items-center justify-center gap-1.5">
+            <span id="headerTitle">하투하 프렌즈 다마고치</span>
+            <span class="serif-italic text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">S2</span>
+        </h1>
+    </div>
 
-    <!-- Minimap HUD Top Left -->
-    <div class="absolute top-6 left-6 z-20 pointer-events-none flex flex-col gap-2">
-        <canvas id="minimapCanvas" width="160" height="160" class="shadow-2xl backdrop-blur-md"></canvas>
-        <!-- Difficulty Indicator Badge -->
-        <div id="difficultyBadge" class="bg-slate-950/80 border border-slate-700/80 px-3 py-1 rounded-xl text-xs font-bold text-amber-400 hidden backdrop-blur w-fit">
-            DIFFICULTY: <span id="diffLabel" class="font-black text-amber-400 val-font text-base tracking-wider">NORMAL</span>
+    <!-- 캐릭터 선택 화면 (이모티콘 없이 이름만 표시되도록 수정) -->
+    <div id="characterSelectScreen" class="tama-shell w-full max-w-xs sm:max-w-sm rounded-[3rem] p-5 sm:p-6 flex flex-col items-center relative">
+        <div class="w-12 h-2 rounded-full bg-white/80 mb-3 shadow-2xs border border-white/60"></div>
+        <div class="lcd-screen w-full rounded-2xl p-4 flex flex-col justify-between" style="height: 330px;">
+            <div class="text-center">
+                <h2 class="text-xs font-black text-emerald-900">✨ 파트너 캐릭터 선택</h2>
+                <p class="text-[10px] text-emerald-700 mt-0.5">함께 키울 친구를 골라주세요!</p>
+            </div>
+            <!-- 캐릭터 그리드 (8종 - 이모티콘 제거 및 원본 레퍼런스 스타일 이름 버튼) -->
+            <div class="grid grid-cols-4 gap-1.5 my-auto overflow-y-auto max-h-[220px] p-1">
+                <!-- 1. 쮸제비 -->
+                <button data-char="jujebi" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">쮸제비</span>
+                </button>
+                <!-- 2. 빙핑 -->
+                <button data-char="bingping" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">빙핑</span>
+                </button>
+                <!-- 3. 토라뮈 -->
+                <button data-char="toramwi" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">토라뮈</span>
+                </button>
+                <!-- 4. 스텔냥 -->
+                <button data-char="stelnyang" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">스텔냥</span>
+                </button>
+                <!-- 5. 쭈일리언 -->
+                <button data-char="jjulian" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">쭈일리언</span>
+                </button>
+                <!-- 6. 노숭이 -->
+                <button data-char="nosung" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">노숭이</span>
+                </button>
+                <!-- 7. 정땅콩 -->
+                <button data-char="peanut" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">정땅콩</span>
+                </button>
+                <!-- 8. 알쏭햄쏭 -->
+                <button data-char="hamssong" class="char-select-btn flex items-center justify-center p-2 bg-white/90 rounded-xl border border-emerald-300 hover:bg-white transition-all shadow-2xs cursor-pointer">
+                    <span class="text-[10px] font-black text-slate-700">알쏭햄쏭</span>
+                </button>
+            </div>
+            <div class="text-[9px] text-center text-emerald-800 font-bold">버튼을 눌러 캐릭터를 선택하세요!</div>
+        </div>
+        <div class="my-3 flex items-center justify-between w-full px-4 text-xs font-bold text-slate-600">
+            <span class="pixel-font text-[10px] text-purple-700 tracking-wider">H2H.SELECT</span>
+            <span class="flex items-center gap-1 text-[11px] text-pink-600">♡ S2 FRIENDS</span>
+        </div>
+        <div class="flex items-center justify-center gap-4 w-full mb-3">
+            <div class="w-12 h-12 rounded-full bg-white/60 border-2 border-white flex items-center justify-center text-xs font-black text-slate-400">A</div>
+            <div class="w-12 h-12 rounded-full bg-white/60 border-2 border-white flex items-center justify-center text-xs font-black text-slate-400">B</div>
+            <div class="w-12 h-12 rounded-full bg-white/60 border-2 border-white flex items-center justify-center text-xs font-black text-slate-400">C</div>
+        </div>
+        <div class="w-full flex justify-between items-center px-1 text-xs text-slate-500 border-t border-white/60 pt-2">
+            <span class="font-bold text-purple-600">캐릭터 선택 대기중</span>
+            <span class="font-mono">0일째</span>
         </div>
     </div>
 
-    <!-- Vignette Damage Effect -->
-    <div id="damageVignette" class="absolute inset-0 opacity-0 pointer-events-none z-30 bg-red-900/30 border-8 border-rose-600/60 transition-opacity duration-150"></div>
-
-    <!-- ADS Gun Scope Overlay UI -->
-    <div id="adsScope" class="absolute inset-0 opacity-0 pointer-events-none z-20 flex items-center justify-center">
-        <div class="w-80 h-80 rounded-full border border-emerald-500/40 relative flex items-center justify-center shadow-[0_0_50px_rgba(0,255,170,0.25)]">
-            <div class="w-full h-[1px] bg-emerald-400/60"></div>
-            <div class="h-full w-[1px] bg-emerald-400/60 absolute"></div>
-            <div class="w-4 h-4 border border-emerald-400 rounded-full absolute bg-emerald-400/20"></div>
-        </div>
-    </div>
-
-    <!-- Flashbang Fullscreen Overlay -->
-    <div id="flashOverlay" class="absolute inset-0 bg-white opacity-0 pointer-events-none z-40"></div>
-
-    <!-- Spike Status Banner -->
-    <div id="spikeBanner" class="absolute top-6 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-950 font-black px-8 py-2 rounded-full val-font text-3xl tracking-widest hidden z-20 shadow-2xl border-2 border-amber-300 animate-bounce">
-        💣 SPIKE PLANTED! DEFUSE IT! (45s)
-    </div>
-
-    <!-- Buy Phase Banner -->
-    <div id="phaseBanner" class="absolute top-20 left-1/2 -translate-x-1/2 bg-rose-600/90 text-white font-black px-8 py-2.5 rounded-full val-font text-3xl tracking-widest hidden z-20 shadow-2xl border border-rose-400/50 backdrop-blur">
-        BUY PHASE - PRESS [B] TO OPEN ARMORY
-    </div>
-
-    <!-- Kill Banner Center Notification -->
-    <div id="killBannerContainer" class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 flex flex-col items-center gap-2"></div>
-
-    <!-- Buy Menu Modal -->
-    <div id="buyMenu" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xl z-50 hidden flex flex-col justify-between p-8">
-        <div class="flex justify-between items-center border-b border-slate-700/80 pb-4">
-            <div>
-                <h2 class="text-5xl font-black val-font tracking-wider text-white">ARMORY (무기 상점)</h2>
-                <p class="text-xs text-slate-400">[B] 또는 [Esc] 키를 눌러 상점 닫기</p>
-            </div>
-            <div class="flex items-center gap-3 bg-slate-900/90 border border-amber-500/50 px-6 py-2.5 rounded-2xl shadow-lg">
-                <i class="fa-solid fa-coins text-amber-400 text-3xl"></i>
-                <span id="creditsText" class="text-4xl font-black val-font text-amber-400 tracking-wider">3000 ¤</span>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-4 gap-6 my-auto">
-            <!-- Weapon: Vandal -->
-            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-rose-400 uppercase tracking-widest">라이플</span>
-                        <span class="text-xs bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded border border-rose-500/30 font-bold">헤드샷 1회 처치</span>
-                    </div>
-                    <h3 class="text-4xl font-black val-font text-white mt-1">VANDAL (밴달)</h3>
-                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">강력한 단발 피해량. 모든 거리 원샷 헤드샷 가능.</p>
-                </div>
-                <div class="mt-6">
-                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">2,900 ¤</div>
-                    <button onclick="window.buyWeapon('vandal', 2900)" class="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-rose-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
-                </div>
-            </div>
-
-            <!-- Weapon: Phantom -->
-            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-indigo-400 uppercase tracking-widest">소음기 라이플</span>
-                        <span class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30 font-bold">빠른 연사 / 집탄율</span>
-                    </div>
-                    <h3 class="text-4xl font-black val-font text-white mt-1">PHANTOM (팬텀)</h3>
-                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">높은 연사력과 안정적인 반동 제어.</p>
-                </div>
-                <div class="mt-6">
-                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">2,900 ¤</div>
-                    <button onclick="window.buyWeapon('phantom', 2900)" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-indigo-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
-                </div>
-            </div>
-
-            <!-- Weapon: Spectre -->
-            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-sky-400 uppercase tracking-widest">기관단총</span>
-                        <span class="text-xs bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded border border-sky-500/30 font-bold">근거리 기습</span>
-                    </div>
-                    <h3 class="text-4xl font-black val-font text-white mt-1">SPECTRE (스펙터)</h3>
-                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">기동성이 뛰어난 서브머신건.</p>
-                </div>
-                <div class="mt-6">
-                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">1,600 ¤</div>
-                    <button onclick="window.buyWeapon('spectre', 1600)" class="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-500 hover:to-sky-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-sky-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
-                </div>
-            </div>
-
-            <!-- Heavy Armor & Skill Pack -->
-            <div class="buy-card p-6 rounded-2xl flex flex-col justify-between">
-                <div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">장비 패키지</span>
-                        <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">풀 쉴드 + 풀 스킬</span>
-                    </div>
-                    <h3 class="text-4xl font-black val-font text-white mt-1">FULL UTILITY (풀팩)</h3>
-                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">중갑주(+50 HP) 및 모든 스킬을 완충합니다.</p>
-                </div>
-                <div class="mt-6">
-                    <div class="text-2xl font-bold text-amber-400 mb-3 val-font">1,400 ¤</div>
-                    <button onclick="window.buyFullPack(1400)" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black rounded-xl text-base transition shadow-lg shadow-emerald-600/30 val-font tracking-wider cursor-pointer">구매 (BUY)</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="text-center text-slate-500 text-xs">구매 시간 동안 필요한 장비를 준비하세요. [B] 키로 닫습니다.</div>
-    </div>
-
-    <!-- HUD Overlay -->
-    <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10 hidden">
+    <!-- 다마고치 본체 게임 플레이 화면 -->
+    <div id="gameScreen" class="tama-shell w-full max-w-xs sm:max-w-sm rounded-[3rem] p-5 sm:p-6 flex flex-col items-center relative hidden">
         
-        <!-- TOP: Round Info & Kill Feed -->
-        <div class="flex justify-between items-start w-full">
-            <div class="w-40"></div> <!-- Placeholder for minimap spacing -->
+        <div class="w-12 h-2 rounded-full bg-white/80 mb-3 shadow-2xs border border-white/60"></div>
 
-            <!-- Score & Timer -->
-            <div class="flex items-center gap-6 bg-slate-950/85 backdrop-blur-md px-8 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
-                <div class="text-emerald-400 font-black text-3xl val-font tracking-wider">DEFENDERS <span id="teamScore" class="text-4xl text-white ml-2">0</span></div>
-                <div class="flex flex-col items-center">
-                    <div class="text-[11px] font-bold text-slate-400 tracking-widest" id="roundCounter">ROUND 1 / 13 WIN</div>
-                    <div class="text-3xl font-black text-amber-400 px-5 py-0.5 bg-slate-900/90 rounded-lg val-font tracking-widest border border-slate-700" id="roundTimer">00:10</div>
-                </div>
-                <div class="text-rose-400 font-black text-3xl val-font tracking-wider"><span id="enemyScore" class="text-4xl text-white mr-2">0</span> ATTACKERS</div>
-            </div>
-
-            <!-- Kill Feed Logs -->
-            <div id="killFeed" class="flex flex-col gap-2 items-end max-w-xs"></div>
-        </div>
-
-        <!-- CENTER: Dynamic Crosshair & Hitmarker -->
-        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <!-- Dynamic Crosshair -->
-            <div id="crosshair" class="relative w-8 h-8 flex items-center justify-center transition-all duration-75">
-                <div id="chLeft" class="crosshair-line w-2.5 h-0.5 -left-3.5"></div>
-                <div id="chRight" class="crosshair-line w-2.5 h-0.5 -right-3.5"></div>
-                <div id="chTop" class="crosshair-line h-2.5 w-0.5 -top-3.5"></div>
-                <div id="chBottom" class="crosshair-line h-2.5 w-0.5 -bottom-3.5"></div>
-                <div class="w-1 h-1 bg-emerald-400 rounded-full shadow-sm"></div>
-            </div>
-            <!-- Hit Marker Flash -->
-            <div id="hitmarker" class="absolute opacity-0 transition-opacity duration-100 text-rose-500 text-4xl font-black scale-125">✕</div>
-        </div>
-
-        <!-- BOTTOM: Player Status, Weapon & Skills -->
-        <div class="flex justify-between items-end w-full">
+        <!-- LCD 액정 디스플레이 -->
+        <div id="lcdScreen" class="lcd-screen w-full rounded-2xl p-3 flex flex-col justify-between relative overflow-hidden transition-colors duration-500" style="height: 310px;">
             
-            <!-- Health & Armor & Credits -->
-            <div class="flex items-center gap-5 bg-slate-950/85 backdrop-blur-md p-4 rounded-2xl border border-slate-700/60 shadow-2xl">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-coins text-amber-400 text-2xl"></i>
-                    <span id="hudCreditsText" class="text-3xl font-black val-font tracking-wider text-amber-300">3000 ¤</span>
+            <div id="sleepZzz" class="absolute inset-0 flex items-center justify-center z-30 pointer-events-none hidden">
+                <div class="pixel-font text-2xl text-purple-400 animate-bounce tracking-widest">Z z z... ♡</div>
+            </div>
+
+            <!-- 상단 상태 아이콘 메뉴바 -->
+            <div class="grid grid-cols-5 gap-1 text-center text-[10px] font-bold border-b border-emerald-300/60 pb-1.5">
+                <div id="menu-0" class="menu-tab py-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-2xs transition-colors cursor-pointer">🍓 간식</div>
+                <div id="menu-1" class="menu-tab py-0.5 rounded-lg opacity-65 transition-colors cursor-pointer">🎮 미니게임</div>
+                <div id="menu-2" class="menu-tab py-0.5 rounded-lg opacity-65 transition-colors cursor-pointer">🎀 코디</div>
+                <div id="menu-3" class="menu-tab py-0.5 rounded-lg opacity-65 transition-colors cursor-pointer">🫧 청결</div>
+                <div id="menu-4" class="menu-tab py-0.5 rounded-lg opacity-65 transition-colors cursor-pointer">🌙 잠자기</div>
+            </div>
+
+            <!-- 중앙 캐릭터 & 미니게임 무대 -->
+            <div class="flex-1 flex flex-col items-center justify-center relative my-1">
+                <div id="speechBubble" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/85 text-emerald-800 shadow-2xs mb-1 border border-emerald-100 z-10">
+                    반가워요! 나와 함께 즐겁게 지내봐요 S2
                 </div>
-                <div class="h-8 w-0.5 bg-slate-800"></div>
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-shield-halved text-sky-400 text-2xl"></i>
-                    <span id="armorText" class="text-3xl font-black val-font tracking-wider text-sky-300">50</span>
+
+                <!-- 간식 / 코디 서브 팝업 -->
+                <div id="subMenuOverlay" class="hidden absolute inset-x-1 top-6 bottom-1 bg-white/95 backdrop-blur-xs rounded-xl border-2 border-purple-300 p-2 flex-col justify-between z-20 shadow-md">
+                    <div class="flex justify-between items-center border-b border-emerald-100 pb-1">
+                        <span id="subMenuTitle" class="text-[11px] font-black text-purple-600">🍓 간식 고르기</span>
+                        <button id="closeSubMenu" class="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-md font-bold cursor-pointer">닫기 ✕</button>
+                    </div>
+                    <div id="subMenuItems" class="grid grid-cols-3 gap-1.5 my-auto py-1"></div>
+                    <div class="text-[9px] text-center text-slate-400 font-bold">터치하거나 A/B 버튼으로 선택!</div>
                 </div>
-                <div class="h-8 w-0.5 bg-slate-800"></div>
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-heart text-rose-500 text-3xl"></i>
-                    <span id="healthText" class="text-5xl font-black val-font tracking-wider text-white">100</span>
+
+                <!-- 미니게임 플레이 오버레이 -->
+                <div id="miniGameOverlay" class="hidden absolute inset-0 bg-emerald-950/90 rounded-xl p-2 flex-col justify-between z-20 text-emerald-100">
+                    <div class="flex justify-between items-center text-[10px] font-bold border-b border-emerald-800 pb-1">
+                        <span>🎮 하트 캐치! 미니게임</span>
+                        <span id="mgScore" class="text-pink-300">점수: 0</span>
+                        <button id="closeMiniGame" class="bg-emerald-800 text-white px-1.5 py-0.5 rounded text-[9px] cursor-pointer">나가기</button>
+                    </div>
+                    <div id="mgPlayArea" class="relative flex-1 my-1 overflow-hidden cursor-pointer border border-emerald-800/80 rounded-lg bg-emerald-900/50">
+                        <div id="mgInstruction" class="absolute inset-0 flex items-center justify-center text-center text-[10px] text-emerald-300 px-2">
+                            떨어지는 하트(S2)를 터치해서 잡아보세요! ♡
+                        </div>
+                    </div>
+                    <div class="text-center text-[9px] text-emerald-400">제한시간 동안 하트를 많이 모아요!</div>
+                </div>
+
+                <!-- 캐릭터 SVG 렌더링 영역 -->
+                <div id="petContainer" class="w-24 h-24 flex items-center justify-center relative"></div>
+
+                <!-- 응가 표시 영역 -->
+                <div id="poopContainer" class="absolute bottom-1 flex gap-1 z-10"></div>
+            </div>
+
+            <!-- 하단 게이지바 -->
+            <div class="bg-white/80 backdrop-blur-xs rounded-xl p-2 border border-emerald-200/80 space-y-1.5">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[9px] font-black text-purple-600 w-8">포만</span>
+                    <div class="flex-1 h-2 bg-purple-200/60 rounded-full overflow-hidden">
+                        <div id="hungerBar" class="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all duration-300" style="width: 80%;"></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[9px] font-black text-pink-500 w-8">행복</span>
+                    <div class="flex-1 h-2 bg-pink-200/60 rounded-full overflow-hidden">
+                        <div id="happyBar" class="h-full bg-gradient-to-r from-pink-400 to-rose-400 transition-all duration-300" style="width: 80%;"></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[9px] font-black text-emerald-600 w-8">청결</span>
+                    <div class="flex-1 h-2 bg-emerald-200/60 rounded-full overflow-hidden">
+                        <div id="cleanBar" class="h-full bg-gradient-to-r from-emerald-400 to-teal-400 transition-all duration-300" style="width: 100%;"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Agent Skills Bar (SOVA / JETT Style) -->
-            <div class="flex items-center gap-3 bg-slate-950/85 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
-                <!-- Skill C: Heal -->
-                <div class="flex flex-col items-center">
-                    <div id="skillC" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-slate-600 flex items-center justify-center text-amber-400 font-bold text-lg relative shadow-inner">
-                        <i class="fa-solid fa-kit-medical"></i>
-                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">C</span>
-                    </div>
-                    <span class="text-[10px] text-slate-400 mt-1 font-bold">회복구</span>
-                </div>
-
-                <!-- Skill Q: Smoke -->
-                <div class="flex flex-col items-center">
-                    <div id="skillQ" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 font-bold text-lg relative shadow-inner">
-                        <i class="fa-solid fa-smog"></i>
-                        <span id="skillQCharges" class="absolute -bottom-1 -right-1 bg-emerald-600 text-white text-[10px] px-1.5 rounded-full font-bold">2</span>
-                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">Q</span>
-                    </div>
-                    <span class="text-[10px] text-slate-400 mt-1 font-bold">연막탄</span>
-                </div>
-
-                <!-- Skill E: Flash -->
-                <div class="flex flex-col items-center">
-                    <div id="skillE" class="w-12 h-12 rounded-xl bg-slate-900 border-2 border-sky-500 flex items-center justify-center text-sky-400 font-bold text-lg relative shadow-inner">
-                        <i class="fa-solid fa-bolt"></i>
-                        <span id="skillECharges" class="absolute -bottom-1 -right-1 bg-sky-600 text-white text-[10px] px-1.5 rounded-full font-bold">1</span>
-                        <span class="absolute -top-2 -left-2 bg-slate-950 text-slate-300 text-xs px-1.5 py-0.5 rounded border border-slate-700 font-bold">E</span>
-                    </div>
-                    <span class="text-[10px] text-slate-400 mt-1 font-bold">섬광탄</span>
-                </div>
-
-                <!-- Skill X: Ultimate -->
-                <div class="flex flex-col items-center">
-                    <div id="skillX" class="w-14 h-14 rounded-xl bg-gradient-to-tr from-rose-600 via-amber-600 to-yellow-500 border-2 border-amber-300 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-rose-600/50 relative">
-                        <i class="fa-solid fa-crosshairs animate-pulse"></i>
-                        <span class="absolute -top-2 -left-2 bg-slate-950 text-amber-400 text-xs px-1.5 py-0.5 rounded border border-amber-500 font-black">X</span>
-                    </div>
-                    <span class="text-[10px] text-amber-400 mt-1 font-black">궁극기</span>
-                </div>
-            </div>
-
-            <!-- Weapon Ammo & Spike Carrier Badge -->
-            <div class="flex items-center gap-4">
-                <div id="spikeCarrierBadge" class="hidden flex-col items-center justify-center bg-amber-500/20 border border-amber-500/50 px-4 py-3 rounded-2xl backdrop-blur-md">
-                    <i class="fa-solid fa-box-archive text-amber-400 text-2xl animate-pulse"></i>
-                    <span class="text-[10px] font-black text-amber-400 mt-1">스파이크 보유 [4]</span>
-                </div>
-
-                <div class="flex flex-col items-end bg-slate-950/85 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-700/60 shadow-2xl">
-                    <div class="text-xs font-bold text-slate-400 tracking-wider mb-0.5 flex items-center gap-2">
-                        <span id="weaponName" class="text-amber-400 font-black">VANDAL</span>
-                        <span id="fireTypeBadge" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-semibold">AUTO</span>
-                    </div>
-                    <div class="flex items-baseline gap-1">
-                        <span id="ammoCurrent" class="text-5xl font-black val-font text-white tracking-widest">25</span>
-                        <span class="text-slate-500 font-bold text-2xl">/</span>
-                        <span id="ammoReserve" class="text-2xl font-bold val-font text-slate-400">75</span>
-                    </div>
-                </div>
-            </div>
         </div>
-    </div>
 
-    <!-- Match Game Over Screen -->
-    <div id="gameOverScreen" class="absolute inset-0 bg-slate-950/95 z-50 hidden flex flex-col items-center justify-center p-8 text-center backdrop-blur-2xl">
-        <div id="winTitle" class="text-8xl font-black val-font tracking-wider mb-2 text-emerald-400 drop-shadow-lg">VICTORY</div>
-        <p id="winSubtitle" class="text-slate-300 text-2xl mb-8 font-semibold">아군 팀이 먼저 13라운드를 선점하여 최종 승리했습니다!</p>
-        <button onclick="location.reload()" class="px-10 py-4 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-3xl rounded-2xl val-font tracking-wider shadow-2xl shadow-rose-600/40 transition hover:scale-105 cursor-pointer">
-            경기 재시작 (RESTART MATCH)
-        </button>
-    </div>
+        <div class="my-3 flex items-center justify-between w-full px-4 text-xs font-bold text-slate-600">
+            <span id="brandLabel" class="pixel-font text-[10px] text-purple-700 tracking-wider">H2H.TAMA</span>
+            <span class="flex items-center gap-1 text-[11px] text-pink-600">♡ S2 FRIENDS</span>
+        </div>
 
-    <!-- Game Start Screen -->
-    <div id="startScreen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center z-50 p-6 text-center">
-        <div class="max-w-xl w-full bg-slate-900/90 p-8 rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col items-center">
-            <div class="w-20 h-20 bg-gradient-to-tr from-rose-600 to-amber-500 rounded-3xl flex items-center justify-center text-4xl text-white font-black mb-4 shadow-xl shadow-rose-600/40">V</div>
-            <h1 class="text-6xl font-black val-font tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-rose-500 via-amber-300 to-indigo-400 mb-1">
-                VALORANT 3D FPS - REPLICATED
-            </h1>
-            <p class="text-slate-400 text-xs mb-5 leading-relaxed">
-                반동 집탄군, 미니맵, 정교한 사이트 구현! 5v5 발로란트 공방 매치에 도전하세요.
-            </p>
-
-            <!-- 난이도 선택 버튼 그룹 -->
-            <div class="w-full mb-6">
-                <div class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest text-left">난이도 선택 (DIFFICULTY SELECT)</div>
-                <div class="grid grid-cols-3 gap-3">
-                    <button id="btnEasy" onclick="window.selectDifficulty('easy')" class="py-3 bg-slate-800 hover:bg-emerald-600/30 border border-slate-700 hover:border-emerald-500 rounded-xl transition text-slate-300 font-bold val-font text-xl tracking-wider cursor-pointer">
-                        🌱 EASY<br><span class="text-[10px] font-normal text-slate-400">조준 느림 / 초보용</span>
-                    </button>
-                    <button id="btnNormal" onclick="window.selectDifficulty('normal')" class="py-3 bg-slate-800 hover:bg-amber-600/30 border-2 border-amber-500 rounded-xl transition text-amber-400 font-bold val-font text-xl tracking-wider cursor-pointer">
-                        ⚔️ NORMAL<br><span class="text-[10px] font-normal text-amber-300">표준 밸런스</span>
-                    </button>
-                    <button id="btnHard" onclick="window.selectDifficulty('hard')" class="py-3 bg-slate-800 hover:bg-rose-600/30 border border-slate-700 hover:border-rose-500 rounded-xl transition text-slate-300 font-bold val-font text-xl tracking-wider cursor-pointer">
-                        🔥 HARD<br><span class="text-[10px] font-normal text-rose-400">레디언트 AI / 네온 맵</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2.5 w-full text-[11px] text-left mb-6 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">WASD</span> 이동 / <span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">Shift</span> 정숙 걸음</div>
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-rose-600 rounded text-white font-bold">B</span> 상점 열기/닫기</div>
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-slate-800 rounded text-slate-200 font-bold">좌클릭 / 우클릭</span> 사격 / ADS 조준</div>
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-amber-600 rounded text-white font-bold">4</span> 스파이크 설치</div>
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-emerald-600 rounded text-white font-bold">Q / E</span> 연막탄 / 섬광탄</div>
-                <div class="flex items-center gap-2"><span class="px-2 py-0.5 bg-amber-500 rounded text-white font-bold">C / X</span> 체력 회복 / 궁극기</div>
-            </div>
-
-            <button id="startGameBtn" class="w-full py-4 bg-gradient-to-r from-rose-600 via-amber-600 to-rose-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-3xl rounded-2xl shadow-xl shadow-rose-600/40 transition-all duration-300 val-font tracking-wider cursor-pointer transform hover:scale-[1.02]">
-                경기 시작 (START MATCH)
+        <!-- 다마고치 물리 버튼 -->
+        <div class="flex items-center justify-center gap-4 sm:gap-6 w-full mb-3">
+            <button id="btnA" class="tama-btn w-12 h-12 rounded-full bg-gradient-to-tr from-white to-purple-100 border-2 border-white flex flex-col items-center justify-center text-xs font-black text-slate-700 active:scale-95 shadow-md cursor-pointer">
+                <span>A</span>
+                <span class="text-[8px] text-purple-500">선택</span>
+            </button>
+            <button id="btnB" class="tama-btn w-12 h-12 rounded-full bg-gradient-to-tr from-white to-pink-100 border-2 border-white flex flex-col items-center justify-center text-xs font-black text-slate-700 active:scale-95 shadow-md cursor-pointer">
+                <span>B</span>
+                <span class="text-[8px] text-pink-500">결정</span>
+            </button>
+            <button id="btnC" class="tama-btn w-12 h-12 rounded-full bg-gradient-to-tr from-white to-emerald-100 border-2 border-white flex flex-col items-center justify-center text-xs font-black text-slate-700 active:scale-95 shadow-md cursor-pointer">
+                <span>C</span>
+                <span class="text-[8px] text-emerald-600">쓰다듬</span>
             </button>
         </div>
+
+        <div class="w-full flex justify-between items-center px-1 text-xs text-slate-500 border-t border-white/60 pt-2">
+            <div class="flex items-center gap-2">
+                <span id="stageLabel" class="font-bold text-purple-600">알</span>
+                <span id="ageDisplay" class="font-mono">0일째</span>
+                <span id="expDisplay" class="hidden">EXP: 0</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="changeCharBtn" class="text-[11px] font-bold text-slate-500 hover:text-purple-600 transition-colors cursor-pointer">캐릭터 변경</button>
+                <button id="soundToggleBtn" class="px-2.5 py-1 rounded-xl bg-white/75 hover:bg-white text-purple-600 text-[11px] font-bold transition-all border border-white cursor-pointer">
+                    🔊 소리 ON
+                </button>
+            </div>
+        </div>
+
     </div>
 
-    <!-- GAME LOGIC SCRIPT -->
     <script>
-        window.selectDifficulty = function(diff) {
-            selectedDifficulty = diff;
-            const buttons = {
-                easy: document.getElementById('btnEasy'),
-                normal: document.getElementById('btnNormal'),
-                hard: document.getElementById('btnHard')
-            };
-
-            Object.keys(buttons).forEach(key => {
-                if (buttons[key]) {
-                    buttons[key].className = "py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition text-slate-400 font-bold val-font text-xl tracking-wider cursor-pointer";
-                }
-            });
-
-            if (diff === 'easy' && buttons.easy) {
-                buttons.easy.className = "py-3 bg-emerald-950/80 border-2 border-emerald-500 rounded-xl transition text-emerald-400 font-bold val-font text-xl tracking-wider cursor-pointer shadow-lg shadow-emerald-500/20";
-            } else if (diff === 'normal' && buttons.normal) {
-                buttons.normal.className = "py-3 bg-amber-950/80 border-2 border-amber-500 rounded-xl transition text-amber-400 font-bold val-font text-xl tracking-wider cursor-pointer shadow-lg shadow-amber-500/20";
-            } else if (diff === 'hard' && buttons.hard) {
-                buttons.hard.className = "py-3 bg-rose-950/80 border-2 border-rose-500 rounded-xl transition text-rose-400 font-bold val-font text-xl tracking-wider cursor-pointer hard-glow";
-            }
-        };
-
-        // --- GAME STATE VARIABLES ---
-        let scene, camera, renderer;
-        let isGameStarted = false;
-        let isPointerLocked = false;
-        let isBuyMenuOpen = false;
-
-        // Audio Synths
-        let gunSynth, specterSynth, flashSynth, spikeBeepSynth, headshotSynth, killChimeSynth, aceSynth;
-
-        // UI Refs
-        let hud, startScreen, buyMenu, phaseBanner, spikeBanner, creditsText, hudCreditsText;
-        let healthText, armorText, ammoCurrent, ammoReserve, killFeed, flashOverlay;
-        let damageVignette, adsScope, hitmarker, teamScoreEl, enemyScoreEl;
-        let roundCounterEl, roundTimerEl, killBannerContainer, spikeCarrierBadge, difficultyBadge, diffLabel;
-        let minimapCtx;
-
-        // Multi-kill count
-        let currentKillStreak = 0;
-
-        // Recoil system
-        let recoilPitch = 0;
-        let recoilYaw = 0;
-        let isShooting = false;
-        let muzzleFlashLight;
-
-        // Difficulty Settings
-        let selectedDifficulty = 'normal';
-        const difficultySettings = {
-            easy: { name: 'EASY', aiInterval: 1000, aiDmg: 12, aiAcc: 0.35, aiMove: false, allyInterval: 1000, allyDmg: 15, allyAcc: 0.4, allyMove: false, labelColor: 'text-emerald-400' },
-            normal: { name: 'NORMAL', aiInterval: 650, aiDmg: 18, aiAcc: 0.65, aiMove: true, allyInterval: 650, allyDmg: 20, allyAcc: 0.65, allyMove: true, labelColor: 'text-amber-400' },
-            hard: { name: 'HARD (RADIANT)', aiInterval: 280, aiDmg: 28, aiAcc: 0.90, aiMove: true, allyInterval: 300, allyDmg: 25, allyAcc: 0.88, allyMove: true, labelColor: 'text-rose-500' }
-        };
-
-        // Match State
-        let teamWins = 0;
-        let enemyWins = 0;
-        const WIN_SCORE = 13;
-        let currentRound = 1;
-        let isBuyPhase = true;
-        let roundTimerSeconds = 10;
-
-        // Spike State
-        let isSpikePlanted = false;
-        let spikeTimer = 45;
-        let spikeMesh = null;
-        let hasSpike = true;
-
-        // Particles
-        const particles = [];
-
-        // Player
-        const player = {
-            height: 1.7,
-            speed: 0.15,
-            walkSpeed: 0.07,
-            health: 100,
-            maxHealth: 100,
-            armor: 50,
-            credits: 3000,
-            isADS: false,
-            skillQ: 2,
-            skillE: 1,
-            skillC: 1,
-            skillXReady: true,
-            weaponType: 'vandal',
-            damage: 40,
-            ammo: 25,
-            maxAmmo: 25,
-            reserveAmmo: 75,
-            isReloading: false,
-            fireRate: 105,
-            lastShotTime: 0
-        };
-
-        const keys = {};
-
-        // World Objects
-        let mapGroup;
-        const teammates = [];
-        const enemies = [];
-        const smokes = [];
-        const mapObstacles = [];
-
-        // Weapon Mesh
-        let gunMesh;
-        let gunBasePos = new THREE.Vector3(0.28, -0.22, -0.42);
-
-        // Map Spawns
-        const allySpawns = [
-            new THREE.Vector3(0, 1.7, 48),
-            new THREE.Vector3(-8, 1.7, 48),
-            new THREE.Vector3(8, 1.7, 48),
-            new THREE.Vector3(-16, 1.7, 50),
-            new THREE.Vector3(16, 1.7, 50)
-        ];
-
-        const enemySpawns = [
-            new THREE.Vector3(0, 1.7, -48),
-            new THREE.Vector3(-8, 1.7, -48),
-            new THREE.Vector3(8, 1.7, -48),
-            new THREE.Vector3(-16, 1.7, -50),
-            new THREE.Vector3(16, 1.7, -50)
-        ];
-
-        function initUIElements() {
-            hud = document.getElementById('hud');
-            startScreen = document.getElementById('startScreen');
-            buyMenu = document.getElementById('buyMenu');
-            phaseBanner = document.getElementById('phaseBanner');
-            spikeBanner = document.getElementById('spikeBanner');
-            creditsText = document.getElementById('creditsText');
-            hudCreditsText = document.getElementById('hudCreditsText');
-            healthText = document.getElementById('healthText');
-            armorText = document.getElementById('armorText');
-            ammoCurrent = document.getElementById('ammoCurrent');
-            ammoReserve = document.getElementById('ammoReserve');
-            killFeed = document.getElementById('killFeed');
-            flashOverlay = document.getElementById('flashOverlay');
-            damageVignette = document.getElementById('damageVignette');
-            adsScope = document.getElementById('adsScope');
-            hitmarker = document.getElementById('hitmarker');
-            teamScoreEl = document.getElementById('teamScore');
-            enemyScoreEl = document.getElementById('enemyScore');
-            roundCounterEl = document.getElementById('roundCounter');
-            roundTimerEl = document.getElementById('roundTimer');
-            killBannerContainer = document.getElementById('killBannerContainer');
-            spikeCarrierBadge = document.getElementById('spikeCarrierBadge');
-            difficultyBadge = document.getElementById('difficultyBadge');
-            diffLabel = document.getElementById('diffLabel');
-
-            const miniCanvas = document.getElementById('minimapCanvas');
-            if (miniCanvas) minimapCtx = miniCanvas.getContext('2d');
-        }
-
-        function init() {
-            initUIElements();
-
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0f1d);
-            scene.fog = new THREE.FogExp2(0x0a0f1d, 0.01);
-
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.copy(allySpawns[0]);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            
-            const container = document.getElementById('gameCanvas');
-            container.appendChild(renderer.domElement);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-            scene.add(ambientLight);
-
-            const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.5);
-            sunLight.position.set(50, 90, 30);
-            sunLight.castShadow = true;
-            sunLight.shadow.mapSize.width = 2048;
-            sunLight.shadow.mapSize.height = 2048;
-            scene.add(sunLight);
-
-            createTacticalMap();
-            createPlayerGun();
-
-            window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { keys[e.code] = true; handleKeyDown(e); });
-            document.addEventListener('keyup', (e) => { keys[e.code] = false; });
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mousedown', handleMouseDown);
-            document.addEventListener('mouseup', (e) => { if (e.button === 0) isShooting = false; });
-
-            document.getElementById('startGameBtn').addEventListener('click', async () => {
-                await initAudio();
-                startMatch();
-            });
-
-            document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement === document.body) {
-                    isPointerLocked = true;
-                    if (!isBuyMenuOpen) hud.classList.remove('hidden');
-                } else {
-                    isPointerLocked = false;
-                }
-            });
-
-            setInterval(updateRoundTimer, 1000);
-            animate();
-        }
-
-        async function initAudio() {
-            if (gunSynth) return;
-            try {
-                if (typeof Tone !== 'undefined') {
-                    await Tone.start();
-                    gunSynth = new Tone.NoiseSynth({
-                        noise: { type: 'pink' },
-                        envelope: { attack: 0.001, decay: 0.18, sustain: 0 }
-                    }).toDestination();
-                    gunSynth.volume.value = -1;
-
-                    specterSynth = new Tone.Synth({
-                        oscillator: { type: 'triangle' },
-                        envelope: { attack: 0.001, decay: 0.08, sustain: 0 }
-                    }).toDestination();
-                    specterSynth.volume.value = -6;
-
-                    headshotSynth = new Tone.Synth({
-                        oscillator: { type: 'sine' },
-                        envelope: { attack: 0.001, decay: 0.25, sustain: 0 }
-                    }).toDestination();
-                    headshotSynth.volume.value = 4;
-
-                    killChimeSynth = new Tone.PolySynth(Tone.Synth).toDestination();
-                    killChimeSynth.volume.value = -2;
-
-                    aceSynth = new Tone.PolySynth(Tone.Synth).toDestination();
-                    aceSynth.volume.value = 4;
-
-                    flashSynth = new Tone.MetalSynth().toDestination();
-                    spikeBeepSynth = new Tone.MembraneSynth().toDestination();
-                }
-            } catch (e) {}
-        }
-
-        // --- Detailed Map Generation (Bermuda / Haven Style) ---
-        function createTacticalMap() {
-            mapGroup = new THREE.Group();
-            mapObstacles.length = 0;
-
-            const isHard = selectedDifficulty === 'hard';
-
-            // Main Ground Floor
-            const floorMat = new THREE.MeshStandardMaterial({ 
-                color: isHard ? 0x050814 : 0x1e293b, 
-                roughness: 0.6 
-            });
-            const floor = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            mapGroup.add(floor);
-
-            // Wall Material
-            const wallMat = new THREE.MeshStandardMaterial({ color: isHard ? 0x0f172a : 0x334155, roughness: 0.7 });
-            
-            function addWall(w, h, d, x, y, z, colorOverride) {
-                const mat = colorOverride ? new THREE.MeshStandardMaterial({ color: colorOverride, roughness: 0.6 }) : wallMat;
-                const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-                wall.position.set(x, y + h / 2, z);
-                wall.castShadow = true;
-                wall.receiveShadow = true;
-                mapGroup.add(wall);
-
-                // Add bounding box for player collision
-                mapObstacles.push(new THREE.Box3().setFromObject(wall));
-            }
-
-            // Outer Boundary Walls
-            addWall(160, 14, 4, 0, 0, -80);
-            addWall(160, 14, 4, 0, 0, 80);
-            addWall(4, 14, 160, -80, 0, 0);
-            addWall(4, 14, 160, 80, 0, 0);
-
-            // --- Site A (East - Left) ---
-            addWall(30, 8, 4, -45, 0, -25, 0x1e1b4b);
-            addWall(4, 8, 30, -30, 0, -40, 0x1e1b4b);
-            // Site A Mark Floor Ground
-            const siteAFloor = new THREE.Mesh(
-                new THREE.PlaneGeometry(24, 24),
-                new THREE.MeshStandardMaterial({ color: 0xef4444, transparent: true, opacity: 0.25 })
-            );
-            siteAFloor.rotation.x = -Math.PI / 2;
-            siteAFloor.position.set(-50, 0.05, -50);
-            mapGroup.add(siteAFloor);
-
-            // --- Site B (Center - Main) ---
-            addWall(24, 6, 24, 0, 0, -10, 0x334155);
-            // Site B Mark Floor
-            const siteBFloor = new THREE.Mesh(
-                new THREE.PlaneGeometry(28, 28),
-                new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.25 })
-            );
-            siteBFloor.rotation.x = -Math.PI / 2;
-            siteBFloor.position.set(0, 0.05, 0);
-            mapGroup.add(siteBFloor);
-
-            // --- Site C (West - Right) ---
-            addWall(30, 8, 4, 45, 0, -25, 0x1e1b4b);
-            addWall(4, 8, 30, 30, 0, -40, 0x1e1b4b);
-
-            // --- Cover Crates & Radianti Boxes ---
-            const radBoxMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3, metalness: 0.8 });
-            const boxMat = new THREE.MeshStandardMaterial({ color: isHard ? 0x881337 : 0xd97706, roughness: 0.5 });
-
-            function addCrate(x, y, z, sx = 3, sy = 3, sz = 3, isRad = false) {
-                const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), isRad ? radBoxMat : boxMat);
-                mesh.position.set(x, y + sy / 2, z);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                mapGroup.add(mesh);
-                mapObstacles.push(new THREE.Box3().setFromObject(mesh));
-            }
-
-            // Site Covers
-            addCrate(-50, 0, -48, 4, 3.5, 4, true);
-            addCrate(-45, 0, -52, 3, 3, 3);
-            addCrate(0, 0, 5, 4, 3, 4, true);
-            addCrate(5, 0, -5, 3, 3, 3);
-            addCrate(50, 0, -48, 4, 3.5, 4, true);
-
-            // Mid Choke Corridor Walls
-            addWall(4, 10, 40, -18, 0, 15);
-            addWall(4, 10, 40, 18, 0, 15);
-
-            scene.add(mapGroup);
-        }
-
-        // --- DETAILED VANDAL / PHANTOM GUN MODELING ---
-        function createPlayerGun() {
-            if (gunMesh) camera.remove(gunMesh);
-            gunMesh = new THREE.Group();
-
-            const isPhantom = (player.weaponType === 'phantom');
-            const bodyMat = new THREE.MeshStandardMaterial({ color: isPhantom ? 0x1e293b : 0x0f172a, roughness: 0.25, metalness: 0.7 });
-            const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.2, metalness: 0.9 });
-
-            // Receiver Body
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.6), bodyMat);
-            gunMesh.add(body);
-
-            // Magazine Clip
-            const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.28, 0.12), goldMat);
-            mag.position.set(0, -0.16, 0.05);
-            mag.rotation.x = -0.2;
-            gunMesh.add(mag);
-
-            // Barrel & Muzzle
-            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, isPhantom ? 0.6 : 0.5), bodyMat);
-            barrel.rotation.x = Math.PI / 2;
-            barrel.position.set(0, 0.03, -0.48);
-            gunMesh.add(barrel);
-
-            // Muzzle Flash Light
-            muzzleFlashLight = new THREE.PointLight(0xffaa00, 0, 8);
-            muzzleFlashLight.position.set(0, 0.03, -0.8);
-            gunMesh.add(muzzleFlashLight);
-
-            gunMesh.position.copy(gunBasePos);
-            camera.add(gunMesh);
-            scene.add(camera);
-        }
-
-        function startMatch() {
-            isGameStarted = true;
-            teamWins = 0;
-            enemyWins = 0;
-            currentRound = 1;
-            player.credits = 3000;
-            
-            const setting = difficultySettings[selectedDifficulty];
-            difficultyBadge.classList.remove('hidden');
-            diffLabel.textContent = setting.name;
-            diffLabel.className = `font-black val-font text-base tracking-wider ${setting.labelColor}`;
-
-            startScreen.classList.add('hidden');
-            hud.classList.remove('hidden');
-            
-            startNewRound();
-            document.body.requestPointerLock();
-        }
-
-        function startNewRound() {
-            isBuyPhase = true;
-            isSpikePlanted = false;
-            spikeTimer = 45;
-            hasSpike = true;
-            roundTimerSeconds = 10;
-            currentKillStreak = 0;
-
-            phaseBanner.classList.remove('hidden');
-            spikeBanner.classList.add('hidden');
-            spikeCarrierBadge.classList.remove('hidden');
-
-            if (spikeMesh) scene.remove(spikeMesh);
-
-            player.health = 100;
-            player.ammo = player.maxAmmo;
-            player.reserveAmmo = 75;
-            camera.position.copy(allySpawns[0]);
-
-            player.credits += 3000;
-            updateCreditUI();
-            updateHealthUI();
-            updateAmmoUI();
-
-            teammates.forEach(b => scene.remove(b.mesh));
-            enemies.forEach(b => scene.remove(b.mesh));
-            teammates.length = 0;
-            enemies.length = 0;
-
-            const allyNames = ["SOVA", "SAGE", "JETT", "REYNA"];
-            for (let i = 0; i < 4; i++) {
-                spawnAgent(allySpawns[i + 1], allyNames[i], 'ally');
-            }
-
-            const enemyNames = ["OMEN", "VIPER", "PHOENIX", "BRIM", "RAZE"];
-            for (let i = 0; i < 5; i++) {
-                spawnAgent(enemySpawns[i], enemyNames[i], 'enemy');
-            }
-
-            roundCounterEl.textContent = `ROUND ${currentRound} / 13 WIN`;
-            updateScoreUI();
-        }
-
-        function updateRoundTimer() {
-            if (!isGameStarted) return;
-
-            if (isSpikePlanted) {
-                spikeTimer--;
-                spikeBanner.textContent = `💣 SPIKE PLANTED! EXPLODING IN (${spikeTimer}s)`;
-                if (spikeBeepSynth) spikeBeepSynth.triggerAttackRelease("C3", "8n");
-
-                if (spikeTimer <= 0) {
-                    roundEnd('ally', "SPIKE EXPLODED! ATTACKERS WIN!");
-                }
-                return;
-            }
-
-            roundTimerSeconds--;
-            const mins = Math.floor(Math.abs(roundTimerSeconds) / 60);
-            const secs = Math.abs(roundTimerSeconds) % 60;
-            roundTimerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-
-            if (isBuyPhase && roundTimerSeconds <= 0) {
-                isBuyPhase = false;
-                phaseBanner.classList.add('hidden');
-                toggleBuyMenu(false);
-                roundTimerSeconds = 100;
-                addKillFeed("SYSTEM", "COMBAT PHASE STARTED!", "skill");
-            } else if (!isBuyPhase && roundTimerSeconds <= 0) {
-                roundEnd('enemy', "TIME EXPIRED! DEFENDERS WIN!");
-            }
-        }
-
-        function checkRoundState() {
-            if (isBuyPhase) return;
-
-            const aliveEnemies = enemies.filter(e => !e.isDead).length;
-            const aliveAllies = teammates.filter(t => !t.isDead).length + (player.health > 0 ? 1 : 0);
-
-            if (aliveEnemies === 0) {
-                roundEnd('ally', "ALL ENEMIES ELIMINATED!");
-            } else if (aliveAllies === 0 && !isSpikePlanted) {
-                roundEnd('enemy', "ALL ALLIES ELIMINATED!");
-            }
-        }
-
-        function roundEnd(winner, reason) {
-            if (winner === 'ally') {
-                teamWins++;
-                player.credits += 3000;
-                addKillFeed("ROUND WIN", reason, "skill");
-            } else {
-                enemyWins++;
-                player.credits += 1900;
-                addKillFeed("ROUND LOSS", reason, "kill");
-            }
-
-            updateScoreUI();
-
-            if (teamWins >= WIN_SCORE || enemyWins >= WIN_SCORE) {
-                endMatch(teamWins >= WIN_SCORE);
-                return;
-            }
-
-            currentRound++;
-            setTimeout(() => {
-                startNewRound();
-            }, 3000);
-        }
-
-        function endMatch(isVictory) {
-            isGameStarted = false;
-            document.exitPointerLock();
-            const screen = document.getElementById('gameOverScreen');
-            const title = document.getElementById('winTitle');
-            const sub = document.getElementById('winSubtitle');
-
-            screen.classList.remove('hidden');
-            if (isVictory) {
-                title.textContent = "VICTORY";
-                title.className = "text-8xl font-black val-font tracking-wider mb-2 text-emerald-400 drop-shadow-lg";
-                sub.textContent = "아군 팀이 13라운드를 선점하여 최종 승리했습니다!";
-            } else {
-                title.textContent = "DEFEAT";
-                title.className = "text-8xl font-black val-font tracking-wider mb-2 text-rose-500 drop-shadow-lg";
-                sub.textContent = "적 팀이 13라운드를 선점했습니다. 다음 기회에!";
-            }
-        }
-
-        function toggleBuyMenu(forceState) {
-            isBuyMenuOpen = forceState !== undefined ? forceState : !isBuyMenuOpen;
-            if (isBuyMenuOpen) {
-                buyMenu.classList.remove('hidden');
-                document.exitPointerLock();
-            } else {
-                buyMenu.classList.add('hidden');
-                if (isGameStarted) document.body.requestPointerLock();
-            }
-        }
-
-        window.buyWeapon = function(type, price) {
-            if (player.credits < price) return alert("크레딧이 부족합니다!");
-            player.credits -= price;
-            player.weaponType = type;
-            if (type === 'vandal') {
-                player.damage = 42;
-                player.maxAmmo = 25;
-                player.fireRate = 100;
-                document.getElementById('weaponName').textContent = "VANDAL";
-            } else if (type === 'phantom') {
-                player.damage = 36;
-                player.maxAmmo = 30;
-                player.fireRate = 85;
-                document.getElementById('weaponName').textContent = "PHANTOM";
-            } else if (type === 'spectre') {
-                player.damage = 26;
-                player.maxAmmo = 30;
-                player.fireRate = 70;
-                document.getElementById('weaponName').textContent = "SPECTRE";
-            }
-            player.ammo = player.maxAmmo;
-            createPlayerGun();
-            updateCreditUI();
-            updateAmmoUI();
-        };
-
-        window.buyFullPack = function(price) {
-            if (player.credits < price) return alert("크레딧이 부족합니다!");
-            player.credits -= price;
-            player.armor = 50;
-            player.skillQ = 2;
-            player.skillE = 1;
-            player.skillC = 1;
-            document.getElementById('skillQCharges').textContent = player.skillQ;
-            document.getElementById('skillECharges').textContent = player.skillE;
-            updateCreditUI();
-            updateHealthUI();
-        };
-
-        function spawnAgent(pos, name, team) {
-            const group = new THREE.Group();
-            const isHardMode = (selectedDifficulty === 'hard');
-            const color = (team === 'ally') ? 0x10b981 : (isHardMode ? 0xff0055 : 0xf43f5e);
-            
-            const bodyMat = new THREE.MeshStandardMaterial({ 
-                color, 
-                roughness: 0.3,
-                emissive: (team === 'enemy') ? 0xaa0022 : 0x002211,
-                emissiveIntensity: 0.3
-            });
-
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.3), bodyMat);
-            torso.position.y = 0.375;
-            torso.castShadow = true;
-
-            const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
-            const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), legMat);
-            leftLeg.position.set(-0.15, -0.35, 0);
-            const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), legMat);
-            rightLeg.position.set(0.15, -0.35, 0);
-
-            const headMesh = new THREE.Mesh(
-                new THREE.SphereGeometry(0.24, 16, 16),
-                new THREE.MeshStandardMaterial({ color: 0xffcbd1, roughness: 0.4 })
-            );
-            headMesh.position.y = 0.92;
-
-            const visorColor = (team === 'enemy') ? 0xff1100 : 0x00ffaa;
-            const visor = new THREE.Mesh(
-                new THREE.BoxGeometry(0.32, 0.09, 0.18),
-                new THREE.MeshBasicMaterial({ color: visorColor })
-            );
-            visor.position.set(0, 0.94, -0.15);
-
-            group.add(torso, leftLeg, rightLeg, headMesh, visor);
-            group.position.copy(pos);
-            scene.add(group);
-
-            const botObj = {
-                mesh: group,
-                headMesh: headMesh,
-                name: name,
-                team: team,
-                health: 100,
-                lastShootTime: 0,
-                strafeDir: Math.random() < 0.5 ? 1 : -1,
-                strafeTimer: 0,
-                isDead: false
-            };
-
-            if (team === 'ally') teammates.push(botObj);
-            else enemies.push(botObj);
-        }
-
-        function handleMouseMove(e) {
-            if (!isPointerLocked || isBuyMenuOpen) return;
-            const sensitivity = player.isADS ? 0.0011 : 0.0022;
-            camera.rotation.y -= e.movementX * sensitivity;
-            const pitch = camera.rotation.x - e.movementY * sensitivity;
-            camera.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
-        }
-
-        function handleMouseDown(e) {
-            if (!isPointerLocked || isBuyMenuOpen || isBuyPhase) return;
-            if (e.button === 0) {
-                isShooting = true;
-                shootGun();
-            } else if (e.button === 2) {
-                player.isADS = !player.isADS;
-                camera.fov = player.isADS ? 40 : 75;
-                
-                if (player.isADS) {
-                    adsScope.style.opacity = '1';
-                    gunMesh.position.set(0, -0.14, -0.28);
-                } else {
-                    adsScope.style.opacity = '0';
-                    gunMesh.position.copy(gunBasePos);
-                }
-                camera.updateProjectionMatrix();
-            }
-        }
-
-        function handleKeyDown(e) {
-            if (e.code === 'KeyB') toggleBuyMenu();
-            if (!isPointerLocked || isBuyMenuOpen) return;
-
-            if (e.code === 'KeyR') reloadWeapon();
-            if (e.code === 'KeyQ') useSkillQ();
-            if (e.code === 'KeyE') useSkillE();
-            if (e.code === 'KeyC') useSkillC();
-            if (e.code === 'KeyX') useSkillX();
-            if (e.code === 'Digit4') plantOrDefuseSpike();
-        }
-
-        function plantOrDefuseSpike() {
-            if (isBuyPhase) return;
-            const distToCenter = camera.position.distanceTo(new THREE.Vector3(0, 1.7, 0));
-
-            if (hasSpike && !isSpikePlanted && distToCenter < 12) {
-                isSpikePlanted = true;
-                hasSpike = false;
-                spikeCarrierBadge.classList.add('hidden');
-                spikeBanner.classList.remove('hidden');
-
-                spikeMesh = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.8, 1.2, 0.8),
-                    new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706 })
-                );
-                spikeMesh.position.set(camera.position.x, 0.6, camera.position.z);
-                scene.add(spikeMesh);
-
-                addKillFeed("YOU", "PLANTED THE SPIKE!", "skill");
-            }
-        }
-
-        function shootGun() {
-            const now = performance.now();
-            if (now - player.lastShotTime < player.fireRate || player.isReloading) return;
-
-            if (player.ammo <= 0) {
-                reloadWeapon();
-                return;
-            }
-
-            player.ammo--;
-            player.lastShotTime = now;
-            updateAmmoUI();
-
-            // Muzzle Flash & Recoil Logic
-            if (muzzleFlashLight) {
-                muzzleFlashLight.intensity = 3;
-                setTimeout(() => muzzleFlashLight.intensity = 0, 35);
-            }
-
-            // Recoil offset simulation
-            recoilPitch += 0.006;
-            recoilYaw += (Math.random() - 0.5) * 0.004;
-            camera.rotation.x += 0.006;
-            camera.rotation.y += recoilYaw;
-
-            gunMesh.position.z += 0.05;
-            expandCrosshair();
-
-            setTimeout(() => {
-                gunMesh.position.set(
-                    player.isADS ? 0 : gunBasePos.x,
-                    player.isADS ? -0.14 : gunBasePos.y,
-                    player.isADS ? -0.28 : gunBasePos.z
-                );
-            }, 50);
-
-            if (gunSynth) gunSynth.triggerAttackRelease("16n");
-
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-            createTracer(raycaster.ray.origin, raycaster.ray.direction);
-
-            const enemyMeshes = enemies.filter(e => !e.isDead).map(e => e.mesh);
-            const intersects = raycaster.intersectObjects(enemyMeshes, true);
-
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                const bot = enemies.find(e => e.mesh === hit.object.parent || e.mesh === hit.object.parent?.parent);
-
-                if (bot && !bot.isDead) {
-                    const isHeadshot = (hit.object === bot.headMesh);
-                    const dmg = isHeadshot ? player.damage * 4 : player.damage;
-                    bot.health -= dmg;
-
-                    createSparkParticles(hit.point);
-
-                    if (isHeadshot && headshotSynth) {
-                        headshotSynth.triggerAttackRelease("A5", "16n");
-                    }
-
-                    hitmarker.style.opacity = '1';
-                    hitmarker.style.color = isHeadshot ? '#f43f5e' : '#10b981';
-                    setTimeout(() => { hitmarker.style.opacity = '0'; }, 120);
-
-                    if (bot.health <= 0) {
-                        bot.isDead = true;
-                        scene.remove(bot.mesh);
-                        player.credits += 300;
-                        currentKillStreak++;
-                        updateCreditUI();
-
-                        triggerKillBanner(bot.name, isHeadshot, currentKillStreak);
-                        addKillFeed("YOU", `${isHeadshot ? '🎯 HEADSHOT' : '🔫 KILL'} ${bot.name}`, "kill");
-                        checkRoundState();
-                    }
-                }
-            }
-
-            if (isShooting) {
-                setTimeout(shootGun, player.fireRate);
-            }
-        }
-
-        function expandCrosshair() {
-            const chL = document.getElementById('chLeft');
-            const chR = document.getElementById('chRight');
-            const chT = document.getElementById('chTop');
-            const chB = document.getElementById('chBottom');
-
-            if (chL) chL.style.transform = 'translateX(-6px)';
-            if (chR) chR.style.transform = 'translateX(6px)';
-            if (chT) chT.style.transform = 'translateY(-6px)';
-            if (chB) chB.style.transform = 'translateY(6px)';
-
-            setTimeout(() => {
-                if (chL) chL.style.transform = 'none';
-                if (chR) chR.style.transform = 'none';
-                if (chT) chT.style.transform = 'none';
-                if (chB) chB.style.transform = 'none';
-            }, 90);
-        }
-
-        function createSparkParticles(pos) {
-            for (let i = 0; i < 8; i++) {
-                const geom = new THREE.SphereGeometry(0.06, 8, 8);
-                const mat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
-                const mesh = new THREE.Mesh(geom, mat);
-                mesh.position.copy(pos);
-                scene.add(mesh);
-
-                const velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.2,
-                    Math.random() * 0.2,
-                    (Math.random() - 0.5) * 0.2
-                );
-
-                particles.push({ mesh, velocity, life: 15 });
-            }
-        }
-
-        // VALORANT Kill Banner & Ace Multi-kill Sound
-        function triggerKillBanner(victimName, isHeadshot, streak) {
-            const streakTitles = ["KILLED", "DOUBLE KILL", "TRIPLE KILL", "QUADRA KILL", "ACE (5K!)"];
-            const titleText = streakTitles[Math.min(streak - 1, 4)];
-
-            if (streak >= 5 && aceSynth) {
-                aceSynth.triggerAttackRelease(["C4", "G4", "C5", "E5"], "2n");
-            } else if (killChimeSynth) {
-                killChimeSynth.triggerAttackRelease(["E5", "G5"], "8n");
-            }
-
-            const banner = document.createElement('div');
-            banner.className = "kill-banner bg-slate-950/90 border-2 border-rose-500 text-white px-8 py-3 rounded-2xl flex items-center gap-4 shadow-2xl backdrop-blur-md";
-            banner.innerHTML = `
-                <i class="fa-solid ${isHeadshot ? 'fa-bullseye text-rose-500' : 'fa-skull text-amber-400'} text-4xl"></i>
-                <div>
-                    <div class="text-xs text-amber-400 font-bold tracking-widest">${titleText}</div>
-                    <div class="text-2xl font-black val-font tracking-wider text-rose-400">${victimName}</div>
-                </div>
-            `;
-            killBannerContainer.appendChild(banner);
-            setTimeout(() => banner.remove(), 2000);
-        }
-
-        function createTracer(origin, direction, isEnemy = false) {
-            const geom = new THREE.BufferGeometry().setFromPoints([
-                origin.clone().add(new THREE.Vector3(0.1, -0.1, 0)),
-                origin.clone().add(direction.clone().multiplyScalar(45))
-            ]);
-            const color = isEnemy ? 0xf43f5e : 0xf59e0b;
-            const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
-            const line = new THREE.Line(geom, mat);
-            scene.add(line);
-            setTimeout(() => scene.remove(line), 40);
-        }
-
-        function reloadWeapon() {
-            if (player.isReloading || player.ammo === player.maxAmmo || player.reserveAmmo <= 0) return;
-            player.isReloading = true;
-            ammoCurrent.textContent = "...";
-            setTimeout(() => {
-                const reloadAmount = Math.min(player.maxAmmo - player.ammo, player.reserveAmmo);
-                player.ammo += reloadAmount;
-                player.reserveAmmo -= reloadAmount;
-                player.isReloading = false;
-                updateAmmoUI();
-            }, 1200);
-        }
-
-        function useSkillQ() {
-            if (player.skillQ <= 0) return;
-            player.skillQ--;
-            document.getElementById('skillQCharges').textContent = player.skillQ;
-
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const smokeMesh = new THREE.Mesh(
-                new THREE.SphereGeometry(5, 32, 32),
-                new THREE.MeshStandardMaterial({ color: 0x10b981, transparent: true, opacity: 0.75, roughness: 0.1 })
-            );
-            smokeMesh.position.copy(camera.position.clone().add(dir.multiplyScalar(10)));
-            scene.add(smokeMesh);
-            smokes.push({ mesh: smokeMesh, spawnTime: performance.now() });
-        }
-
-        function useSkillE() {
-            if (player.skillE <= 0) return;
-            player.skillE--;
-            document.getElementById('skillECharges').textContent = player.skillE;
-            flashOverlay.style.opacity = '1';
-            if (flashSynth) flashSynth.triggerAttackRelease("C6", "8n");
-            setTimeout(() => { flashOverlay.style.opacity = '0'; }, 1000);
-        }
-
-        function useSkillC() {
-            if (player.skillC <= 0) return;
-            player.skillC--;
-            player.health = Math.min(100, player.health + 50);
-            updateHealthUI();
-        }
-
-        function useSkillX() {
-            if (!player.skillXReady) return;
-            player.skillXReady = false;
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const targetPos = camera.position.clone().add(dir.multiplyScalar(16));
-
-            enemies.forEach(bot => {
-                if (!bot.isDead && bot.mesh.position.distanceTo(targetPos) < 10) {
-                    bot.health -= 150;
-                    if (bot.health <= 0) {
-                        bot.isDead = true;
-                        scene.remove(bot.mesh);
-                    }
-                }
-            });
-            checkRoundState();
-        }
-
-        function updateBots() {
-            if (isBuyPhase) return;
-
-            const now = performance.now();
-            const config = difficultySettings[selectedDifficulty];
-
-            // Enemy AI Logic
-            enemies.forEach(bot => {
-                if (bot.isDead) return;
-
-                const targets = [
-                    { pos: camera.position, isPlayer: true, health: player.health },
-                    ...teammates.filter(t => !t.isDead).map(t => ({ pos: t.mesh.position, isPlayer: false, bot: t }))
+        /**
+         * Hearts2Hearts 8 Friends Tamagotchi Web App (Refined Character SVG & Text-only Selection)
+         */
+        class TamagotchiGame {
+            constructor() {
+                this.currentCharacter = null;
+                this.state = {
+                    stage: 0, // 0: 알, 1: 아기, 2: 주니어, 3: 슈퍼스타, 4: 휴식
+                    hunger: 80,
+                    happy: 80,
+                    clean: 100,
+                    poopCount: 0,
+                    isSleeping: false,
+                    age: 0,
+                    exp: 0,
+                    selectedMenu: 0,
+                    outfit: 'none'
+                };
+
+                this.soundEnabled = true;
+                this.tickCounter = 0;
+                this.activeSubMenu = null;
+                this.subMenuIndex = 0;
+                this.gameLoopInterval = null;
+
+                this.isMiniGameActive = false;
+                this.mgScore = 0;
+                this.mgInterval = null;
+                this.mgTimer = null;
+
+                this.characterMeta = {
+                    jujebi: { name: '쮸제비', brand: 'JUJEBI.TAMA' },
+                    bingping: { name: '빙핑', brand: 'BINGPING.TAMA' },
+                    toramwi: { name: '토라뮈', brand: 'TORAMWI.TAMA' },
+                    stelnyang: { name: '스텔냥', brand: 'STELNYANG.TAMA' },
+                    jjulian: { name: '쭈일리언', brand: 'JJULIAN.TAMA' },
+                    nosung: { name: '노숭이', brand: 'NOSUNG.TAMA' },
+                    peanut: { name: '정땅콩', brand: 'PEANUT.TAMA' },
+                    hamssong: { name: '알쏭햄쏭', brand: 'HAMSSONG.TAMA' }
+                };
+
+                this.snacks = [
+                    { id: 'macaron', icon: '🍓', name: '딸기마카롱', hunger: 20, happy: 10, exp: 8, msg: '달콤한 딸기 마카롱 냠냠! 🍓' },
+                    { id: 'riceball', icon: '🍙', name: '하트주먹밥', hunger: 35, happy: 5, exp: 9, msg: '든든한 하트 주먹밥 꿀꺽! 🍙' },
+                    { id: 'pudding', icon: '🍮', name: '커스터드푸딩', hunger: 15, happy: 20, exp: 10, msg: '말랑탱글 푸딩 최고! 🍮' }
                 ];
 
-                let closest = null;
-                let minDist = 999;
-                targets.forEach(t => {
-                    const d = bot.mesh.position.distanceTo(t.pos);
-                    if (d < minDist) {
-                        minDist = d;
-                        closest = t;
-                    }
+                this.outfits = [
+                    { id: 'none', icon: '✨', name: '기본룩' },
+                    { id: 'ribbon', icon: '🎀', name: '핑크리본' },
+                    { id: 'headphone', icon: '🎧', name: 'Y2K헤드폰' },
+                    { id: 'glasses', icon: '🕶️', name: '하트선글라스' },
+                    { id: 'scarf', icon: '🧣', name: '하늘망토' },
+                    { id: 'tiara', icon: '👑', name: 'S2티아라' }
+                ];
+
+                this.stagesInfo = [
+                    { name: '알 부화 대기', reqExp: 20 },
+                    { name: '아기', reqExp: 50 },
+                    { name: '주니어', reqExp: 100 },
+                    { name: '슈퍼스타 ★', reqExp: 999 },
+                    { name: '구름 위 휴식', reqExp: 999 }
+                ];
+
+                this.selectScreen = document.getElementById('characterSelectScreen');
+                this.gameScreen = document.getElementById('gameScreen');
+                this.lcdScreen = document.getElementById('lcdScreen');
+                this.petContainer = document.getElementById('petContainer');
+                this.speechBubble = document.getElementById('speechBubble');
+                this.poopContainer = document.getElementById('poopContainer');
+                this.sleepZzz = document.getElementById('sleepZzz');
+                this.stageLabel = document.getElementById('stageLabel');
+                this.ageDisplay = document.getElementById('ageDisplay');
+                this.expDisplay = document.getElementById('expDisplay');
+                this.brandLabel = document.getElementById('brandLabel');
+
+                this.subMenuOverlay = document.getElementById('subMenuOverlay');
+                this.subMenuTitle = document.getElementById('subMenuTitle');
+                this.subMenuItems = document.getElementById('subMenuItems');
+
+                this.miniGameOverlay = document.getElementById('miniGameOverlay');
+                this.mgScoreDisplay = document.getElementById('mgScore');
+                this.mgPlayArea = document.getElementById('mgPlayArea');
+                this.mgInstruction = document.getElementById('mgInstruction');
+
+                this.synth = new Tone.Synth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.2 }
+                }).toDestination();
+
+                this.initApp();
+            }
+
+            initApp() {
+                document.querySelectorAll('.char-select-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const charKey = e.currentTarget.dataset.char;
+                        this.startGameWithCharacter(charKey);
+                    });
                 });
 
-                if (closest && minDist < 50) {
-                    bot.mesh.lookAt(closest.pos.x, bot.mesh.position.y, closest.pos.z);
+                document.getElementById('changeCharBtn').addEventListener('click', () => {
+                    this.returnToSelect();
+                });
+
+                this.bindGameEvents();
+            }
+
+            startGameWithCharacter(charKey) {
+                this.currentCharacter = charKey;
+                this.playBeep('select');
+                this.state = {
+                    stage: 0,
+                    hunger: 80,
+                    happy: 80,
+                    clean: 100,
+                    poopCount: 0,
+                    isSleeping: false,
+                    age: 0,
+                    exp: 0,
+                    selectedMenu: 0,
+                    outfit: 'none'
+                };
+
+                const meta = this.characterMeta[charKey];
+                this.brandLabel.textContent = meta.brand;
+                document.getElementById('headerTitle').textContent = `${meta.name} 다마고치`;
+
+                this.selectScreen.classList.add('hidden');
+                this.gameScreen.classList.remove('hidden');
+
+                this.renderPet();
+                this.updateMenuUI();
+                this.updateUI();
+                this.showBubble(`안녕! 나는 ${meta.name}야. 예쁘게 키워줘! S2`);
+
+                if (this.gameLoopInterval) clearInterval(this.gameLoopInterval);
+                this.gameLoopInterval = setInterval(() => {
+                    if (this.currentCharacter) this.gameLoop();
+                }, 5000);
+            }
+
+            returnToSelect() {
+                this.currentCharacter = null;
+                if (this.gameLoopInterval) clearInterval(this.gameLoopInterval);
+                this.stopMiniGame(true);
+                this.closeSubMenu();
+                this.gameScreen.classList.add('hidden');
+                this.selectScreen.classList.remove('hidden');
+                document.getElementById('headerTitle').textContent = `하투하 프렌즈 다마고치`;
+            }
+
+            playBeep(type) {
+                if (!this.soundEnabled) return;
+                try {
+                    if (Tone.context.state !== 'running') Tone.start();
+                    const now = Tone.now();
+                    if (type === 'select') {
+                        this.synth.triggerAttackRelease('C5', '32n', now);
+                    } else if (type === 'action') {
+                        this.synth.triggerAttackRelease('E5', '16n', now);
+                        this.synth.triggerAttackRelease('G5', '16n', now + 0.08);
+                    } else if (type === 'evolve') {
+                        this.synth.triggerAttackRelease('C5', '16n', now);
+                        this.synth.triggerAttackRelease('E5', '16n', now + 0.1);
+                        this.synth.triggerAttackRelease('G5', '16n', now + 0.2);
+                        this.synth.triggerAttackRelease('C6', '8n', now + 0.3);
+                    } else if (type === 'catch') {
+                        this.synth.triggerAttackRelease('A5', '32n', now);
+                    } else if (type === 'error') {
+                        this.synth.triggerAttackRelease('A3', '16n', now);
+                    }
+                } catch (e) {
+                    console.warn('Audio error:', e);
+                }
+            }
+
+            bindGameEvents() {
+                document.getElementById('btnA').addEventListener('click', () => this.handleButtonA());
+                document.getElementById('btnB').addEventListener('click', () => this.handleButtonB());
+                document.getElementById('btnC').addEventListener('click', () => this.handleButtonC());
+
+                for (let i = 0; i < 5; i++) {
+                    document.getElementById(`menu-${i}`).addEventListener('click', () => {
+                        if (this.isMiniGameActive) return;
+                        if (this.activeSubMenu) this.closeSubMenu();
+                        this.state.selectedMenu = i;
+                        this.playBeep('select');
+                        this.updateMenuUI();
+                    });
+                }
+
+                document.getElementById('closeSubMenu').addEventListener('click', () => {
+                    this.playBeep('select');
+                    this.closeSubMenu();
+                });
+
+                document.getElementById('closeMiniGame').addEventListener('click', () => {
+                    this.stopMiniGame(true);
+                });
+
+                document.getElementById('soundToggleBtn').addEventListener('click', () => {
+                    this.soundEnabled = !this.soundEnabled;
+                    document.getElementById('soundToggleBtn').textContent = this.soundEnabled ? '🔊 소리 ON' : '🔇 소리 OFF';
+                });
+            }
+
+            handleButtonA() {
+                if (this.isMiniGameActive) return;
+                this.playBeep('select');
+                if (this.activeSubMenu) {
+                    const list = this.activeSubMenu === 'snack' ? this.snacks : this.outfits;
+                    this.subMenuIndex = (this.subMenuIndex + 1) % list.length;
+                    this.renderSubMenu();
+                    return;
+                }
+                this.state.selectedMenu = (this.state.selectedMenu + 1) % 5;
+                this.updateMenuUI();
+            }
+
+            handleButtonB() {
+                if (this.isMiniGameActive) return;
+
+                if (this.activeSubMenu) {
+                    if (this.activeSubMenu === 'snack') {
+                        this.giveSnack(this.snacks[this.subMenuIndex]);
+                    } else if (this.activeSubMenu === 'outfit') {
+                        this.wearOutfit(this.outfits[this.subMenuIndex]);
+                    }
+                    return;
+                }
+
+                if (this.state.stage === 4) {
+                    this.showBubble('휴가 중인 친구예요!');
+                    this.playBeep('error');
+                    return;
+                }
+
+                if (this.state.stage === 0) {
+                    this.playBeep('action');
+                    this.addExp(7);
+                    this.showBubble('사랑을 듬뿍 주어 부화시키는 중! ♡');
+                    return;
+                }
+
+                const menu = this.state.selectedMenu;
+
+                if (menu === 4) {
+                    this.toggleSleep();
+                    return;
+                }
+
+                if (this.state.isSleeping) {
+                    this.playBeep('error');
+                    this.showBubble('지금은 꿀잠 자는 시간이에요... 🌙');
+                    return;
+                }
+
+                if (menu === 0) this.openSubMenu('snack');
+                else if (menu === 1) this.startMiniGame();
+                else if (menu === 2) this.openSubMenu('outfit');
+                else if (menu === 3) this.cleanPet();
+            }
+
+            handleButtonC() {
+                if (this.isMiniGameActive) return;
+                if (this.activeSubMenu) {
+                    this.playBeep('select');
+                    this.closeSubMenu();
+                    return;
+                }
+                if (this.state.stage === 4) return;
+                if (this.state.isSleeping) {
+                    this.showBubble('포근하게 쓰다듬어 주었어요 ♡');
+                    this.playBeep('select');
+                    return;
+                }
+                this.playBeep('action');
+                if (this.state.stage === 0) {
+                    this.addExp(5);
+                    this.showBubble('알이 반짝이며 반응해요 ✨');
+                } else {
+                    this.state.happy = Math.min(100, this.state.happy + 5);
+                    this.addExp(3);
+                    this.showBubble('기분 좋아 점프를 뜁니다! S2');
+                }
+                this.updateUI();
+            }
+
+            startMiniGame() {
+                if (this.state.stage === 0) {
+                    this.showBubble('알 상태에서는 미니게임을 할 수 없어요!');
+                    this.playBeep('error');
+                    return;
+                }
+                this.playBeep('action');
+                this.isMiniGameActive = true;
+                this.mgScore = 0;
+                this.mgScoreDisplay.textContent = '점수: 0';
+                this.miniGameOverlay.classList.remove('hidden');
+                this.miniGameOverlay.classList.add('flex');
+                this.mgInstruction.style.display = 'flex';
+                this.mgPlayArea.innerHTML = '';
+                this.mgPlayArea.appendChild(this.mgInstruction);
+
+                setTimeout(() => {
+                    if (!this.isMiniGameActive) return;
+                    this.mgInstruction.style.display = 'none';
                     
-                    if (config.aiMove) {
-                        bot.strafeTimer++;
-                        if (bot.strafeTimer > 35) {
-                            bot.strafeDir *= -1;
-                            bot.strafeTimer = 0;
-                        }
-                        bot.mesh.translateX(0.05 * bot.strafeDir);
+                    this.mgInterval = setInterval(() => {
+                        this.spawnMgHeart();
+                    }, 650);
+
+                    this.mgTimer = setTimeout(() => {
+                        this.stopMiniGame(false);
+                    }, 15000);
+                }, 1200);
+            }
+
+            spawnMgHeart() {
+                if (!this.isMiniGameActive) return;
+                const heart = document.createElement('div');
+                heart.className = 'absolute text-xl cursor-pointer transition-transform hover:scale-125';
+                heart.textContent = Math.random() < 0.2 ? '🍓' : '💖';
+                
+                const maxX = this.mgPlayArea.clientWidth - 30;
+                const startX = Math.max(10, Math.floor(Math.random() * maxX));
+                heart.style.left = `${startX}px`;
+                heart.style.top = `-20px`;
+
+                this.mgPlayArea.appendChild(heart);
+
+                let currentY = -20;
+                const speed = 2 + Math.random() * 2;
+
+                const fallInterval = setInterval(() => {
+                    if (!this.isMiniGameActive) {
+                        clearInterval(fallInterval);
+                        heart.remove();
+                        return;
                     }
+                    currentY += speed;
+                    heart.style.top = `${currentY}px`;
 
-                    if (minDist > 8) bot.mesh.translateZ(0.06);
+                    if (currentY > this.mgPlayArea.clientHeight - 25) {
+                        clearInterval(fallInterval);
+                        heart.remove();
+                    }
+                }, 30);
 
-                    if (now - bot.lastShootTime > config.aiInterval) {
-                        bot.lastShootTime = now;
-                        createTracer(bot.mesh.position.clone().add(new THREE.Vector3(0, 0.8, 0)), closest.pos.clone().sub(bot.mesh.position).normalize(), true);
+                heart.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!this.isMiniGameActive) return;
+                    this.playBeep('catch');
+                    this.mgScore += heart.textContent === '🍓' ? 3 : 1;
+                    this.mgScoreDisplay.textContent = `점수: ${this.mgScore}`;
+                    clearInterval(fallInterval);
+                    heart.remove();
+                });
+            }
 
-                        if (Math.random() < config.aiAcc) {
-                            if (closest.isPlayer) {
-                                player.health -= config.aiDmg;
-                                damageVignette.style.opacity = '1';
-                                setTimeout(() => damageVignette.style.opacity = '0', 180);
+            stopMiniGame(isManual) {
+                this.isMiniGameActive = false;
+                clearInterval(this.mgInterval);
+                clearTimeout(this.mgTimer);
+                this.miniGameOverlay.classList.add('hidden');
+                this.miniGameOverlay.classList.remove('flex');
 
-                                updateHealthUI();
-                                if (player.health <= 0) {
-                                    addKillFeed("ENEMY", "ELIMINATED YOU", "kill");
-                                    checkRoundState();
-                                }
-                            } else {
-                                closest.bot.health -= config.aiDmg;
-                                if (closest.bot.health <= 0) {
-                                    closest.bot.isDead = true;
-                                    scene.remove(closest.bot.mesh);
-                                    addKillFeed("ENEMY", `KILLED ALLY (${closest.bot.name})`, "kill");
-                                    checkRoundState();
-                                }
-                            }
+                if (!isManual) {
+                    const earnedHappy = Math.min(30, this.mgScore * 3);
+                    const earnedExp = Math.min(25, this.mgScore * 2);
+                    this.state.happy = Math.min(100, this.state.happy + earnedHappy);
+                    this.addExp(earnedExp);
+                    this.playBeep('evolve');
+                    this.showBubble(`미니게임 종료! 점수 ${this.mgScore}점 획득! 💖`);
+                } else {
+                    this.showBubble('미니게임을 종료했어요.');
+                }
+                this.updateUI();
+            }
+
+            openSubMenu(type) {
+                this.playBeep('select');
+                this.activeSubMenu = type;
+                this.subMenuIndex = 0;
+                this.subMenuTitle.textContent = type === 'snack' ? '🍓 간식 고르기' : '🎀 코디 아이템';
+                this.subMenuOverlay.classList.remove('hidden');
+                this.subMenuOverlay.classList.add('flex');
+                this.renderSubMenu();
+            }
+
+            closeSubMenu() {
+                this.activeSubMenu = null;
+                this.subMenuOverlay.classList.add('hidden');
+                this.subMenuOverlay.classList.remove('flex');
+            }
+
+            renderSubMenu() {
+                const list = this.activeSubMenu === 'snack' ? this.snacks : this.outfits;
+                this.subMenuItems.innerHTML = list.map((item, idx) => {
+                    const isSelected = idx === this.subMenuIndex;
+                    const isEquipped = this.activeSubMenu === 'outfit' && this.state.outfit === item.id;
+                    return `
+                        <button data-idx="${idx}" class="sub-item-btn flex flex-col items-center justify-center p-1 rounded-lg border text-center transition-all cursor-pointer ${
+                            isSelected 
+                                ? 'bg-gradient-to-b from-purple-100 to-pink-100 border-pink-400 scale-105 shadow-2xs' 
+                                : 'bg-slate-50 border-slate-200 opacity-80'
+                        }">
+                            <span class="text-sm leading-none">${item.icon}</span>
+                            <span class="text-[9px] font-extrabold text-slate-700 mt-0.5 truncate w-full">${item.name}</span>
+                            ${isEquipped ? '<span class="text-[8px] text-pink-500 font-black">착용중</span>' : ''}
+                        </button>
+                    `;
+                }).join('');
+
+                this.subMenuItems.querySelectorAll('.sub-item-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const idx = parseInt(e.currentTarget.dataset.idx, 10);
+                        this.subMenuIndex = idx;
+                        if (this.activeSubMenu === 'snack') {
+                            this.giveSnack(this.snacks[idx]);
+                        } else {
+                            this.wearOutfit(this.outfits[idx]);
                         }
+                    });
+                });
+            }
+
+            giveSnack(snack) {
+                if (this.state.hunger >= 100 && snack.id !== 'pudding') {
+                    this.playBeep('error');
+                    this.showBubble('배가 불러서 더 못 먹겠어요!');
+                    this.closeSubMenu();
+                    return;
+                }
+                this.playBeep('action');
+                this.state.hunger = Math.min(100, this.state.hunger + snack.hunger);
+                this.state.happy = Math.min(100, this.state.happy + snack.happy);
+                this.addExp(snack.exp);
+                this.showBubble(snack.msg);
+                
+                if (Math.random() < 0.4 && this.state.poopCount < 3) {
+                    this.state.poopCount++;
+                    this.state.clean = Math.max(0, this.state.clean - 25);
+                }
+                this.closeSubMenu();
+                this.updateUI();
+            }
+
+            wearOutfit(outfit) {
+                this.playBeep('action');
+                this.state.outfit = outfit.id;
+                this.state.happy = Math.min(100, this.state.happy + 8);
+                this.addExp(5);
+                this.renderPet();
+                this.showBubble(outfit.id === 'none' ? '기본 코디로 변경했어요!' : `${outfit.name} 착용 완료! ${outfit.icon}`);
+                this.closeSubMenu();
+                this.updateUI();
+            }
+
+            cleanPet() {
+                this.playBeep('action');
+                this.state.poopCount = 0;
+                this.state.clean = 100;
+                this.state.happy = Math.min(100, this.state.happy + 10);
+                this.showBubble('목욕을 깨끗하게 마쳤어요! 🫧✨');
+                this.updateUI();
+            }
+
+            toggleSleep() {
+                if (this.state.stage === 0) {
+                    this.showBubble('알은 지금 포근히 잠들어 있어요.');
+                    this.playBeep('error');
+                    return;
+                }
+                this.playBeep('select');
+                this.state.isSleeping = !this.state.isSleeping;
+                if (this.state.isSleeping) {
+                    this.lcdScreen.classList.add('lights-off');
+                    this.sleepZzz.classList.remove('hidden');
+                    this.showBubble('굿나잇! 꿈나라로 고고... 🌙');
+                } else {
+                    this.lcdScreen.classList.remove('lights-off');
+                    this.sleepZzz.classList.add('hidden');
+                    this.showBubble('좋은 아침이에요! 오늘도 화이팅 ♡');
+                }
+                this.renderPet();
+            }
+
+            addExp(amount) {
+                if (this.state.stage >= 3) return;
+                this.state.exp += amount;
+                const req = this.stagesInfo[this.state.stage].reqExp;
+                if (this.state.exp >= req) {
+                    this.state.stage++;
+                    this.state.exp = 0;
+                    this.playBeep('evolve');
+                    this.renderPet();
+                    const name = this.characterMeta[this.currentCharacter].name;
+                    if (this.state.stage === 1) {
+                        this.showBubble(`짜잔! 아기 ${name}(이)가 태어났어요!`);
+                    } else if (this.state.stage === 2) {
+                        this.showBubble(`쑥쑥 자라 주니어 ${name}이 되었어요!`);
+                    } else if (this.state.stage === 3) {
+                        this.showBubble(`완벽한 슈퍼스타 ${name} 진화 완료! 👑`);
                     }
                 }
-            });
+                this.updateUI();
+            }
 
-            // Ally AI Logic
-            teammates.forEach(bot => {
-                if (bot.isDead) return;
-                const aliveEnemies = enemies.filter(e => !e.isDead);
-                if (aliveEnemies.length === 0) return;
+            gameLoop() {
+                if (!this.currentCharacter) return;
+                this.tickCounter++;
+                if (this.tickCounter % 3 === 0) {
+                    this.state.age++;
+                }
 
-                const target = aliveEnemies[0];
-                const dist = bot.mesh.position.distanceTo(target.mesh.position);
+                if (!this.state.isSleeping && this.state.stage > 0) {
+                    this.state.hunger = Math.max(0, this.state.hunger - 4);
+                    this.state.happy = Math.max(0, this.state.happy - 4);
+                    
+                    if (Math.random() < 0.25 && this.state.poopCount < 3) {
+                        this.state.poopCount++;
+                        this.state.clean = Math.max(0, this.state.clean - 20);
+                    }
 
-                bot.mesh.lookAt(target.mesh.position.x, bot.mesh.position.y, target.mesh.position.z);
-                if (dist > 9) bot.mesh.translateZ(0.05);
-
-                if (now - bot.lastShootTime > config.allyInterval) {
-                    bot.lastShootTime = now;
-                    createTracer(bot.mesh.position.clone().add(new THREE.Vector3(0, 0.8, 0)), target.mesh.position.clone().sub(bot.mesh.position).normalize());
-
-                    if (Math.random() < config.allyAcc) {
-                        target.health -= config.allyDmg;
-                        if (target.health <= 0) {
-                            target.isDead = true;
-                            scene.remove(target.mesh);
-                            addKillFeed(`ALLY (${bot.name})`, `ELIMINATED ${target.name}`, "kill");
-                            checkRoundState();
-                        }
+                    if (this.state.hunger <= 0 && this.state.happy <= 0 && this.state.stage < 4) {
+                        this.state.stage = 4;
+                        this.showBubble('구름 위로 휴가를 떠났어요... ☁️');
                     }
                 }
-            });
-        }
+                this.updateUI();
+                this.renderPoops();
+            }
 
-        function updateMinimap() {
-            if (!minimapCtx) return;
-            minimapCtx.clearRect(0, 0, 160, 160);
+            updateUI() {
+                document.getElementById('hungerBar').style.width = `${this.state.hunger}%`;
+                document.getElementById('happyBar').style.width = `${this.state.happy}%`;
+                document.getElementById('cleanBar').style.width = `${this.state.clean}%`;
 
-            // Center: Player Position Map Coordinates
-            const mapScale = 1.1;
-            const cx = 80;
-            const cy = 80;
+                this.stageLabel.textContent = this.stagesInfo[this.state.stage].name;
+                this.ageDisplay.textContent = `${this.state.age}일째`;
+                this.expDisplay.textContent = `EXP: ${this.state.exp}`;
+            }
 
-            // Draw player dot
-            minimapCtx.fillStyle = '#00ffaa';
-            minimapCtx.beginPath();
-            minimapCtx.arc(cx, cy, 4, 0, Math.PI * 2);
-            minimapCtx.fill();
-
-            // Draw Teammates
-            teammates.forEach(t => {
-                if (t.isDead) return;
-                const dx = (t.mesh.position.x - camera.position.x) * mapScale;
-                const dz = (t.mesh.position.z - camera.position.z) * mapScale;
-                minimapCtx.fillStyle = '#38bdf8';
-                minimapCtx.beginPath();
-                minimapCtx.arc(cx + dx, cy + dz, 3, 0, Math.PI * 2);
-                minimapCtx.fill();
-            });
-
-            // Draw Enemies
-            enemies.forEach(e => {
-                if (e.isDead) return;
-                const dx = (e.mesh.position.x - camera.position.x) * mapScale;
-                const dz = (e.mesh.position.z - camera.position.z) * mapScale;
-                minimapCtx.fillStyle = '#f43f5e';
-                minimapCtx.beginPath();
-                minimapCtx.arc(cx + dx, cy + dz, 3, 0, Math.PI * 2);
-                minimapCtx.fill();
-            });
-        }
-
-        function updateParticles() {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.mesh.position.add(p.velocity);
-                p.life--;
-                if (p.life <= 0) {
-                    scene.remove(p.mesh);
-                    particles.splice(i, 1);
+            updateMenuUI() {
+                for (let i = 0; i < 5; i++) {
+                    const tab = document.getElementById(`menu-${i}`);
+                    if (i === this.state.selectedMenu) {
+                        tab.className = 'menu-tab py-0.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-2xs transition-colors cursor-pointer';
+                    } else {
+                        tab.className = 'menu-tab py-0.5 rounded-lg opacity-65 transition-colors cursor-pointer';
+                    }
                 }
+            }
+
+            showBubble(text) {
+                this.speechBubble.textContent = text;
+            }
+
+            renderPoops() {
+                let html = '';
+                for (let i = 0; i < this.state.poopCount; i++) {
+                    html += `<span class="text-xs">💩</span>`;
+                }
+                this.poopContainer.innerHTML = html;
+            }
+
+            renderPet() {
+                const s = this.state.stage;
+                const sleeping = this.state.isSleeping;
+                const char = this.currentCharacter;
+                const outfit = this.state.outfit;
+                let svgHTML = '';
+
+                const getOutfitSVG = () => {
+                    if (outfit === 'ribbon') {
+                        return `<path d="M26 8 L20 3 L21 11 Z" fill="#f472b6" stroke="#ffffff" stroke-width="1"/><path d="M38 8 L44 3 L43 11 Z" fill="#f472b6" stroke="#ffffff" stroke-width="1"/><circle cx="32" cy="7.5" r="2" fill="#db2777"/>`;
+                    } else if (outfit === 'headphone') {
+                        return `<path d="M12 22 C12 6, 52 6, 52 22" fill="none" stroke="#c084fc" stroke-width="3.5" stroke-linecap="round"/><rect x="8" y="17" width="5" height="12" rx="2.5" fill="#f472b6" stroke="#ffffff" stroke-width="1"/><rect x="51" y="17" width="5" height="12" rx="2.5" fill="#f472b6" stroke="#ffffff" stroke-width="1"/>`;
+                    } else if (outfit === 'glasses') {
+                        return `<path d="M20 22 C18 20, 16 22, 18 25 L22 28 L26 25 C28 22, 26 20, 24 22 C23 23, 21 23, 20 22 Z" fill="#f472b6" stroke="#581c87" stroke-width="1.2"/><path d="M40 22 C38 20, 36 22, 38 25 L42 28 L46 25 C48 22, 46 20, 44 22 C43 23, 41 23, 40 22 Z" fill="#f472b6" stroke="#581c87" stroke-width="1.2"/><line x1="26" y1="23" x2="38" y2="23" stroke="#581c87" stroke-width="1.5"/>`;
+                    } else if (outfit === 'scarf') {
+                        return `<path d="M16 38 Q32 44 48 38 L51 48 Q32 53 13 48 Z" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5"/><circle cx="32" cy="44" r="2" fill="#ffffff"/>`;
+                    } else if (outfit === 'tiara') {
+                        return `<path d="M23 11 L26 4 L32 9 L38 4 L41 11 Z" fill="#f472b6" stroke="#ffffff" stroke-width="1.2"/><circle cx="32" cy="7" r="1.5" fill="#e9d5ff"/>`;
+                    }
+                    return '';
+                };
+
+                const scale = s === 1 ? '0.85' : (s === 2 ? '0.95' : '1.08');
+
+                if (s === 0) {
+                    this.petContainer.innerHTML = `
+                        <svg class="w-20 h-20 animate-egg" viewBox="0 0 64 64">
+                            <path d="M32 8 C20 8, 12 24, 12 40 C12 52, 20 58, 32 58 C44 58, 52 52, 52 40 C52 24, 44 8, 32 8 Z" fill="#ffffff" stroke="#f472b6" stroke-width="3"/>
+                            <path d="M32 42 C25 36, 21 31, 25 27 C28 24, 31 27, 32 29 C33 27, 36 24, 39 27 C43 31, 39 36, 32 42 Z" fill="#f472b6"/>
+                            <circle cx="23" cy="46" r="2" fill="#fbcfe8"/>
+                            <circle cx="41" cy="46" r="2" fill="#fbcfe8"/>
+                        </svg>`;
+                    return;
+                }
+
+                if (char === 'jujebi') {
+                    // 1. 쮸제비 (새하얀 고양이/족제비 스타일, 날렵한 눈매와 하늘색 꼬리)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <ellipse cx="46" cy="38" rx="12" ry="8" fill="#e0f2fe" stroke="#93c5fd" stroke-width="1.5" transform="rotate(-15 46 38)"/>
+                            <circle cx="32" cy="27" r="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.8"/>
+                            <path d="M19 23 L25 26 M19 28 L25 28" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M45 23 L39 26 M45 28 L39 28" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/>
+                            ${sleeping ? '<path d="M26 26 H30 M34 26 H38" stroke="#334155" stroke-width="1.8" stroke-linecap="round"/>' : '<circle cx="28" cy="26" r="1.8" fill="#334155"/><circle cx="36" cy="26" r="1.8" fill="#334155"/>'}
+                            <path d="M30 30 Q32 32 34 30" fill="none" stroke="#334155" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M25 43 C25 37, 39 37, 39 43 L41 52 C41 54, 23 54, 23 52 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.8"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'bingping') {
+                    // 2. 빙핑 (노란 곰돌이/강아지, 핑크 모자와 멜빵 옷)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <circle cx="16" cy="26" r="6" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <circle cx="48" cy="26" r="6" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <circle cx="32" cy="32" r="15" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <path d="M22 22 Q32 13 42 22 Z" fill="#f472b6" stroke="#db2777" stroke-width="1.5"/>
+                            <ellipse cx="32" cy="20" rx="4" ry="2.5" fill="#38bdf8"/>
+                            ${sleeping ? '<path d="M27 30 H30 M34 30 H37" stroke="#854d0e" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="30" r="1.5" fill="#854d0e"/><circle cx="36" cy="30" r="1.5" fill="#854d0e"/>'}
+                            <path d="M30 33 Q32 35 34 33" fill="none" stroke="#854d0e" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M24 44 C24 39, 40 39, 40 44 L42 53 C42 54, 22 54, 22 53 Z" fill="#38bdf8" stroke="#0284c7" stroke-width="1.5"/>
+                            <rect x="29" y="44" width="6" height="5" fill="#fef08a"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'toramwi') {
+                    // 3. 토라뮈 (토끼 귀와 핑크 리본)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <ellipse cx="24" cy="11" rx="4.5" ry="11" fill="#ffffff" stroke="#f472b6" stroke-width="1.8" transform="rotate(-12 24 11)"/>
+                            <ellipse cx="24" cy="11" rx="2" ry="7.5" fill="#fbcfe8"/>
+                            <ellipse cx="40" cy="11" rx="4.5" ry="11" fill="#ffffff" stroke="#f472b6" stroke-width="1.8" transform="rotate(12 40 11)"/>
+                            <ellipse cx="40" cy="11" rx="2" ry="7.5" fill="#fbcfe8"/>
+                            <circle cx="32" cy="32" r="15" fill="#ffffff" stroke="#f472b6" stroke-width="1.8"/>
+                            <path d="M25 6 L32 10 L39 6 L32 3 Z" fill="#f472b6"/>
+                            <circle cx="32" cy="6.5" r="2" fill="#ffffff"/>
+                            ${sleeping ? '<path d="M27 32 H30 M34 32 H37" stroke="#db2777" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="32" r="1.5" fill="#db2777"/><circle cx="36" cy="32" r="1.5" fill="#db2777"/>'}
+                            <path d="M30 35 Q32 37 34 35" fill="none" stroke="#db2777" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="23" cy="34" r="3" fill="#fbcfe8" opacity="0.7"/>
+                            <circle cx="41" cy="34" r="3" fill="#fbcfe8" opacity="0.7"/>
+                            <path d="M26 44 C26 40, 38 40, 38 44 L40 52 C40 53, 24 53, 24 52 Z" fill="#ffffff" stroke="#f472b6" stroke-width="1.5"/>
+                            <path d="M29 44 L32 48 L35 44 Z" fill="#f472b6"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'stelnyang') {
+                    // 4. 스텔냥 (별 모양 후드티를 입은 고양이 캐릭터)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <polygon points="32,6 38,20 52,18 41,28 45,42 32,35 19,42 23,28 12,18 26,20" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <circle cx="32" cy="33" r="13" fill="#ffffff" stroke="#ca8a04" stroke-width="1.5"/>
+                            ${sleeping ? '<path d="M27 32 H30 M34 32 H37" stroke="#ca8a04" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="32" r="1.5" fill="#ca8a04"/><circle cx="36" cy="32" r="1.5" fill="#ca8a04"/>'}
+                            <path d="M30 35 Q32 37 34 35" fill="none" stroke="#ca8a04" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="24" cy="34" r="2.5" fill="#fbcfe8" opacity="0.8"/>
+                            <circle cx="40" cy="34" r="2.5" fill="#fbcfe8" opacity="0.8"/>
+                            <path d="M26 45 C26 41, 38 41, 38 45 L40 52 C40 53, 24 53, 24 52 Z" fill="#fef08a" stroke="#ca8a04" stroke-width="1.5"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'jjulian') {
+                    // 5. 쭈일리언 (연보라빛 귀여운 왕관 고양이)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <path d="M26 13 L29 6 L32 11 L35 6 L38 13 Z" fill="#fef08a" stroke="#ca8a04" stroke-width="1.5"/>
+                            <circle cx="32" cy="34" r="16" fill="#e9d5ff" stroke="#c084fc" stroke-width="2"/>
+                            <ellipse cx="16" cy="34" rx="4" ry="7" fill="#e9d5ff" stroke="#c084fc" stroke-width="1.5"/>
+                            <ellipse cx="48" cy="34" rx="4" ry="7" fill="#e9d5ff" stroke="#c084fc" stroke-width="1.5"/>
+                            ${sleeping ? '<path d="M26 33 H30 M34 33 H38" stroke="#7e22ce" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="33" r="1.8" fill="#7e22ce"/><circle cx="36" cy="33" r="1.8" fill="#7e22ce"/>'}
+                            <ellipse cx="32" cy="37" rx="2.5" ry="1.5" fill="#7e22ce"/>
+                            <circle cx="22" cy="38" r="3" fill="#fbcfe8" opacity="0.7"/>
+                            <circle cx="42" cy="38" r="3" fill="#fbcfe8" opacity="0.7"/>
+                            <path d="M25 48 C25 44, 39 44, 39 48 L41 54 C41 55, 23 55, 23 54 Z" fill="#e9d5ff" stroke="#c084fc" stroke-width="1.5"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'nosung') {
+                    // 6. 노숭이 (주황빛 원숭이, 꽃 장식과 교복 깃)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <circle cx="15" cy="33" r="7" fill="#fdba74" stroke="#c2410c" stroke-width="1.8"/>
+                            <circle cx="49" cy="33" r="7" fill="#fdba74" stroke="#c2410c" stroke-width="1.8"/>
+                            <circle cx="32" cy="33" r="16" fill="#fdba74" stroke="#c2410c" stroke-width="2"/>
+                            <ellipse cx="32" cy="36" rx="11" ry="9" fill="#fef3c7"/>
+                            <circle cx="41" cy="27" r="3.5" fill="#fef08a" stroke="#ca8a04" stroke-width="1.2"/>
+                            <circle cx="41" cy="27" r="1" fill="#f472b6"/>
+                            ${sleeping ? '<path d="M27 32 H30 M34 32 H37" stroke="#c2410c" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="32" r="1.5" fill="#c2410c"/><circle cx="36" cy="32" r="1.5" fill="#c2410c"/>'}
+                            <circle cx="32" cy="37" r="1.5" fill="#c2410c"/>
+                            <path d="M24 47 L32 42 L40 47 L38 53 L26 53 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+                            <polygon points="32,42 29,48 35,48" fill="#ef4444"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else if (char === 'peanut') {
+                    // 7. 정땅콩 (땅콩 실루엣의 귀여운 젤리 캐릭터와 크로스백)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <path d="M23 18 C16 18, 16 31, 22 37 C16 41, 16 54, 23 54 C30 54, 41 50, 41 41 C48 41, 48 28, 41 24 C41 17, 30 18, 23 18 Z" fill="#fde68a" stroke="#d97706" stroke-width="2"/>
+                            <path d="M23 35 L41 45" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="33" cy="41" r="4.5" fill="#34d399" stroke="#059669" stroke-width="1.2"/>
+                            <path d="M31 39 L33 41 L36 38" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+                            ${sleeping ? '<path d="M27 33 H30 M34 33 H37" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="33" r="1.5" fill="#92400e"/><circle cx="36" cy="33" r="1.5" fill="#92400e"/>'}
+                            <path d="M30 36 Q32 38 34 36" fill="none" stroke="#92400e" stroke-width="1.5" stroke-linecap="round"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                } else {
+                    // 8. 알쏭햄쏭 (노란 햄스터 스타일)
+                    svgHTML = `
+                        <svg class="w-24 h-24 ${sleeping ? '' : 'animate-tama'}" viewBox="0 0 64 64" style="transform: scale(${scale});">
+                            <circle cx="17" cy="22" r="6" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <circle cx="47" cy="22" r="6" fill="#fef08a" stroke="#ca8a04" stroke-width="1.8"/>
+                            <circle cx="32" cy="34" r="16" fill="#fef08a" stroke="#ca8a04" stroke-width="2"/>
+                            <ellipse cx="23" cy="38" rx="4" ry="3" fill="#fbcfe8"/>
+                            <ellipse cx="41" cy="38" rx="4" ry="3" fill="#fbcfe8"/>
+                            ${sleeping ? '<path d="M27 32 H30 M34 32 H37" stroke="#854d0e" stroke-width="1.5" stroke-linecap="round"/>' : '<circle cx="28" cy="32" r="1.5" fill="#854d0e"/><circle cx="36" cy="32" r="1.5" fill="#854d0e"/>'}
+                            <path d="M30 35 Q32 37 34 35" fill="none" stroke="#854d0e" stroke-width="1.5" stroke-linecap="round"/>
+                            <path d="M26 48 C26 44, 38 44, 38 48 L40 54 C40 55, 24 55, 24 54 Z" fill="#fef08a" stroke="#ca8a04" stroke-width="1.5"/>
+                            ${getOutfitSVG()}
+                        </svg>`;
+                }
+
+                this.petContainer.innerHTML = svgHTML;
             }
         }
 
-        function updateCreditUI() {
-            if (creditsText) creditsText.textContent = `${player.credits} ¤`;
-            if (hudCreditsText) hudCreditsText.textContent = `${player.credits} ¤`;
-        }
-
-        function updateScoreUI() {
-            if (teamScoreEl) teamScoreEl.textContent = teamWins;
-            if (enemyScoreEl) enemyScoreEl.textContent = enemyWins;
-        }
-
-        function updateHealthUI() {
-            if (healthText) healthText.textContent = Math.max(0, Math.round(player.health));
-            if (armorText) armorText.textContent = Math.max(0, Math.round(player.armor));
-        }
-
-        function updateAmmoUI() {
-            if (ammoCurrent) ammoCurrent.textContent = player.ammo;
-            if (ammoReserve) ammoReserve.textContent = player.reserveAmmo;
-        }
-
-        function addKillFeed(killer, action, type) {
-            if (!killFeed) return;
-            const item = document.createElement('div');
-            item.className = "bg-slate-950/90 border border-slate-700/80 px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xl backdrop-blur-md";
-            item.innerHTML = `<span class="text-amber-400 font-black">${killer}</span> <span class="text-slate-300">${action}</span>`;
-            killFeed.appendChild(item);
-            setTimeout(() => item.remove(), 4000);
-        }
-
-        function updatePlayerMovement() {
-            if (!isPointerLocked || isBuyMenuOpen) return;
-
-            const moveDir = new THREE.Vector3();
-            if (keys['KeyW']) moveDir.z -= 1;
-            if (keys['KeyS']) moveDir.z += 1;
-            if (keys['KeyA']) moveDir.x -= 1;
-            if (keys['KeyD']) moveDir.x += 1;
-            moveDir.normalize();
-
-            const speed = keys['ShiftLeft'] ? player.walkSpeed : player.speed;
-            const yaw = camera.rotation.y;
-
-            camera.position.x += (moveDir.x * Math.cos(yaw) + moveDir.z * Math.sin(yaw)) * speed;
-            camera.position.z += (-moveDir.x * Math.sin(yaw) + moveDir.z * Math.cos(yaw)) * speed;
-
-            camera.position.x = Math.max(-75, Math.min(75, camera.position.x));
-            camera.position.z = Math.max(-75, Math.min(75, camera.position.z));
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (isGameStarted) {
-                updatePlayerMovement();
-                updateBots();
-                updateParticles();
-                updateMinimap();
-            }
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
-        }
-
-        function onWindowResize() {
-            if (!camera || !renderer) return;
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        window.onload = init;
+        window.addEventListener('DOMContentLoaded', () => {
+            new TamagotchiGame();
+        });
     </script>
 </body>
 </html>
